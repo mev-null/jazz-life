@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 RecordSource = Literal["spotify", "manual"]
 
-_DATE_PATTERN = r"^\d{4}(-\d{2})?$"
+_DATE_PATTERN = r"^\d{4}(-\d{2}(-\d{2})?)?$"
 _CURRENCY_PATTERN = r"^[A-Z]{3}$"
 
 

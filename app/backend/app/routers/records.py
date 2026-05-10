@@ -24,8 +24,9 @@ def create_record(
     body: VinylRecordCreate,
     service: RecordService = Depends(get_record_service),
 ) -> VinylRecordRead:
-    record = service.create(body)
-    return VinylRecordRead.model_validate(record)
+    with http_errors():
+        record = service.create(body)
+        return VinylRecordRead.model_validate(record)
 
 
 @router.put("/{id}", response_model=VinylRecordRead)

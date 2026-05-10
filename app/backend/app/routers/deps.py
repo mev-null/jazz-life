@@ -24,5 +24,6 @@ def get_record_repository(session: Session = Depends(get_session)) -> RecordRepo
 
 def get_record_service(
     repo: RecordRepository = Depends(get_record_repository),
+    artist_repo: ArtistRepository = Depends(get_artist_repository),
 ) -> RecordService:
-    return RecordService(repo)
+    return RecordService(repo, artist_repo)

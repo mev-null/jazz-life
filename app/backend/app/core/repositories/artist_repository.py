@@ -11,6 +11,9 @@ class ArtistRepository:
         stmt = select(Artist).order_by(col(Artist.added_at).desc())
         return list(self.session.exec(stmt).all())
 
+    def get(self, spotify_id: str) -> Artist | None:
+        return self.session.get(Artist, spotify_id)
+
     def count(self) -> int:
         stmt = select(func.count()).select_from(Artist)
         return self.session.exec(stmt).one() or 0
