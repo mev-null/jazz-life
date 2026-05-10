@@ -50,7 +50,10 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
       uploadJacket(recordId, file),
   });
 
-  // load fields when modal opens
+  // load fields when modal opens / mode changes.
+  // 依存は mode のみ。artists を deps に入れると、TanStack Query の refetch で
+  // artists 参照が変わった際に effect が再走 → ユーザの編集中の入力が初期値に
+  // 戻されるため除外する。add 時の default artist 埋めは別 effect で扱う。
   useEffect(() => {
     if (!mode) return;
     if (mode.kind === "edit") {
@@ -67,7 +70,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
       setPreviewUrl(r.image_url);
     } else {
       setTitle("");
-      setArtistId(artists[0]?.spotify_id ?? "");
+      setArtistId(""); // 別 effect が artists 到着後に補完する
       setReleaseDate("");
       setPressingInfo("");
       setPurchaseStore("");
@@ -78,13 +81,23 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
       setPreviewUrl(null);
     }
     setPendingFile(null);
+    // pending blob はモーダル切替（mode→null 含む）/ unmount で確実に解放する
     return () => {
       if (previewBlobRef.current) {
         URL.revokeObjectURL(previewBlobRef.current);
         previewBlobRef.current = null;
       }
     };
-  }, [mode, artists]);
+  }, [mode]);
+
+  // add モード時、ユーザが未選択かつ artists が利用可能になったら先頭をデフォルトに。
+  // edit モード or 既にユーザが選択済みの場合は触らない。
+  useEffect(() => {
+    if (mode?.kind !== "add") return;
+    if (artistId) return;
+    if (artists.length === 0) return;
+    setArtistId(artists[0].spotify_id);
+  }, [mode, artists, artistId]);
 
   if (!mode) return null;
 

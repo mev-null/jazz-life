@@ -26,9 +26,11 @@ export function sleeveTintByIndex(i: number): string {
 }
 
 export function avatarTintByString(key: string): string {
-  let hash = 0;
+  // djb2: アナグラム衝突を避けるため積算 + XOR で順序を反映する。
+  // `^` が暗黙に 32bit int 化するので hash はオーバーフローしない。
+  let hash = 5381;
   for (let i = 0; i < key.length; i++) {
-    hash = (hash + key.charCodeAt(i)) % AVATAR_TINTS.length;
+    hash = (hash * 33) ^ key.charCodeAt(i);
   }
-  return AVATAR_TINTS[hash];
+  return AVATAR_TINTS[Math.abs(hash) % AVATAR_TINTS.length];
 }

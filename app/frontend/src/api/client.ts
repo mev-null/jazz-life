@@ -58,9 +58,12 @@ export async function getConcerts(): Promise<ListResponse<Concert>> {
 /**
  * Create-or-update a vinyl record.
  *
- * Real API: `PUT /api/records/:id`（id が新規ならサーバ側で作成）
- *   ※ 完全な置換ではなく upsert としたいなら、サーバ側で id 既存チェック
- * Mock: in-memory mockRecordsStore を直接書き換える
+ * Mock: in-memory mockRecordsStore を直接書き換える（id 衝突リスクは Phase A 限定として受容）。
+ *
+ * Phase B（ADR-001 §2.3）: 新規は `POST /api/records`（サーバ側 auto-increment）、
+ * 既存更新は `PUT /api/records/:id` に分割する。本関数は呼び出し側ごとに
+ * `createVinylRecord` / `updateVinylRecord` の 2 関数へ分解する想定。
+ * 暫定として PUT のみ実装している。
  */
 export async function upsertVinylRecord(
   record: VinylRecord,

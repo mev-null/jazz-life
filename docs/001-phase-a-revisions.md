@@ -109,14 +109,23 @@ CREATE TABLE feed_read_state (
 
 ### 2.3 書き込み API の確定
 
-レコードの追加・更新およびジャケット画像のアップロードを、以下の 2 エンドポイントで扱う。
+レコードの追加・更新およびジャケット画像のアップロードを、以下のエンドポイントで扱う。
 
 | 用途 | メソッド | パス | リクエスト | レスポンス |
 |---|---|---|---|---|
-| レコードの upsert | `PUT` | `/api/records/{id}` | `application/json`, body は VinylRecord 全体 | `VinylRecord` |
+| レコードの新規作成 | `POST` | `/api/records` | `application/json`, body は VinylRecord（id なし） | `VinylRecord`（採番済み id 付き） |
+| レコードの更新 | `PUT` | `/api/records/{id}` | `application/json`, body は VinylRecord 全体 | `VinylRecord` |
 | ジャケット画像の差し替え | `PUT` | `/api/records/{id}/jacket` | `multipart/form-data`, field name `file` | `{ image_url: string }` |
 
-`PUT` を upsert として扱う。`id` が既存の場合は更新、新規の場合は作成する。`id` の採番はクライアント側（mock では `Date.now()`）またはサーバ側のいずれでも可とする。
+#### id 採番方針
+
+Phase A の mock は単一クライアント前提で `Date.now()` による採番を行うが、Phase B では **サーバ側 auto-increment に統一する**。理由は以下のとおり。
+
+- マルチクライアント / 同時編集時の id 衝突リスクを排除するため。
+- `Date.now()` は同一ミリ秒内で複数生成すれば衝突する。実用的には稀だが、契約として保証されない。
+- POST と PUT を分離することで「新規」と「更新」の意図が API 上で明確になり、サーバ側の権限制御や監査ログが書きやすい。
+
+フロントエンドの `upsertVinylRecord` は Phase B 移行時に内部で id 有無により POST / PUT を出し分ける実装に差し替える。呼び出し側のシグネチャは維持する。
 
 #### フロントエンド呼び出し側
 
@@ -194,7 +203,7 @@ CREATE TABLE feed_read_state (
 
 - [ ] `VinylRecord` SQLModel への `original_release_date` および `favorite_tracks` 追加
 - [ ] Pydantic スキーマでの `original_release_date` フォーマットバリデーション
-- [ ] `PUT /api/records/{id}` upsert エンドポイントの実装
+- [ ] `POST /api/records`（新規・サーバ側採番）および `PUT /api/records/{id}`（更新）エンドポイントの実装
 - [ ] `PUT /api/records/{id}/jacket` multipart エンドポイントの実装（Pillow リサイズを含む）
 - [ ] `StaticFiles` による `/jackets/*` の配信設定
 - [ ] `releases` および `concerts` への `read_at` 追加と既読 API（PUT/DELETE）の実装
