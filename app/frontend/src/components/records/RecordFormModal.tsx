@@ -201,6 +201,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
     <ModalShell onClose={onClose}>
       <form
         onSubmit={handleSubmit}
+        autoComplete="off"
         className="max-h-[90vh] w-[min(90vw,560px)] overflow-y-auto bg-paper p-8 text-left text-ink shadow-xl ring-1 ring-ink/10"
       >
         <h2 className="border-b border-ink/15 pb-3 text-lg font-medium">
@@ -255,6 +256,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
               onChange={(e) => setTitle(e.target.value)}
               required
               autoFocus
+              autoComplete="off"
               className={inputClass}
             />
           </label>
@@ -283,6 +285,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
                 value={releaseDate}
                 onChange={(e) => setReleaseDate(e.target.value)}
                 placeholder="1962-01 or 1962"
+                autoComplete="off"
                 className={inputClass}
               />
             </label>
@@ -294,6 +297,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
                 value={pressingInfo}
                 onChange={(e) => setPressingInfo(e.target.value)}
                 placeholder="Riverside RLP-9399"
+                autoComplete="off"
                 className={inputClass}
               />
             </label>
@@ -307,6 +311,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
                 value={purchaseStore}
                 onChange={(e) => setPurchaseStore(e.target.value)}
                 placeholder="ディスクユニオン..."
+                autoComplete="off"
                 className={inputClass}
               />
             </label>
@@ -317,6 +322,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
                 type="date"
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
+                autoComplete="off"
                 className={inputClass}
               />
             </label>
@@ -328,6 +334,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
               rows={3}
+              autoComplete="off"
               className={`${inputClass} resize-none`}
             />
           </label>
@@ -339,6 +346,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
               value={favoriteTracks}
               onChange={(e) => setFavoriteTracks(e.target.value)}
               placeholder="Track 1 · Track 2"
+              autoComplete="off"
               className={inputClass}
             />
           </label>
