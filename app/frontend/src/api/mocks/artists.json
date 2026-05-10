@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "spotify_id": "7HRgLn5KUXfLeKjsoXl5XS",
+      "name": "Avishai Cohen",
+      "image_url": null,
+      "followed": true,
+      "added_at": "2026-01-10T12:00:00Z"
+    },
+    {
+      "spotify_id": "1d4dvLcRoOiH3w2Eb4TPDD",
+      "name": "Makoto Ozone",
+      "image_url": null,
+      "followed": true,
+      "added_at": "2026-01-12T12:00:00Z"
+    },
+    {
+      "spotify_id": "0RqtSIYZmd4fiBKVFqyIqD",
+      "name": "Brad Mehldau",
+      "image_url": null,
+      "followed": true,
+      "added_at": "2026-02-01T12:00:00Z"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    image: jazz-life-backend:dev
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+
+  frontend:
+    build:
+      context: ./frontend
+    image: jazz-life-frontend:dev
+    env_file:
+      - .env
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend

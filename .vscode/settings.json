@@ -1,0 +1,15 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/app/backend/.venv/bin/python",
+  "python.analysis.extraPaths": ["${workspaceFolder}/app/backend"],
+  "python.testing.pytestEnabled": true,
+  "python.testing.pytestArgs": ["app/backend"],
+  "python.terminal.activateEnvironment": true,
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+  "ruff.path": ["${workspaceFolder}/app/backend/.venv/bin/ruff"]
+}

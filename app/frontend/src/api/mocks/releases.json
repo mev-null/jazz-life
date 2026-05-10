@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "spotify_id": "release_001",
+      "artist_id": "7HRgLn5KUXfLeKjsoXl5XS",
+      "title": "Brightlight",
+      "album_type": "album",
+      "release_date": "2026-04-18",
+      "image_url": null
+    },
+    {
+      "spotify_id": "release_002",
+      "artist_id": "0RqtSIYZmd4fiBKVFqyIqD",
+      "title": "Suite: Spring 2026",
+      "album_type": "single",
+      "release_date": "2026-05-02",
+      "image_url": null
+    }
+  ]
+}

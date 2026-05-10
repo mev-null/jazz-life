@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /workspaces/jazz-life mv 000-pre-adr.md docs/000-pre-adr.md)",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Bash(docker info *)",
+      "Bash(make up *)",
+      "Bash(curl -s -o /dev/null -w \"GET /healthz -> %{http_code}\\\\n\" http://localhost:8000/healthz)",
+      "Bash(curl -s http://localhost:8000/healthz)",
+      "Bash(curl -s http://localhost:8000/)",
+      "Bash(curl -s -o /dev/null -w \"GET /openapi.json -> %{http_code}\\\\n\" http://localhost:8000/openapi.json)",
+      "Bash(curl -s -o /dev/null -w \"GET / -> %{http_code}\\\\n\" http://localhost:5173/)",
+      "Bash(curl -s http://localhost:5173/)",
+      "Bash(curl -s -o /dev/null -w \"GET /src/main.tsx -> %{http_code}\\\\n\" http://localhost:5173/src/main.tsx)",
+      "Edit(/.claude/skills/pr-summary/**)",
+      "Bash(uv --version)",
+      "Bash(make help *)",
+      "Bash(pipx install *)",
+      "Bash(make sync-dev *)",
+      "Bash(uv run *)",
+      "Bash(make lint *)",
+      "Bash(make fmt *)",
+      "Bash(make typecheck *)",
+      "Bash(make check *)",
+      "Bash(echo \"---exit: $?\")",
+      "Bash(git check-ignore *)",
+      "Read(//usr/local/python/3.12.1/bin/**)",
+      "Bash(git add *)"
+    ]
+  }
+}
