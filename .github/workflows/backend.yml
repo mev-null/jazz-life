@@ -82,3 +82,31 @@ jobs:
 
       - name: pytest ${{ matrix.suite }}
         run: uv run pytest tests/${{ matrix.suite }} -v
+
+  openapi-spec-check:
+    # backend のコード変更後に `make spec` でコミット済み openapi.json を更新し忘れていないか
+    # 検証する。FastAPI app を直接 import して `app.openapi()` をダンプし、jq で整形した
+    # 結果がコミット済みファイルと byte 一致するかを確認する。lifespan を起動しないので
+    # DB 不要・サーバ不要で軽量に走る（make spec の jq 出力と一致する）。
+    name: openapi.json freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Sync deps (with dev)
+        run: uv sync --group dev
+
+      - name: Verify openapi.json is up to date
+        run: |
+          set -euo pipefail
+          uv run python -c "import json; from app.main import app; print(json.dumps(app.openapi()))" \
+            | jq --indent 2 . > /tmp/openapi.json
+          if ! diff -u openapi.json /tmp/openapi.json; then
+            echo "::error::openapi.json is stale. Run 'cd app && make spec' and commit the result."
+            exit 1
+          fi

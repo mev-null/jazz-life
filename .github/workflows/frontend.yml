@@ -1,0 +1,51 @@
+name: frontend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/frontend/**"
+      - "app/backend/openapi.json"
+      - ".github/workflows/frontend.yml"
+  pull_request:
+    paths:
+      - "app/frontend/**"
+      - "app/backend/openapi.json"
+      - ".github/workflows/frontend.yml"
+
+defaults:
+  run:
+    working-directory: app/frontend
+
+jobs:
+  typecheck-and-gen:
+    name: typecheck + gen freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: app/frontend/package-lock.json
+
+      - name: npm ci
+        run: npm ci
+
+      - name: typecheck
+        run: npm run typecheck
+
+      # backend/openapi.json から再生成して、コミット済み generated/ と一致するか確認する。
+      # backend で API が変わった後に frontend 側で `make gen` を回し忘れたケースを検出する。
+      - name: regenerate types
+        run: npm run gen
+
+      - name: verify generated types are up to date
+        run: |
+          if ! git diff --quiet src/api/generated; then
+            echo "::error::src/api/generated/ is stale. Run 'cd app && make gen' and commit the result."
+            git diff src/api/generated
+            exit 1
+          fi
