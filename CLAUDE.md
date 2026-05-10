@@ -48,6 +48,7 @@ jazz-life/
 │   │   ├── alembic.ini         file_template は YYYYMMDD_HHMM_<slug>
 │   │   ├── migrations/         Alembic 環境 (env.py + versions/)
 │   │   ├── entrypoint.sh       コンテナ起動時に alembic upgrade head → uvicorn
+│   │   ├── openapi.json        backend が所有する OpenAPI spec（`make spec` で更新、コミット対象）
 │   │   └── app/                3 層クリーンアーキテクチャ
 │   │       ├── main.py         lifespan で artists seed 投入、include_router
 │   │       ├── core/           DB アクセス層
@@ -59,11 +60,13 @@ jazz-life/
 │   │       ├── routers/        FastAPI 薄い API 層 (try/except → HTTPException)
 │   │       └── seeds/          artists.json (frontend mocks の複製)
 │   └── frontend/
+│       ├── orval.config.ts     orval 設定（input は `../backend/openapi.json`、output は `src/api/generated/`）
 │       └── src/
-│           ├── api/client.ts   モック/実 API 切替（VITE_USE_MOCK で分岐、Phase B-2 以降も維持）
-│           ├── api/generated/  orval 生成物（Phase B-2 以降。型 + react-query hooks、tags-split。gitignore しない）
+│           ├── api/client.ts   モック/実 API 切替（VITE_USE_MOCK で分岐、実 API は orval 経由）
+│           ├── api/mutator.ts  orval fetch mode 用カスタム fetcher（API_BASE を組み合わせる）
+│           ├── api/generated/  orval 生成物（型 + react-query hooks、tags-split。gitignore しない）
 │           ├── api/mocks/      ダミー JSON（実 API レスポンスと shape 一致を維持）
-│           ├── types/api.ts    手書き暫定型（Phase B-2 PR-A で破棄、generated/ から型を import）
+│           ├── types/api.ts    既実装分は generated/ から re-export、未実装分は手書き
 │           ├── pages/          HomePage / FeedPage / ArtistsPage
 │           └── components/     records/ feed/ artists/
 └── .claude/
@@ -79,7 +82,8 @@ jazz-life/
 make up          # 全サービス起動（HMR 有効）
 make down        # 停止
 make logs        # 全ログ follow
-make gen         # orval で OpenAPI から TS 型 + react-query hooks 生成（Phase B-2 以降、backend 起動中であること）
+make spec        # 起動中の backend から OpenAPI spec を取得して backend/openapi.json に保存（要 backend 起動）
+make gen         # backend/openapi.json から TS 型 + react-query hooks 生成（backend 不要）
 ```
 
 backend 単体（`cd app/backend`）:
@@ -105,8 +109,11 @@ make shell           # コンテナに bash で入る
 
 ### 型契約戦略（ADR-002 §2.7）
 - **Phase A 中**: `frontend/src/types/api.ts` を **手書き** で更新
-- **Phase B-2 以降**: `make gen` で `src/api/generated/` 配下に **型 + react-query hooks** を生成、手書き `types/api.ts` は破棄
-- **`src/api/generated/` は gitignore しない**（CI で生成不要にするため）
+- **Phase B-2 以降**: `make gen` で `src/api/generated/` 配下に **型 + react-query hooks** を生成
+  - `types/api.ts` は **既実装分（artists / records）** を generated から re-export する形に縮小
+  - **未実装分（releases / concerts / sync_status / auth）** は手書きを残し、対応する backend が実装されたら順次 generated 由来に置換
+- **spec の取り回し**: 起動中の backend から `make spec` で `backend/openapi.json` を取得 → backend PR に同梱してコミット → frontend 側は `make gen` で型生成（backend 不要）。`openapi.json` を backend 配下に置くことで、API 変更の差分が frontend PR に漏れないようにしている。CI でも gen を走らせられる
+- **`src/api/generated/` と `backend/openapi.json` は gitignore しない**
 - 生成ツールは **orval**（`react-query` + `fetch` mode、output: `tags-split`）。`openapi-typescript` は使わない
 
 ## やってはいけないこと
@@ -127,7 +134,7 @@ make shell           # コンテナに bash で入る
   - 実行には PostgreSQL（`make up` で起動 or `docker compose up -d db`）と `TEST_DATABASE_URL` が必要
   - **`make check` は `ruff format --check` を含まない**ので、CI 落ちを避けたければ `cd app/backend && uv run ruff format .` を別途実行する
 - frontend を変えたら: `cd app/frontend && npm run typecheck`
-  - API 形状が変わったら `cd app && make gen` で `src/api/generated/` を再生成してから typecheck
+  - API 形状が変わったら `cd app && make spec && make gen` で spec 更新 + 生成し直してから typecheck
 - スタック全体: `cd app && make up && curl http://localhost:8000/healthz`
 - CI (`.github/workflows/backend.yml`): backend 変更で ruff (format/check) + mypy + pytest (unit / integration マトリクス) が走る
 

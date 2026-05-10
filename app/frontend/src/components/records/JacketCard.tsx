@@ -1,11 +1,11 @@
-import { sleeveTintByIndex } from "../../lib/palette";
+import { sleeveTintByKey } from "../../lib/palette";
 import type { VinylRecord } from "../../types/api";
 
 export function SleeveFallback({ record }: { record: VinylRecord }) {
   return (
     <div
       className="h-full w-full"
-      style={{ backgroundColor: sleeveTintByIndex(record.id) }}
+      style={{ backgroundColor: sleeveTintByKey(record.id) }}
     />
   );
 }

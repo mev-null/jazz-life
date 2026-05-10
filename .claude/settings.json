@@ -62,7 +62,16 @@
       "Bash(python -m json.tool)",
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" -X PUT http://localhost:8000/api/records/00000000-0000-7000-8000-000000000000 -H 'Content-Type: application/json' -d '{\"memo\":\"x\"}')",
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" -X POST http://localhost:8000/api/records -H 'Content-Type: application/json' -d '{\"artist_id\":\"4xRYI6VqpkE3UwrDrAZL8L\",\"title\":\"X\",\"original_release_date\":\"notadate\"}')",
-      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" -X POST http://localhost:8000/api/records -H 'Content-Type: application/json' -d '{\"artist_id\":\"4xRYI6VqpkE3UwrDrAZL8L\",\"title\":\"X\",\"purchase_currency\":\"yen\"}')"
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" -X POST http://localhost:8000/api/records -H 'Content-Type: application/json' -d '{\"artist_id\":\"4xRYI6VqpkE3UwrDrAZL8L\",\"title\":\"X\",\"purchase_currency\":\"yen\"}')",
+      "Bash(npm --version)",
+      "Bash(npm uninstall *)",
+      "Bash(make gen *)",
+      "Bash(jq '.items = [.items[] | .id = \\(\"019e0000-0000-7000-8000-\" + \\(1000000000000 + .id | tostring | .[1:]\\)\\) | .source = \"manual\" | .purchase_currency = \"JPY\"]' vinyl_records.json)",
+      "Bash(mv vinyl_records.json.tmp vinyl_records.json)",
+      "Bash(curl -s http://localhost:8000/openapi.json)",
+      "Bash(curl -sf http://localhost:8000/healthz)",
+      "Bash(curl -sf http://localhost:8000/openapi.json)",
+      "Bash(make spec *)"
     ]
   }
 }

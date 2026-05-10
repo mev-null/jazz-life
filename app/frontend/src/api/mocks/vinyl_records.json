@@ -1,7 +1,7 @@
 {
   "items": [
     {
-      "id": 1,
+      "id": "019e0000-0000-7000-8000-000000000001",
       "artist_id": "4xRYI6VqpkE3UwrDrAZL8L",
       "spotify_album_id": null,
       "title": "Waltz for Debby",
@@ -16,10 +16,12 @@
       "favorite_tracks": "Waltz for Debby · My Foolish Heart",
       "display_order": 1,
       "created_at": "2026-01-08T09:00:00Z",
-      "updated_at": "2026-01-08T09:00:00Z"
+      "updated_at": "2026-01-08T09:00:00Z",
+      "source": "manual",
+      "purchase_currency": "JPY"
     },
     {
-      "id": 2,
+      "id": "019e0000-0000-7000-8000-000000000002",
       "artist_id": "2T0HkYzLYxPjXNJqNZTUzz",
       "spotify_album_id": null,
       "title": "Indiana",
@@ -34,10 +36,12 @@
       "favorite_tracks": null,
       "display_order": 2,
       "created_at": "2026-01-12T09:00:00Z",
-      "updated_at": "2026-01-12T09:00:00Z"
+      "updated_at": "2026-01-12T09:00:00Z",
+      "source": "manual",
+      "purchase_currency": "JPY"
     },
     {
-      "id": 3,
+      "id": "019e0000-0000-7000-8000-000000000003",
       "artist_id": "5cBUgxmLHKlkIWLQkGUKnx",
       "spotify_album_id": null,
       "title": "Diavola",
@@ -52,10 +56,12 @@
       "favorite_tracks": null,
       "display_order": 3,
       "created_at": "2026-01-22T09:00:00Z",
-      "updated_at": "2026-01-22T09:00:00Z"
+      "updated_at": "2026-01-22T09:00:00Z",
+      "source": "manual",
+      "purchase_currency": "JPY"
     },
     {
-      "id": 4,
+      "id": "019e0000-0000-7000-8000-000000000004",
       "artist_id": "4xRYI6VqpkE3UwrDrAZL8L",
       "spotify_album_id": null,
       "title": "Portrait in Jazz",
@@ -70,10 +76,12 @@
       "favorite_tracks": null,
       "display_order": 4,
       "created_at": "2026-02-01T09:00:00Z",
-      "updated_at": "2026-02-01T09:00:00Z"
+      "updated_at": "2026-02-01T09:00:00Z",
+      "source": "manual",
+      "purchase_currency": "JPY"
     },
     {
-      "id": 5,
+      "id": "019e0000-0000-7000-8000-000000000005",
       "artist_id": "6Mt1DgI3mzrnvY1xGruqLk",
       "spotify_album_id": null,
       "title": "Night Train",
@@ -88,10 +96,12 @@
       "favorite_tracks": null,
       "display_order": 5,
       "created_at": "2026-02-10T09:00:00Z",
-      "updated_at": "2026-02-10T09:00:00Z"
+      "updated_at": "2026-02-10T09:00:00Z",
+      "source": "manual",
+      "purchase_currency": "JPY"
     },
     {
-      "id": 6,
+      "id": "019e0000-0000-7000-8000-000000000006",
       "artist_id": "7HRgLn5KUXfLeKjsoXl5XS",
       "spotify_album_id": null,
       "title": "Gently Disturbed",
@@ -106,10 +116,12 @@
       "favorite_tracks": null,
       "display_order": 6,
       "created_at": "2026-02-15T09:00:00Z",
-      "updated_at": "2026-02-15T09:00:00Z"
+      "updated_at": "2026-02-15T09:00:00Z",
+      "source": "manual",
+      "purchase_currency": "JPY"
     },
     {
-      "id": 7,
+      "id": "019e0000-0000-7000-8000-000000000007",
       "artist_id": "6Mt1DgI3mzrnvY1xGruqLk",
       "spotify_album_id": null,
       "title": "Encore at the Blue Note",
@@ -124,10 +136,12 @@
       "favorite_tracks": null,
       "display_order": 7,
       "created_at": "2026-02-22T09:00:00Z",
-      "updated_at": "2026-02-22T09:00:00Z"
+      "updated_at": "2026-02-22T09:00:00Z",
+      "source": "manual",
+      "purchase_currency": "JPY"
     },
     {
-      "id": 8,
+      "id": "019e0000-0000-7000-8000-000000000008",
       "artist_id": "2T0HkYzLYxPjXNJqNZTUzz",
       "spotify_album_id": null,
       "title": "Live from San Pedro",
@@ -142,10 +156,12 @@
       "favorite_tracks": null,
       "display_order": 8,
       "created_at": "2026-03-01T09:00:00Z",
-      "updated_at": "2026-03-01T09:00:00Z"
+      "updated_at": "2026-03-01T09:00:00Z",
+      "source": "manual",
+      "purchase_currency": "JPY"
     },
     {
-      "id": 9,
+      "id": "019e0000-0000-7000-8000-000000000009",
       "artist_id": "1d4dvLcRoOiH3w2Eb4TPDD",
       "spotify_album_id": null,
       "title": "Spring Is Here",
@@ -160,10 +176,12 @@
       "favorite_tracks": null,
       "display_order": 9,
       "created_at": "2026-03-12T09:00:00Z",
-      "updated_at": "2026-03-12T09:00:00Z"
+      "updated_at": "2026-03-12T09:00:00Z",
+      "source": "manual",
+      "purchase_currency": "JPY"
     },
     {
-      "id": 10,
+      "id": "019e0000-0000-7000-8000-000000000010",
       "artist_id": "1d4dvLcRoOiH3w2Eb4TPDD",
       "spotify_album_id": null,
       "title": "For Someone",
@@ -178,10 +196,12 @@
       "favorite_tracks": null,
       "display_order": 10,
       "created_at": "2026-04-05T09:00:00Z",
-      "updated_at": "2026-04-05T09:00:00Z"
+      "updated_at": "2026-04-05T09:00:00Z",
+      "source": "manual",
+      "purchase_currency": "JPY"
     },
     {
-      "id": 11,
+      "id": "019e0000-0000-7000-8000-000000000011",
       "artist_id": "4xRYI6VqpkE3UwrDrAZL8L",
       "spotify_album_id": null,
       "title": "Sunday at the Village Vanguard",
@@ -196,7 +216,9 @@
       "favorite_tracks": null,
       "display_order": 11,
       "created_at": "2026-05-09T09:00:00Z",
-      "updated_at": "2026-05-09T09:00:00Z"
+      "updated_at": "2026-05-09T09:00:00Z",
+      "source": "manual",
+      "purchase_currency": "JPY"
     }
   ]
 }

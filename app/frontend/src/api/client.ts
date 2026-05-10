@@ -1,10 +1,13 @@
 // ====================================================================
-// Phase A-3: API クライアント抽象（モック / 実 API 切替）
-//   ADR §4 「モック切り替え機構」に従い、VITE_USE_MOCK で挙動を切り替える。
-//   Phase B 以降の実 API 接続では、ここの fetch 部分が本格化する想定。
+// API クライアント抽象（モック / 実 API 切替）
+//   ADR-002 §2.7-§2.8 に従い、VITE_USE_MOCK で mock / 実 API を切り替える。
 //
-//   書き込み系（upsertVinylRecord / uploadJacket）も同じパターンで分岐。
-//   実 API では PUT /api/records/:id と PUT /api/records/:id/jacket を想定。
+//   実 API パス:
+//     - artists / records は orval 生成 fetcher (src/api/generated/) を経由
+//     - releases / concerts / jacket upload は backend 未実装のため fetch のまま
+//
+//   書き込み系 (upsertVinylRecord) は当面 PUT のみ。Phase B-2 PR-B で
+//   POST (新規) と PUT (更新) に分解する。
 // ====================================================================
 
 import { API_BASE, USE_MOCK } from "../lib/env";
@@ -15,6 +18,12 @@ import type {
   Release,
   VinylRecord,
 } from "../types/api";
+
+import { listArtistsApiArtistsGet } from "./generated/artists/artists";
+import {
+  listRecordsApiRecordsGet,
+  updateRecordApiRecordsIdPut,
+} from "./generated/records/records";
 
 import artistsMock from "./mocks/artists.json";
 import concertsMock from "./mocks/concerts.json";
@@ -37,19 +46,23 @@ const mockRecordsStore: VinylRecord[] = (
 
 export async function getArtists(): Promise<ListResponse<Artist>> {
   if (USE_MOCK) return artistsMock as ListResponse<Artist>;
-  return fetchJson<ListResponse<Artist>>("/api/artists");
+  const res = await listArtistsApiArtistsGet();
+  return res.data as ListResponse<Artist>;
 }
 
 export async function getVinylRecords(): Promise<ListResponse<VinylRecord>> {
   if (USE_MOCK) return { items: mockRecordsStore.slice() };
-  return fetchJson<ListResponse<VinylRecord>>("/api/records");
+  const res = await listRecordsApiRecordsGet();
+  return res.data as ListResponse<VinylRecord>;
 }
 
+// backend 未実装。実 API 接続は Phase B-3 以降。
 export async function getReleases(): Promise<ListResponse<Release>> {
   if (USE_MOCK) return releasesMock as ListResponse<Release>;
   return fetchJson<ListResponse<Release>>("/api/releases");
 }
 
+// backend 未実装。実 API 接続は Phase B-3 以降。
 export async function getConcerts(): Promise<ListResponse<Concert>> {
   if (USE_MOCK) return concertsMock as ListResponse<Concert>;
   return fetchJson<ListResponse<Concert>>("/api/concerts");
@@ -58,12 +71,11 @@ export async function getConcerts(): Promise<ListResponse<Concert>> {
 /**
  * Create-or-update a vinyl record.
  *
- * Mock: in-memory mockRecordsStore を直接書き換える（id 衝突リスクは Phase A 限定として受容）。
+ * Mock: in-memory mockRecordsStore を直接書き換える。
  *
- * Phase B（ADR-001 §2.3）: 新規は `POST /api/records`（サーバ側 auto-increment）、
- * 既存更新は `PUT /api/records/:id` に分割する。本関数は呼び出し側ごとに
- * `createVinylRecord` / `updateVinylRecord` の 2 関数へ分解する想定。
- * 暫定として PUT のみ実装している。
+ * 実 API: 当面 PUT のみ実装。新規 (id 既存なし) は backend で 404 になる。
+ * Phase B-2 PR-B で createRecordApiRecordsPost (新規) と
+ * updateRecordApiRecordsIdPut (更新) の出し分けに分解する。
  */
 export async function upsertVinylRecord(
   record: VinylRecord,
@@ -78,24 +90,20 @@ export async function upsertVinylRecord(
     }
     return record;
   }
-  const res = await fetch(`${API_BASE}/api/records/${record.id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(record),
-  });
-  if (!res.ok) throw new Error(`PUT record ${record.id} failed: ${res.status}`);
-  return (await res.json()) as VinylRecord;
+  const res = await updateRecordApiRecordsIdPut(record.id, record);
+  return res.data as VinylRecord;
 }
 
 /**
  * Upload a jacket image for a record.
  *
+ * 実 API は Phase B-3 以降で実装する。それまでは mock のみ動作する。
  * Real API: `PUT /api/records/:id/jacket` (multipart/form-data, field name `file`)
  *   サーバは保存して `image_url`（例: `/jackets/{id}-{hash}.jpg`）を返す。
- * Mock: ブラウザ blob URL を返す（リロードで消える）
+ * Mock: ブラウザ blob URL を返す（リロードで消える）。
  */
 export async function uploadJacket(
-  recordId: number,
+  recordId: VinylRecord["id"],
   file: File,
 ): Promise<{ image_url: string }> {
   if (USE_MOCK) {
