@@ -1,12 +1,12 @@
 from fastapi import Depends, HTTPException, Request, status
 from sqlmodel import Session
 
-from app.core.config import Settings, get_settings
 from app.core.db import get_session
 from app.core.exceptions import AuthError
 from app.core.repositories.artist_repository import ArtistRepository
 from app.core.repositories.record_repository import RecordRepository
 from app.core.repositories.user_repository import UserRepository
+from app.core.settings import Settings, get_settings
 from app.models.user import User
 from app.services.artist_service import ArtistService
 from app.services.auth_service import AuthService

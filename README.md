@@ -5,11 +5,21 @@
 
 ## クイックスタート
 
+環境変数は [.devcontainer/devcontainer.json](.devcontainer/devcontainer.json) で集約管理する。公開デフォルトは `containerEnv`、Spotify / JWT 等のシークレットは Codespaces user secrets を `secrets` 経由で取り込む（`.env` は使わない）。
+
+GitHub Codespaces で開く場合:
+
+1. https://github.com/settings/codespaces で `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` / `ALLOWED_SPOTIFY_USER_ID` / `JWT_SECRET` / `REFRESH_TOKEN_KEY` を登録し、本リポジトリに access 許可
+2. codespace を Stop → Start（secret は shell 起動時に注入される）
+
+そのうえで:
+
 ```bash
 cd app
-cp .env.example .env   # Spotify クレデンシャル等を埋める
 make up                # db (5432) / backend (8000) / frontend (5173) が起動
 ```
+
+ローカル Docker のみで動かしたい場合は、上記 env を host shell に export してから `make up`。
 
 確認:
 
@@ -33,6 +43,7 @@ docker volume rm app_jazz-pgdata   # DB ごと完全リセットしたい時の�
 
 ```
 jazz-life/
+├── .devcontainer/    # Codespaces 設定 (containerEnv + secrets 宣言)
 ├── docs/             # ADR・設計ドキュメント（要件のソース・オブ・トゥルース）
 ├── app/              # 全アプリ成果物（compose の作業ディレクトリ）
 │   ├── backend/      # FastAPI + 3 層クリーンアーキ + Alembic
@@ -41,8 +52,7 @@ jazz-life/
 │   ├── data/         # jacket 画像等の bind mount 永続化先（DB は named volume `jazz-pgdata`）
 │   ├── docker-compose.yml
 │   ├── docker-compose.override.yml
-│   ├── Makefile
-│   └── .env.example
+│   └── Makefile
 ├── CLAUDE.md         # Claude Code セッション向け作業規約
 └── README.md
 ```

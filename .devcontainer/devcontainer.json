@@ -1,0 +1,32 @@
+{
+  "name": "jazz-life",
+  "image": "mcr.microsoft.com/devcontainers/universal:2-linux",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "containerEnv": {
+    "SPOTIFY_REDIRECT_URI": "http://127.0.0.1:8000/api/auth/callback",
+    "FRONTEND_BASE_URL": "http://127.0.0.1:5173",
+    "COOKIE_SECURE": "false",
+    "VITE_API_BASE": "http://127.0.0.1:8000",
+    "VITE_USE_MOCK": "false"
+  },
+  "secrets": {
+    "SPOTIFY_CLIENT_ID": {
+      "description": "Spotify app Client ID — set at https://github.com/settings/codespaces (User secrets) and grant repo access to jazz-life. Source: https://developer.spotify.com/dashboard"
+    },
+    "SPOTIFY_CLIENT_SECRET": {
+      "description": "Spotify app Client Secret — set at https://github.com/settings/codespaces. Source: same Dashboard page as Client ID."
+    },
+    "ALLOWED_SPOTIFY_USER_ID": {
+      "description": "Owner's Spotify user ID (login allowlist). The bit after open.spotify.com/user/."
+    },
+    "JWT_SECRET": {
+      "description": "JWT signing key, 32+ chars. Generate: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+    },
+    "REFRESH_TOKEN_KEY": {
+      "description": "Fernet key for encrypting Spotify refresh_token in DB. Generate: python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'"
+    }
+  },
+  "postCreateCommand": "echo 'jazz-life devcontainer ready. run cd app && make up next.'"
+}

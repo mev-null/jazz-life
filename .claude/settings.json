@@ -102,7 +102,14 @@
       "Read(//workspaces/.codespaces/.persistedshare/**)",
       "Bash(python3 -c \"import json,sys;d=json.load\\(sys.stdin\\);print\\('\\\\n'.join\\(sorted\\(d.keys\\(\\)\\)\\)\\)\")",
       "Bash(find /workspaces -name \"*.env*\" -type f 2>/dev/null | head -10 ; echo \"---\" ; find /workspaces/.codespaces -name \"*env*\" -type f 2>/dev/null | head -10)",
-      "Read(//workspaces/**)"
+      "Read(//workspaces/**)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(git rm *)",
+      "Bash(git mv *)",
+      "Bash(gh run *)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
     ]
   }
 }

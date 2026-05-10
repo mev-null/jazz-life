@@ -17,8 +17,8 @@ from urllib.parse import urlencode
 
 import httpx
 
-from app.core.config import Settings
 from app.core.exceptions import SpotifyAuthError
+from app.core.settings import Settings
 
 # uvicorn のデフォルト logger 設定下では `uvicorn.error` が stdout に流れるため、
 # それに乗せる (アプリ独自 logger だと basicConfig 未呼び出しで黙ることがある)。

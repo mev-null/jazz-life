@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
 
-from app.core.db import engine
+from app.core.db import get_engine
 from app.core.repositories.artist_repository import ArtistRepository
 from app.routers import artists, auth, records
 from app.seed import seed_artists_if_empty
@@ -13,7 +13,7 @@ from app.seed import seed_artists_if_empty
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         seed_artists_if_empty(ArtistRepository(session))
     yield
 

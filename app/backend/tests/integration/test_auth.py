@@ -6,12 +6,11 @@ from unittest.mock import MagicMock
 
 import jwt
 import pytest
-from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from pytest_httpx import HTTPXMock
 from sqlmodel import Session
 
-from app.core.config import (
+from app.core.settings import (
     JWT_AUDIENCE,
     JWT_ISSUER,
     OAUTH_STATE_COOKIE_NAME,
@@ -22,27 +21,17 @@ from app.main import app
 from app.models.user import User
 from app.services import auth_service as auth_service_module
 from app.services.auth_service import AuthService
+from tests.conftest import make_settings
 
+# `test_settings` fixture は conftest で提供。本ファイルでは
+# `allowed_spotify_user_id` を固定して使う必要があるので上書きする。
 ALLOWED_USER = "owner-spotify-id"
-JWT_SECRET = "x" * 32
-COOKIE_NAME = "jl_session"
+COOKIE_NAME = "jl_session"  # Settings.cookie_name のデフォルトと一致
 
 
 @pytest.fixture
-def test_settings() -> Settings:
-    return Settings(  # type: ignore[call-arg]
-        spotify_client_id="cid",
-        spotify_client_secret="csecret",
-        spotify_redirect_uri="http://localhost:8000/api/auth/callback",
-        allowed_spotify_user_id=ALLOWED_USER,
-        jwt_secret=JWT_SECRET,
-        refresh_token_key=Fernet.generate_key().decode(),
-        frontend_base_url="http://localhost:5173",
-        cookie_name=COOKIE_NAME,
-        cookie_secure=False,
-        session_ttl_seconds=3600,
-        state_ttl_seconds=300,
-    )
+def test_settings() -> Settings:  # type: ignore[no-redef]
+    return make_settings(allowed_spotify_user_id=ALLOWED_USER)
 
 
 @pytest.fixture

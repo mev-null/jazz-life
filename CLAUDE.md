@@ -39,7 +39,7 @@ jazz-life/
 │   ├── docker-compose.yml      共通定義（db / backend / frontend）
 │   ├── docker-compose.override.yml  dev 用上書き（HMR、bind mount）
 │   ├── Makefile                up / down / logs / gen
-│   ├── .env / .env.example     Spotify クレデンシャル / DATABASE_URL
+│   (環境変数は .devcontainer/devcontainer.json で集約管理、.env は廃止)
 │   ├── db/init/                Postgres initdb スクリプト（jazz_test 作成）
 │   ├── data/                   永続化先（jacket 画像等。DB は named volume）
 │   ├── backend/
@@ -118,7 +118,7 @@ make shell           # コンテナに bash で入る
 
 ## やってはいけないこと
 
-- `.env` / `.venv/` / `node_modules/` / `app/data/*.db` をコミットしない（`.gitignore` で防御済み）
+- `.venv/` / `node_modules/` / `app/data/*.db` をコミットしない（`.gitignore` で防御済み）。シークレットは `.env` ではなく **Codespaces user secrets** に置き、`.devcontainer/devcontainer.json` の `secrets` 宣言経由で container に流す
 - `src/api/generated/` を `.gitignore` に追加しない（ADR-002 §2.7）
 - backend と frontend を同一 PR で混ぜない（例外: 機能完結 1 PR は許容、PR description で明示）
 - ホスト直接実行は `cd app/backend` してから（`uv` は host にもインストール済み、pyproject は backend ディレクトリ）
@@ -147,4 +147,4 @@ make shell           # コンテナに bash で入る
 | Phase B 開始時の方針再評価（PostgreSQL / クリーンアーキ / orval / UUID v7 / 寛容 PUT） | [docs/002-phase-b-decisions.md](docs/002-phase-b-decisions.md) |
 | 起動・依存・型生成コマンド | [app/Makefile](app/Makefile) / [app/backend/Makefile](app/backend/Makefile) |
 | PR 概要のテンプレート | `.claude/skills/pr-summary/SKILL.md` 経由（`/pr-summary`） |
-| 環境変数の意味 | [app/.env.example](app/.env.example) |
+| 環境変数の意味 | [.devcontainer/devcontainer.json](.devcontainer/devcontainer.json)（公開デフォルト + Codespaces secret 宣言） |

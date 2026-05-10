@@ -23,14 +23,14 @@ from datetime import UTC, datetime, timedelta
 
 import jwt
 
-from app.core.config import (
+from app.core.crypto import TokenCipher
+from app.core.exceptions import AuthError, ForbiddenError, SpotifyAuthError
+from app.core.repositories.user_repository import UserRepository
+from app.core.settings import (
     JWT_AUDIENCE,
     JWT_ISSUER,
     Settings,
 )
-from app.core.crypto import TokenCipher
-from app.core.exceptions import AuthError, ForbiddenError, SpotifyAuthError
-from app.core.repositories.user_repository import UserRepository
 from app.models.user import User
 from app.services.spotify_oauth_client import SpotifyOAuthClient
 

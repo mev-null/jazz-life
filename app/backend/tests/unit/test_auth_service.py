@@ -4,34 +4,19 @@ from unittest.mock import MagicMock
 
 import jwt
 import pytest
-from cryptography.fernet import Fernet
 
-from app.core.config import JWT_AUDIENCE, JWT_ISSUER, Settings
 from app.core.exceptions import AuthError, ForbiddenError, SpotifyAuthError
+from app.core.settings import JWT_AUDIENCE, JWT_ISSUER, Settings
 from app.services import auth_service as auth_service_module
 from app.services.auth_service import AuthService
-
-
-def _settings(**overrides: object) -> Settings:
-    base: dict[str, object] = {
-        "spotify_client_id": "cid",
-        "spotify_client_secret": "secret",
-        "spotify_redirect_uri": "http://localhost:8000/api/auth/callback",
-        "allowed_spotify_user_id": "owner",
-        "jwt_secret": "x" * 32,
-        "refresh_token_key": Fernet.generate_key().decode(),
-        "session_ttl_seconds": 60 * 60,
-        "state_ttl_seconds": 60,
-    }
-    base.update(overrides)
-    return Settings(**base)  # type: ignore[arg-type]
+from tests.conftest import make_settings
 
 
 def _make_service(settings: Settings | None = None) -> AuthService:
     return AuthService(
         user_repo=MagicMock(),
         spotify=MagicMock(),
-        settings=settings or _settings(),
+        settings=settings or make_settings(allowed_spotify_user_id="owner"),
     )
 
 
@@ -78,7 +63,7 @@ def test_state_url_missing_is_rejected() -> None:
 
 
 def test_state_ttl_expiry_is_rejected() -> None:
-    svc = _make_service(_settings(state_ttl_seconds=0))
+    svc = _make_service(make_settings(allowed_spotify_user_id="owner", state_ttl_seconds=0))
     state = svc.issue_state()
     time.sleep(0.05)
     with pytest.raises(AuthError):
@@ -191,7 +176,7 @@ def test_jwt_with_wrong_token_type_is_rejected() -> None:
 
 
 def test_jwt_expired_is_rejected() -> None:
-    svc = _make_service(_settings(session_ttl_seconds=0))
+    svc = _make_service(make_settings(allowed_spotify_user_id="owner", session_ttl_seconds=0))
     user_id = uuid.uuid4()
     token = svc._issue_session_token(user_id)
     time.sleep(0.05)

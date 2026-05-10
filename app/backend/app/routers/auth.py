@@ -9,8 +9,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 
-from app.core.config import OAUTH_STATE_COOKIE_NAME, Settings, get_settings
 from app.core.exceptions import AuthError, ForbiddenError, SpotifyAuthError
+from app.core.settings import OAUTH_STATE_COOKIE_NAME, Settings, get_settings
 from app.models.user import User
 from app.routers.deps import get_auth_service, get_current_user
 from app.schemas.auth import AuthUserRead

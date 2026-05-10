@@ -2,11 +2,12 @@ import pytest
 from cryptography.fernet import Fernet
 from pydantic import ValidationError
 
-from app.core.config import Settings
+from app.core.settings import Settings
 
 
 def _valid_kwargs(**overrides: object) -> dict[str, object]:
     base: dict[str, object] = {
+        "database_url": "postgresql+psycopg://jazz:jazz@db:5432/jazz",
         "spotify_client_id": "cid",
         "spotify_client_secret": "secret",
         "spotify_redirect_uri": "http://localhost:8000/api/auth/callback",
