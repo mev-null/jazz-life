@@ -2,8 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { uploadJacket, upsertVinylRecord } from "../../api/client";
+import {
+  createVinylRecord,
+  updateVinylRecord,
+  uploadJacket,
+} from "../../api/client";
 import type { Artist, VinylRecord } from "../../types/api";
+import type {
+  VinylRecordCreate,
+  VinylRecordUpdate,
+} from "../../api/generated/model";
 import { ModalShell } from "../ModalShell";
 
 export type FormMode =
@@ -39,8 +47,15 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const previewBlobRef = useRef<string | null>(null);
 
-  const upsert = useMutation({
-    mutationFn: upsertVinylRecord,
+  const create = useMutation({
+    mutationFn: createVinylRecord,
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["records"] }),
+  });
+
+  const update = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: VinylRecordUpdate }) =>
+      updateVinylRecord(id, input),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["records"] }),
   });
@@ -48,6 +63,8 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
   const upload = useMutation({
     mutationFn: ({ recordId, file }: { recordId: string; file: File }) =>
       uploadJacket(recordId, file),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["records"] }),
   });
 
   // load fields when modal opens / mode changes.
@@ -123,70 +140,58 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
     setExistingImageUrl(null);
   }
 
-  const submitting = upsert.isPending || upload.isPending;
+  const submitting =
+    create.isPending || update.isPending || upload.isPending;
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!title.trim() || !artistId || !mode) return;
 
-    const now = new Date().toISOString();
-    // 新規追加時はクライアント側で UUID を採る (mock 用)。実 API 接続後 (PR-B) は
-    // POST /api/records のレスポンスで返る backend 採番 UUID v7 を使う想定。
-    const baseId = mode.kind === "edit" ? mode.record.id : crypto.randomUUID();
-
-    // 1) upload jacket if a new file was chosen
-    let imageUrl: string | null = existingImageUrl;
-    if (pendingFile) {
-      const result = await upload.mutateAsync({
-        recordId: baseId,
-        file: pendingFile,
-      });
-      imageUrl = result.image_url;
+    if (mode.kind === "edit") {
+      // edit: 先に jacket を上げ（成功時 backend 側で image_url が更新される）、
+      // その上で全フィールドの PUT を投げて他項目の変更を保存する。
+      let imageUrl: string | null = existingImageUrl;
+      if (pendingFile) {
+        const result = await upload.mutateAsync({
+          recordId: mode.record.id,
+          file: pendingFile,
+        });
+        imageUrl = result.image_url;
+      }
+      const updateInput: VinylRecordUpdate = {
+        artist_id: artistId,
+        title: title.trim(),
+        image_url: imageUrl,
+        original_release_date: releaseDate.trim() || null,
+        pressing_info: pressingInfo.trim() || null,
+        purchase_date: purchaseDate || null,
+        purchase_store: purchaseStore.trim() || null,
+        memo: memo.trim() || null,
+        favorite_tracks: favoriteTracks.trim() || null,
+      };
+      await update.mutateAsync({ id: mode.record.id, input: updateInput });
+    } else {
+      // add: id は backend が UUID v7 で採番するため、まず POST して採番された
+      // id を受け取り、必要があれば jacket をその id 宛にアップロードする。
+      const createInput: VinylRecordCreate = {
+        artist_id: artistId,
+        title: title.trim(),
+        original_release_date: releaseDate.trim() || null,
+        pressing_info: pressingInfo.trim() || null,
+        purchase_date: purchaseDate || null,
+        purchase_store: purchaseStore.trim() || null,
+        memo: memo.trim() || null,
+        favorite_tracks: favoriteTracks.trim() || null,
+      };
+      const created = await create.mutateAsync(createInput);
+      if (pendingFile) {
+        await upload.mutateAsync({
+          recordId: created.id,
+          file: pendingFile,
+        });
+      }
     }
 
-    // 2) upsert the record
-    const base: VinylRecord =
-      mode.kind === "edit"
-        ? mode.record
-        : {
-            id: baseId,
-            artist_id: artistId,
-            spotify_album_id: null,
-            source: "manual",
-            title: "",
-            image_url: null,
-            original_release_date: null,
-            pressing_info: null,
-            purchase_date: null,
-            purchase_store: null,
-            purchase_price: null,
-            purchase_currency: "JPY",
-            rating: null,
-            memo: null,
-            favorite_tracks: null,
-            display_order:
-              (queryClient.getQueryData<{ items: VinylRecord[] }>([
-                "records",
-              ])?.items.length ?? 0) + 1,
-            created_at: now,
-            updated_at: now,
-          };
-
-    const next: VinylRecord = {
-      ...base,
-      artist_id: artistId,
-      title: title.trim(),
-      image_url: imageUrl,
-      original_release_date: releaseDate.trim() || null,
-      pressing_info: pressingInfo.trim() || null,
-      purchase_date: purchaseDate || null,
-      purchase_store: purchaseStore.trim() || null,
-      memo: memo.trim() || null,
-      favorite_tracks: favoriteTracks.trim() || null,
-      updated_at: now,
-    };
-
-    await upsert.mutateAsync(next);
     // ownership of preview blob URL passes to the saved record; don't revoke.
     previewBlobRef.current = null;
     onClose();

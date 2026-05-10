@@ -21,6 +21,12 @@ import type { AuthUser } from "../types/api";
 
 const MOCK_STORAGE_KEY = STORAGE_KEYS.AUTH_MOCK;
 
+// backend が `/api/auth/*` を実装するまで mock 経路を強制する。Phase B-3 で
+// 認証エンドポイントが入ったら true にして USE_MOCK 経由の分岐に戻す。
+// `USE_MOCK || !AUTH_BACKEND_READY` のうち後者が真の間は常に mock 側。
+const AUTH_BACKEND_READY = false;
+const useAuthMock = USE_MOCK || !AUTH_BACKEND_READY;
+
 const MOCK_USER: AuthUser = {
   spotify_id: "owner_mock",
   display_name: "Jazz Life Owner",
@@ -43,7 +49,7 @@ function readMockUser(): AuthUser | null {
  * mock: localStorage から仮ユーザを取り出す
  */
 export async function getMe(): Promise<AuthUser | null> {
-  if (USE_MOCK) {
+  if (useAuthMock) {
     await new Promise((r) => setTimeout(r, 50)); // mimic small latency
     return readMockUser();
   }
@@ -65,7 +71,7 @@ export async function getMe(): Promise<AuthUser | null> {
  * mock: 仮ユーザを localStorage に保存して即「ログイン済み」状態にする。
  */
 export async function login(): Promise<void> {
-  if (USE_MOCK) {
+  if (useAuthMock) {
     localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(MOCK_USER));
     return;
   }
@@ -80,7 +86,7 @@ export async function login(): Promise<void> {
  * mock: localStorage からエントリ削除
  */
 export async function logout(): Promise<void> {
-  if (USE_MOCK) {
+  if (useAuthMock) {
     localStorage.removeItem(MOCK_STORAGE_KEY);
     return;
   }
