@@ -38,7 +38,17 @@
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:5173/)",
       "Bash(curl -s http://localhost:5173/login -o /dev/null -w \"HTTP %{http_code}\\\\n\")",
       "Bash(git reset *)",
-      "Bash(git restore *)"
+      "Bash(git restore *)",
+      "Bash(git fetch *)",
+      "Bash(gh pr create --title 'frontend: Phase A — editorial UI + records/feed/artists/auth' --body ' *)",
+      "Bash(gh pr *)",
+      "Bash(git switch *)",
+      "Bash(git merge *)",
+      "Bash(git stash *)",
+      "Bash(git -C /workspaces/jazz-life log --oneline -10 -- app/backend/)",
+      "Read(//home/codespace/.claude/plans/**)",
+      "Bash(git -C /workspaces/jazz-life log --oneline -10)",
+      "Bash(git pull *)"
     ]
   }
 }
