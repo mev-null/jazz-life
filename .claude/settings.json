@@ -87,7 +87,22 @@
       "Bash(curl -sf -o /dev/null -w \"GET /openapi.json -> %{http_code}\\\\n\" http://localhost:8000/openapi.json)",
       "Bash(curl -sf -o /dev/null -w \"GET /redoc -> %{http_code}\\\\n\" http://localhost:8000/redoc)",
       "Bash(curl -sf -o /dev/null http://localhost:8000/healthz)",
-      "Bash(xargs -I{} echo \"records in DB: {}\")"
+      "Bash(xargs -I{} echo \"records in DB: {}\")",
+      "Bash(ls /workspaces/jazz-life/.claude/ 2>/dev/null; ls /home/codespace/.claude/ 2>/dev/null)",
+      "Read(//home/codespace/.claude/**)",
+      "Bash(uv add *)",
+      "Bash(TEST_DATABASE_URL=postgresql+psycopg://jazz:jazz@localhost:5432/jazz_test uv run pytest tests/integration/test_auth.py -v)",
+      "Bash(curl -sf -o /dev/null -w \"GET /api/auth/me -> %{http_code}\\\\n\" http://localhost:8000/api/auth/me)",
+      "Bash(curl -sf -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8000/api/auth/me)",
+      "Bash(echo \"JWT_SECRET=$\\(uv run python -c 'import secrets; print\\(secrets.token_urlsafe\\(32\\)\\)'\\)\")",
+      "Bash(echo \"REFRESH_TOKEN_KEY=$\\(uv run python -c 'from cryptography.fernet import Fernet; print\\(Fernet.generate_key\\(\\).decode\\(\\)\\)'\\)\")",
+      "Bash(env)",
+      "Bash(grep -r \"SPOTIFY_CLIENT\" /workspaces/.codespaces 2>/dev/null | head -5; echo \"---\"; ls /workspaces/.codespaces/.persistedshare 2>/dev/null | head -5; echo \"---\"; ls -la /workspaces/jazz-life/.devcontainer 2>/dev/null)",
+      "Read(//workspaces/.codespaces/**)",
+      "Read(//workspaces/.codespaces/.persistedshare/**)",
+      "Bash(python3 -c \"import json,sys;d=json.load\\(sys.stdin\\);print\\('\\\\n'.join\\(sorted\\(d.keys\\(\\)\\)\\)\\)\")",
+      "Bash(find /workspaces -name \"*.env*\" -type f 2>/dev/null | head -10 ; echo \"---\" ; find /workspaces/.codespaces -name \"*env*\" -type f 2>/dev/null | head -10)",
+      "Read(//workspaces/**)"
     ]
   }
 }

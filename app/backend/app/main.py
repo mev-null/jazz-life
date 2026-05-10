@@ -7,7 +7,7 @@ from sqlmodel import Session
 
 from app.core.db import engine
 from app.core.repositories.artist_repository import ArtistRepository
-from app.routers import artists, records
+from app.routers import artists, auth, records
 from app.seed import seed_artists_if_empty
 
 
@@ -20,14 +20,22 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="jazz-life", version="0.1.0", lifespan=lifespan)
 
+# Spotify が redirect URI に http://localhost を許容しなくなったため (2025-04 以降)、
+# OAuth は 127.0.0.1 経由に揃える。cookie のホストスコープと CORS の origin 一致を
+# 守るため、frontend も 127.0.0.1:5173 経由でアクセスする前提。両方の origin を
+# allowlist に並べて、過渡期も既存リンクが切れないようにする。
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(artists.router)
 app.include_router(records.router)
 
