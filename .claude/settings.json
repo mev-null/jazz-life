@@ -71,7 +71,23 @@
       "Bash(curl -s http://localhost:8000/openapi.json)",
       "Bash(curl -sf http://localhost:8000/healthz)",
       "Bash(curl -sf http://localhost:8000/openapi.json)",
-      "Bash(make spec *)"
+      "Bash(make spec *)",
+      "Bash(python3 -c \"import yaml; yaml.safe_load\\(open\\('.github/workflows/backend.yml'\\)\\); yaml.safe_load\\(open\\('.github/workflows/frontend.yml'\\)\\); print\\('OK'\\)\")",
+      "Bash(python3 -c \"import yaml; yaml.safe_load\\(open\\('.github/workflows/backend.yml'\\)\\); yaml.safe_load\\(open\\('.github/workflows/frontend.yml'\\)\\); print\\('YAML OK'\\)\")",
+      "Bash(cd /workspaces/jazz-life/app/backend && uv run python -c \"import json; from app.main import app; print\\(json.dumps\\(app.openapi\\(\\)\\)\\)\" | jq --indent 2 . > /tmp/openapi-py.json && diff -u openapi.json /tmp/openapi-py.json && echo \"BYTE-IDENTICAL\")",
+      "Read(//tmp/**)",
+      "Bash(curl -sf -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5173)",
+      "Bash(curl -sf -X DELETE http://localhost:8000/api/records/019e1175-6ccd-70fc-ad9a-e14b5acb35be -o /dev/null -w \"DELETE %{http_code}\\\\n\")",
+      "Bash(curl -sf -o /dev/null http://localhost:5173/)",
+      "Bash(curl -sf http://localhost:5173/)",
+      "Bash(curl -sf http://localhost:8000/api/records)",
+      "Bash(curl -sf http://localhost:8000/api/artists)",
+      "Bash(curl -sf -H \"Origin: http://localhost:5173\" -i http://localhost:8000/api/records)",
+      "Bash(curl -sf -o /dev/null -w \"GET /docs -> %{http_code}\\\\n\" http://localhost:8000/docs)",
+      "Bash(curl -sf -o /dev/null -w \"GET /openapi.json -> %{http_code}\\\\n\" http://localhost:8000/openapi.json)",
+      "Bash(curl -sf -o /dev/null -w \"GET /redoc -> %{http_code}\\\\n\" http://localhost:8000/redoc)",
+      "Bash(curl -sf -o /dev/null http://localhost:8000/healthz)",
+      "Bash(xargs -I{} echo \"records in DB: {}\")"
     ]
   }
 }
