@@ -38,7 +38,31 @@
       "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:5173/)",
       "Bash(curl -s http://localhost:5173/login -o /dev/null -w \"HTTP %{http_code}\\\\n\")",
       "Bash(git reset *)",
-      "Bash(git restore *)"
+      "Bash(git restore *)",
+      "Bash(git fetch *)",
+      "Bash(gh pr create --title 'frontend: Phase A — editorial UI + records/feed/artists/auth' --body ' *)",
+      "Bash(gh pr *)",
+      "Bash(git switch *)",
+      "Bash(git merge *)",
+      "Bash(git stash *)",
+      "Bash(git -C /workspaces/jazz-life log --oneline -10 -- app/backend/)",
+      "Read(//home/codespace/.claude/plans/**)",
+      "Bash(git -C /workspaces/jazz-life log --oneline -10)",
+      "Bash(git pull *)",
+      "Bash(uv lock *)",
+      "Bash(uv sync *)",
+      "Bash(DATABASE_URL=postgresql+psycopg://jazz:jazz@localhost:5432/jazz uv run alembic revision --autogenerate -m \"initial\")",
+      "Bash(DATABASE_URL=postgresql+psycopg://jazz:jazz@localhost:5432/jazz uv run alembic upgrade head)",
+      "Bash(TEST_DATABASE_URL=postgresql+psycopg://jazz:jazz@localhost:5432/jazz_test uv run pytest -x)",
+      "Bash(TEST_DATABASE_URL=postgresql+psycopg://jazz:jazz@localhost:5432/jazz_test uv run pytest)",
+      "Bash(curl -s http://localhost:8000/api/artists)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('count:', len\\(d['items']\\)\\); print\\('names:', [a['name'] for a in d['items']]\\)\")",
+      "Bash(curl -s http://localhost:8000/api/records)",
+      "Bash(curl -s -X PUT http://localhost:8000/api/records/019e1108-b31d-7f84-ad7a-339ba3812527 -H 'Content-Type: application/json' -d '{\"memo\":\"updated only memo\"}')",
+      "Bash(python -m json.tool)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" -X PUT http://localhost:8000/api/records/00000000-0000-7000-8000-000000000000 -H 'Content-Type: application/json' -d '{\"memo\":\"x\"}')",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" -X POST http://localhost:8000/api/records -H 'Content-Type: application/json' -d '{\"artist_id\":\"4xRYI6VqpkE3UwrDrAZL8L\",\"title\":\"X\",\"original_release_date\":\"notadate\"}')",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" -X POST http://localhost:8000/api/records -H 'Content-Type: application/json' -d '{\"artist_id\":\"4xRYI6VqpkE3UwrDrAZL8L\",\"title\":\"X\",\"purchase_currency\":\"yen\"}')"
     ]
   }
 }

@@ -15,8 +15,8 @@ unexport VIRTUAL_ENV
 .PHONY: help \
         run sync sync-dev add lock \
         test lint lint-fix fmt typecheck check \
-        shell logs restart \
-        alembic-revision alembic-upgrade alembic-downgrade
+        shell logs restart db-shell \
+        migrate migration migrate-down
 
 help:
 	@echo "backend targets:"
@@ -38,15 +38,16 @@ help:
 	@echo "    typecheck           mypy app"
 	@echo "    check               lint + typecheck + test"
 	@echo ""
-	@echo "  Docker (稼働中の backend コンテナ)"
-	@echo "    shell               コンテナに bash で入る"
+	@echo "  Docker (稼働中のコンテナ)"
+	@echo "    shell               backend に bash で入る"
 	@echo "    logs                backend のログを follow"
 	@echo "    restart             backend サービスのみ再起動"
+	@echo "    db-shell            db に psql で入る"
 	@echo ""
-	@echo "  Alembic (Phase C-4 以降)"
-	@echo "    alembic-revision name=...   autogenerate でマイグレーション生成"
-	@echo "    alembic-upgrade             head までアップグレード"
-	@echo "    alembic-downgrade           1 つダウングレード"
+	@echo "  Alembic"
+	@echo "    migration MSG=...   autogenerate でマイグレーション生成"
+	@echo "    migrate             head までアップグレード"
+	@echo "    migrate-down        1 つダウングレード"
 
 # ---------- 起動（host） ----------
 run:
@@ -94,13 +95,16 @@ logs:
 restart:
 	cd $(COMPOSE_DIR) && docker compose restart backend
 
-# ---------- Alembic（Phase C-4 以降） ----------
-alembic-revision:
-	@if [ -z "$(name)" ]; then echo "usage: make alembic-revision name=\"<msg>\""; exit 1; fi
-	cd $(COMPOSE_DIR) && docker compose exec backend alembic revision --autogenerate -m "$(name)"
+db-shell:
+	cd $(COMPOSE_DIR) && docker compose exec db psql -U jazz -d jazz
 
-alembic-upgrade:
+# ---------- Alembic ----------
+migration:
+	@if [ -z "$(MSG)" ]; then echo "usage: make migration MSG=\"<message>\""; exit 1; fi
+	cd $(COMPOSE_DIR) && docker compose exec backend alembic revision --autogenerate -m "$(MSG)"
+
+migrate:
 	cd $(COMPOSE_DIR) && docker compose exec backend alembic upgrade head
 
-alembic-downgrade:
+migrate-down:
 	cd $(COMPOSE_DIR) && docker compose exec backend alembic downgrade -1

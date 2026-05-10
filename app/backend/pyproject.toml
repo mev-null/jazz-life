@@ -7,7 +7,9 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "sqlmodel>=0.0.22",
-    "alembic>=1.13",
+    "alembic[tz]>=1.13",
+    "psycopg[binary]>=3.2",
+    "uuid6>=2024.7.10",
     "httpx>=0.27",
     "beautifulsoup4>=4.12",
     "apscheduler>=3.10",
@@ -26,6 +28,23 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+extend-exclude = ["migrations/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+# B008: Depends(...) を関数引数の default 値に書くのは FastAPI の標準パターン
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+# SQLModel の Field overload は sa_type + nullable などの組み合わせで誤検出する
+# ことがあるため、ORM 層 (models/) と migrations/ は緩める。
+exclude = ["migrations/"]
+
+[[tool.mypy.overrides]]
+module = "app.models.*"
+disable_error_code = ["call-overload"]

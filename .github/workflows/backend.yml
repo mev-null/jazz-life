@@ -1,0 +1,84 @@
+name: backend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/backend/**"
+      - ".github/workflows/backend.yml"
+  pull_request:
+    paths:
+      - "app/backend/**"
+      - ".github/workflows/backend.yml"
+
+defaults:
+  run:
+    working-directory: app/backend
+
+jobs:
+  lint-and-typecheck:
+    name: ruff + mypy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Sync deps (with dev)
+        run: uv sync --group dev
+
+      - name: ruff format --check
+        run: uv run ruff format --check .
+
+      - name: ruff check
+        run: uv run ruff check .
+
+      - name: mypy
+        run: uv run mypy app
+
+  test:
+    name: pytest (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [unit, integration]
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: jazz
+          POSTGRES_PASSWORD: jazz
+          POSTGRES_DB: jazz
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jazz -d jazz"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://jazz:jazz@localhost:5432/jazz_test
+      PGPASSWORD: jazz
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Sync deps (with dev)
+        run: uv sync --group dev
+
+      - name: Create jazz_test database
+        run: psql -h localhost -U jazz -d jazz -c "CREATE DATABASE jazz_test;"
+
+      - name: pytest ${{ matrix.suite }}
+        run: uv run pytest tests/${{ matrix.suite }} -v

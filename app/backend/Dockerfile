@@ -17,8 +17,13 @@ RUN uv sync --no-dev --frozen 2>/dev/null || uv sync --no-dev
 
 # アプリ本体
 COPY app ./app
+COPY alembic.ini ./
+COPY migrations ./migrations
+COPY entrypoint.sh ./
+RUN chmod +x ./entrypoint.sh
 
 EXPOSE 8000
 
+ENTRYPOINT ["./entrypoint.sh"]
 # dev では docker-compose.override.yml で --reload を付与する
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

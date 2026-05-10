@@ -1,0 +1,46 @@
+{
+  "items": [
+    {
+      "spotify_id": "4xRYI6VqpkE3UwrDrAZL8L",
+      "name": "Bill Evans",
+      "image_url": null,
+      "followed": true,
+      "added_at": "2026-01-08T12:00:00Z"
+    },
+    {
+      "spotify_id": "7HRgLn5KUXfLeKjsoXl5XS",
+      "name": "Avishai Cohen",
+      "image_url": null,
+      "followed": true,
+      "added_at": "2026-01-10T12:00:00Z"
+    },
+    {
+      "spotify_id": "1d4dvLcRoOiH3w2Eb4TPDD",
+      "name": "Makoto Ozone",
+      "image_url": null,
+      "followed": true,
+      "added_at": "2026-01-12T12:00:00Z"
+    },
+    {
+      "spotify_id": "2T0HkYzLYxPjXNJqNZTUzz",
+      "name": "Jeff Hamilton",
+      "image_url": null,
+      "followed": true,
+      "added_at": "2026-01-14T12:00:00Z"
+    },
+    {
+      "spotify_id": "5cBUgxmLHKlkIWLQkGUKnx",
+      "name": "Gabrielle Cavassa",
+      "image_url": null,
+      "followed": true,
+      "added_at": "2026-01-16T12:00:00Z"
+    },
+    {
+      "spotify_id": "6Mt1DgI3mzrnvY1xGruqLk",
+      "name": "Oscar Peterson",
+      "image_url": null,
+      "followed": true,
+      "added_at": "2026-01-18T12:00:00Z"
+    }
+  ]
+}

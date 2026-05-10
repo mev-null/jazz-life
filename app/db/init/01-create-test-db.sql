@@ -1,0 +1,1 @@
+CREATE DATABASE jazz_test;
