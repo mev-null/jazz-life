@@ -18,7 +18,7 @@ make up                # db (5432) / backend (8000) / frontend (5173) が起動
 | <http://localhost:8000/healthz> | `{"status":"ok"}` |
 | <http://localhost:8000/api/artists> | seed 投入済みの 6 件が返る |
 | <http://localhost:8000/api/records> | 空または手動投入分 |
-| <http://localhost:8000/openapi.json> | OpenAPI 仕様（`make gen` の入力） |
+| <http://localhost:8000/openapi.json> | OpenAPI 仕様（`make spec` で `backend/openapi.json` に保存 → `make gen` で型生成） |
 | <http://localhost:8000/docs> | Swagger UI |
 | <http://localhost:5173> | フロントエンド（`VITE_USE_MOCK=true` の間はモック） |
 

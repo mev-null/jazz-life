@@ -46,7 +46,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
   });
 
   const upload = useMutation({
-    mutationFn: ({ recordId, file }: { recordId: number; file: File }) =>
+    mutationFn: ({ recordId, file }: { recordId: string; file: File }) =>
       uploadJacket(recordId, file),
   });
 
@@ -130,7 +130,9 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
     if (!title.trim() || !artistId || !mode) return;
 
     const now = new Date().toISOString();
-    const baseId = mode.kind === "edit" ? mode.record.id : Date.now();
+    // 新規追加時はクライアント側で UUID を採る (mock 用)。実 API 接続後 (PR-B) は
+    // POST /api/records のレスポンスで返る backend 採番 UUID v7 を使う想定。
+    const baseId = mode.kind === "edit" ? mode.record.id : crypto.randomUUID();
 
     // 1) upload jacket if a new file was chosen
     let imageUrl: string | null = existingImageUrl;
@@ -150,6 +152,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
             id: baseId,
             artist_id: artistId,
             spotify_album_id: null,
+            source: "manual",
             title: "",
             image_url: null,
             original_release_date: null,
@@ -157,6 +160,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
             purchase_date: null,
             purchase_store: null,
             purchase_price: null,
+            purchase_currency: "JPY",
             rating: null,
             memo: null,
             favorite_tracks: null,

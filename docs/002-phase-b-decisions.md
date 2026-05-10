@@ -160,7 +160,7 @@ def lock_for_display_order(self) -> None:
 
 frontend 側の置換は backend と独立した PR として扱う。
 
-- **PR-A（型基盤）**: orval 導入、`make gen` 差し替え、生成型への全 import 置換、モック JSON の id を UUID 文字列化。挙動は `VITE_USE_MOCK=true` のまま据え置き。
+- **PR-A（型基盤）**: orval 導入、`make gen` 差し替え、**既実装エンドポイント (artists / records) の型のみ generated 由来に切替**（未実装の releases / concerts / sync_status / auth は `types/api.ts` に手書きで残す）、モック JSON の id を UUID 文字列化。OpenAPI spec は `app/backend/openapi.json` に backend が所有する形でコミットし、frontend は orval から `../backend/openapi.json` を読む。これにより API 変更の差分が backend PR 内で完結し、frontend PR には混入しない。backend 未起動でも `make gen` / CI が走る構成は変わらない。挙動は `VITE_USE_MOCK=true` のまま据え置き。
 - **PR-B（実 API 接続）**: `upsertVinylRecord` を `createVinylRecord` (POST) / `updateVinylRecord` (PUT) に分解、`.env.example` の `VITE_USE_MOCK` を `false` に切替、ブラウザでの golden path 動作確認。
 
 ### 2.8 モック切替機構の維持
@@ -248,14 +248,16 @@ CI (`.github/workflows/backend.yml`) で 3 ジョブを並走させる。
 
 ### frontend: orval 導入と型置換（PR-A）
 
-- [ ] `app/frontend` に `orval` を devDependency として追加
-- [ ] `orval.config.ts` を作成（input: `http://localhost:8000/openapi.json`、client: `react-query`、httpClient: `fetch`、output mode: `tags-split`、output path: `src/api/generated/`）
-- [ ] `app/Makefile` の `gen` ターゲットを orval 呼び出しに差し替え
-- [ ] `make gen` の事前条件として backend 起動が必要である旨を Makefile help に明記
-- [ ] 生成された `src/api/generated/` 配下を import 元に切り替え、手書き `src/types/api.ts` を破棄
+- [ ] `app/frontend` に `orval` を devDependency として追加（`openapi-typescript` は削除）
+- [ ] `orval.config.ts` を作成（input: `../backend/openapi.json`、client: `react-query`、httpClient: `fetch`、output mode: `tags-split`、output path: `src/api/generated/`）
+- [ ] OpenAPI spec を `app/backend/openapi.json` にコミットする（backend が所有。jq で 2-space indent に整形）
+- [ ] `app/Makefile` に `make spec`（backend から spec を再取得）と `make gen`（spec ファイルから生成）を分離
+- [ ] orval 用カスタム mutator (`src/api/mutator.ts`) を実装し、`API_BASE` を env から取って fetch する
+- [ ] `src/types/api.ts` から既実装分（`Artist` / `VinylRecord`）を削除し、generated/ から re-export する形に縮小（未実装の `Release` / `Concert` / `SyncStatus` / `AuthUser` 等は手書きのまま残す）
 - [ ] `src/api/mocks/*.json` の `id` を UUID 文字列化（vinyl_records）
 - [ ] `src/api/mocks/*.json` に `source` / `purchase_currency` フィールドを補完（実 API レスポンスと shape を一致させる）
-- [ ] `client.ts` の `VITE_USE_MOCK` 分岐は維持（実 API 側のみ orval hooks を使用）
+- [ ] `RecordFormModal` の `Date.now()` 採番を `crypto.randomUUID()` に変更（VinylRecord.id が string 化したため）
+- [ ] `client.ts` の `VITE_USE_MOCK` 分岐は維持（実 API 側のみ orval 生成 fetcher を経由）
 - [ ] `npm run typecheck` が green
 
 ### frontend: home の実 API 接続（PR-B）

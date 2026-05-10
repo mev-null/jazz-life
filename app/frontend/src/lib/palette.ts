@@ -21,16 +21,20 @@ export const AVATAR_TINTS = [
   "#b08a3a",
 ] as const;
 
-export function sleeveTintByIndex(i: number): string {
-  return SLEEVE_TINTS[i % SLEEVE_TINTS.length];
-}
-
-export function avatarTintByString(key: string): string {
-  // djb2: アナグラム衝突を避けるため積算 + XOR で順序を反映する。
-  // `^` が暗黙に 32bit int 化するので hash はオーバーフローしない。
+// djb2: アナグラム衝突を避けるため積算 + XOR で順序を反映する。
+// `^` が暗黙に 32bit int 化するので hash はオーバーフローしない。
+function djb2(key: string): number {
   let hash = 5381;
   for (let i = 0; i < key.length; i++) {
     hash = (hash * 33) ^ key.charCodeAt(i);
   }
-  return AVATAR_TINTS[Math.abs(hash) % AVATAR_TINTS.length];
+  return Math.abs(hash);
+}
+
+export function sleeveTintByKey(key: string): string {
+  return SLEEVE_TINTS[djb2(key) % SLEEVE_TINTS.length];
+}
+
+export function avatarTintByString(key: string): string {
+  return AVATAR_TINTS[djb2(key) % AVATAR_TINTS.length];
 }
