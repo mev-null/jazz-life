@@ -1,8 +1,19 @@
+import concurrent.futures
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.engine import Engine
+from sqlmodel import Session
+
+from app.core.repositories.artist_repository import ArtistRepository
+from app.core.repositories.record_repository import RecordRepository
+from app.schemas.record import VinylRecordCreate
+from app.seed import seed_artists_if_empty
+from app.services.record_service import RecordService
 
 BILL_EVANS_ID = "4xRYI6VqpkE3UwrDrAZL8L"
+AVISHAI_COHEN_ID = "7HRgLn5KUXfLeKjsoXl5XS"
 
 
 def _new_record_payload(**overrides) -> dict:
@@ -87,3 +98,69 @@ def test_invalid_currency_returns_422(seeded_client: TestClient) -> None:
         json=_new_record_payload(purchase_currency="yen"),
     )
     assert res.status_code == 422
+
+
+@pytest.mark.parametrize("date_str", ["1962", "1962-06", "1962-06-25"])
+def test_release_date_accepts_year_yearmonth_yearmonthday(
+    seeded_client: TestClient, date_str: str
+) -> None:
+    res = seeded_client.post(
+        "/api/records",
+        json=_new_record_payload(title=f"R-{date_str}", original_release_date=date_str),
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["original_release_date"] == date_str
+
+
+def test_post_unknown_artist_returns_404(seeded_client: TestClient) -> None:
+    res = seeded_client.post(
+        "/api/records",
+        json=_new_record_payload(artist_id="ghost_artist_id"),
+    )
+    assert res.status_code == 404
+    assert "artist" in res.json()["detail"]
+
+
+def test_put_can_swap_artist_id(seeded_client: TestClient) -> None:
+    created = seeded_client.post(
+        "/api/records",
+        json=_new_record_payload(artist_id=BILL_EVANS_ID),
+    ).json()
+
+    res = seeded_client.put(
+        f"/api/records/{created['id']}",
+        json={"artist_id": AVISHAI_COHEN_ID},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["artist_id"] == AVISHAI_COHEN_ID
+
+
+def test_put_to_unknown_artist_returns_404(seeded_client: TestClient) -> None:
+    created = seeded_client.post("/api/records", json=_new_record_payload()).json()
+
+    res = seeded_client.put(
+        f"/api/records/{created['id']}",
+        json={"artist_id": "ghost_artist_id"},
+    )
+    assert res.status_code == 404
+
+
+def test_concurrent_create_assigns_unique_display_order(engine: Engine) -> None:
+    """Parallel POSTs must each get a distinct display_order via the advisory lock."""
+    with Session(engine) as bootstrap:
+        seed_artists_if_empty(ArtistRepository(bootstrap))
+
+    n_workers = 5
+
+    def worker(i: int) -> int:
+        with Session(engine) as session:
+            service = RecordService(RecordRepository(session), ArtistRepository(session))
+            record = service.create(
+                VinylRecordCreate(artist_id=BILL_EVANS_ID, title=f"R{i}")
+            )
+            return record.display_order
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n_workers) as ex:
+        orders = sorted(ex.map(worker, range(n_workers)))
+
+    assert orders == list(range(1, n_workers + 1))
