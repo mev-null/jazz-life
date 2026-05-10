@@ -26,7 +26,19 @@
       "Bash(echo \"---exit: $?\")",
       "Bash(git check-ignore *)",
       "Read(//usr/local/python/3.12.1/bin/**)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git checkout *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(docker exec *)",
+      "Bash(curl -s -f http://localhost:5173/)",
+      "WebFetch(domain:jamiezigelbaum.com)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:5173/)",
+      "Bash(curl -s http://localhost:5173/login -o /dev/null -w \"HTTP %{http_code}\\\\n\")",
+      "Bash(git reset *)",
+      "Bash(git restore *)"
     ]
   }
 }

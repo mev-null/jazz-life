@@ -1,9 +1,15 @@
 # ジャズ・アーティスト ダッシュボード 要件定義書
 
-**バージョン**: v1.6 (MVP)
+**バージョン**: v1.7 (MVP)
 **最終更新**: 2026-05-10
 
 ### バージョン履歴
+
+**v1.7**
+- §19「将来拡張（方針メモ）」を新設
+  - ジャケット画像ストレージの選択（ローカルFS / MinIO）
+  - AIによるレコードメタデータ自動補完（Spotify + Claude API ハイブリッド）
+  - プレス違い管理（MusicBrainz / Discogs、Phase 2 候補）
 
 **v1.6**
 - 型契約戦略をハイブリッドに変更（Phase Aは手書き、Phase B以降は openapi-typescript による自動生成）
@@ -784,3 +790,65 @@ make down
   - 監視対象局を事前登録（NHK-FM、TOKYO FM、InterFM897、bayfm等のジャズ番組がある局）
   - 番組表を週次取得 → 出演者欄（`<pfm>`）にフォロー中アーティスト名（+エイリアス）が含まれていれば抽出
   - radiko APIは非公式エンドポイント（10年来コミュニティで利用、ただし破壊的変更リスクあり）
+
+---
+
+## 19. 将来拡張（方針メモ）
+
+§18 のカタログとは別に、設計判断が必要な拡張について方針を残す。実装時期に至っていないが、後で揺れないようにここで方向だけ決めておく。
+
+### 19.1 ジャケット画像ストレージ
+
+**背景**: `vinyl_records.image_url` には Spotify CDN の URL が入る想定だが、(a) Spotify にない盤、(b) 自前のスリーブ写真を使いたいプレス違い、では自分でアップロードする必要がある。
+
+**選択肢**:
+
+| 方式 | メリット | デメリット |
+|---|---|---|
+| ローカルFS (`app/data/jackets/`) | コンテナ追加不要 / バックアップは `data/` ごと tar / コード最小 | 単一ホスト前提 |
+| MinIO (S3互換) | S3 SDK で書ける / Phase 2 で R2/S3 に移行が楽 / pre-signed URL でブラウザ直アップ可 | docker-compose に1サービス追加 / 単一ユーザだと過剰 |
+
+**方針**: **MVP はローカルFS**。`app/data/jackets/{record_id}-{hash}.{ext}` に保存し、`image_url` には `/jackets/...` の相対パスを入れる。FastAPI の `StaticFiles` か小さな route で配信。Spotify CDN URL は完全 URL のまま入れて分岐表示。
+
+MinIO 移行の判断は「リモートデプロイ」「複数デバイス共有」が現実化した時。
+
+**実装は Phase B 後半**（バックエンドの `vinyl_records` API が動いてから）。
+
+### 19.2 AIによるレコードメタデータ自動補完
+
+**背景**: `+` ボタンから手入力でレコードを追加する時、タイトル・アーティスト・発売年月・プレス情報・カタログ番号などをすべて手で埋めるのは負担が大きい。タイトルとアーティストだけ入れたら残りを自動補完したい。
+
+**選択肢（精度 vs 実装コスト）**:
+
+| ソース | 取れる情報 | コスト・精度 |
+|---|---|---|
+| Spotify Search API | title / artist / release_date / image_url / spotify_album_id | 無料、再発と原盤の混在あり |
+| MusicBrainz | label / catalog # / format / 原盤情報 | 無料、ジャズの classic は強い |
+| Discogs | プレス違い / コンディション / カタログ網羅 | 無料（要 API key）、コレクター詳細◎ |
+| Claude API (Haiku 4.5) | 自由記述・統合・整形 | 〜$0.001/件、未知盤は幻覚リスク |
+
+**方針**:
+
+1. **第一段階（Phase B 後半）**: **Spotify + Claude API ハイブリッド**
+   - フロントから `POST /api/records/lookup` を叩く（`{title, artist}` を送る）
+   - バックエンド: Spotify Search でヒットした候補の release_date / image_url / spotify_album_id を確定情報として採用、足りない pressing / memo の叩き台を Claude が補完
+   - 結果は (title, artist) ハッシュでキャッシュ（DBテーブル `lookup_cache` 検討）
+2. **第二段階（Phase 2）**: MusicBrainz / Discogs を統合してプレス違いまで取得（§19.3 と連動）
+
+**幻覚対策**: AI 補完結果はあくまで「叩き台」としてフォームに pre-fill するだけ。ユーザがレビューして Save する設計を必ず守る（自動 Save 禁止）。
+
+**コスト管理**: Anthropic API key は `.env` に `ANTHROPIC_API_KEY` として持つ。月の上限を環境変数で設定できるようにする。
+
+### 19.3 プレス違い管理（Phase 2 候補）
+
+**背景**: 同じアルバムでも「Riverside オリジナル 1962年プレス」と「OJC 再発 180g」では別の物理レコードとして所有・管理したい。MVP では `pressing_info` フリーテキストで対応しているが、フィルタ・検索・統計を取りたくなると構造化が必要。
+
+**方針**:
+
+- **MVP（現状）**: `vinyl_records.pressing_info` フリーテキストで継続。タイトル + アーティストだけで識別する
+- **Phase 2**: MusicBrainz `release` 単位、Discogs `release_id` でプレスを同定。`vinyl_records` に `musicbrainz_release_id` / `discogs_release_id` を追加。同じアルバムの複数プレス所有を「同じ `recording` だが異なる `release`」として扱う
+
+§7 マトリクスのアーティストごと表示は、プレス違い管理が入った後でも `recording_id` でグルーピングすれば破綻しない。
+
+**判断保留**: API key 管理 / レート制限 / レスポンス形式の差をどう吸収するかは Phase 2 着手時に検討。
+
