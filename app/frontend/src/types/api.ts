@@ -1,28 +1,12 @@
-// ====================================================================
-// API 型の集約ポイント。
-//
-// Phase B-2 PR-A 以降:
-//   - backend 実装済み (artists / records) の型は orval 生成
-//     (src/api/generated/model/) から re-export する。
-//   - backend 未実装 (releases / concerts / sync_status / auth / artist_aliases)
-//     は Phase A の手書き暫定型をそのまま残す。
-//
-// 後続 PR で backend が拡張されたら、対応する手書き型を generated 由来に
-// 順次置換していく。最終的にこのファイルは re-export のみとなる想定。
-//
-// ADR-002 §6 / §2.7 を参照。
-// ====================================================================
+// 既実装 (artists / records) は orval 生成から re-export し、未実装は
+// 手書きの暫定型として残す。backend 実装が進むたびに対応する手書き型を
+// generated 由来へ置換していく。詳細は ADR-002 §2.7 を参照。
 
-// ---------- backend 実装済み（orval 生成からの re-export）----------
 export type {
   ArtistRead as Artist,
   VinylRecordRead as VinylRecord,
 } from "../api/generated/model";
 
-// ---------- 共通レスポンス（手書きジェネリック）----------
-// 生成側に `ListResponseArtistRead` / `ListResponseVinylRecordRead` の
-// concrete 型はあるが、mock や useQuery の汎用ラッパで使うため
-// ジェネリック版を手書きで保持する。
 export type ListResponse<T> = {
   items: T[];
 };
