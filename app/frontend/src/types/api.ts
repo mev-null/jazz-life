@@ -40,13 +40,14 @@ export type VinylRecord = {
   spotify_album_id: string | null;
   title: string;
   image_url: string | null;
-  original_release_year: number | null;
+  original_release_date: string | null; // "YYYY" or "YYYY-MM"
   pressing_info: string | null;
   purchase_date: string | null;
   purchase_store: string | null;
   purchase_price: number | null;
   rating: number | null; // 1-5
   memo: string | null;
+  favorite_tracks: string | null; // 自由記述（"A2 Continuo · B1 Smile" 等）
   display_order: number;
   created_at: string;
   updated_at: string;
@@ -84,6 +85,15 @@ export type SyncStatus = {
   last_success_at: string | null;
   last_attempt_at: string | null;
   last_error: string | null;
+};
+
+// ---------- 認証 ----------
+// 注: アクセストークン / リフレッシュトークンはサーバ側 (backend) のみで保持し、
+//     フロントには絶対に渡さない。フロントが受け取るのは表示用のプロフィールのみ。
+export type AuthUser = {
+  spotify_id: string;
+  display_name: string;
+  image_url: string | null;
 };
 
 // ---------- 共通レスポンス ----------

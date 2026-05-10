@@ -1,1 +1,19 @@
 @import "tailwindcss";
+
+@theme {
+  --color-paper: #f4efe3;
+  --color-ink: #1a1714;
+  --color-ink-mute: #1a171499;
+  --color-ink-faint: #1a17144d;
+
+  --font-serif:
+    "Source Serif 4", "Noto Serif JP", "Times New Roman", Georgia, serif;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-serif);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
