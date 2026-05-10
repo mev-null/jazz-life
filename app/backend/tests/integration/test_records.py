@@ -155,9 +155,7 @@ def test_concurrent_create_assigns_unique_display_order(engine: Engine) -> None:
     def worker(i: int) -> int:
         with Session(engine) as session:
             service = RecordService(RecordRepository(session), ArtistRepository(session))
-            record = service.create(
-                VinylRecordCreate(artist_id=BILL_EVANS_ID, title=f"R{i}")
-            )
+            record = service.create(VinylRecordCreate(artist_id=BILL_EVANS_ID, title=f"R{i}"))
             return record.display_order
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_workers) as ex:
