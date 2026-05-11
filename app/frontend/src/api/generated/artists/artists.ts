@@ -27,7 +27,8 @@ import type {
   ArtistCreate,
   ArtistRead,
   HTTPValidationError,
-  ListResponseArtistRead
+  ListResponseArtistRead,
+  ListResponseArtistRecordCount
 } from '../model';
 
 import { customFetch } from '../../mutator';
@@ -242,3 +243,242 @@ export const useUpsertArtistApiArtistsPost = <TError = HTTPValidationError,
       > => {
       return useMutation(getUpsertArtistApiArtistsPostMutationOptions(options), queryClient);
     }
+    export type listRecordCountsApiArtistsRecordCountsGetResponse200 = {
+  data: ListResponseArtistRecordCount
+  status: 200
+}
+
+export type listRecordCountsApiArtistsRecordCountsGetResponseSuccess = (listRecordCountsApiArtistsRecordCountsGetResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listRecordCountsApiArtistsRecordCountsGetResponse = (listRecordCountsApiArtistsRecordCountsGetResponseSuccess)
+
+export const getListRecordCountsApiArtistsRecordCountsGetUrl = () => {
+
+
+
+
+  return `/api/artists/record-counts`
+}
+
+/**
+ * artist_id ごとの所有レコード数を集計して返す。
+
+ArtistsPage 一覧の件数列専用。records 全件取得を避けて軽量化する。
+ * @summary List Record Counts
+ */
+export const listRecordCountsApiArtistsRecordCountsGet = async ( options?: RequestInit): Promise<listRecordCountsApiArtistsRecordCountsGetResponse> => {
+
+  return customFetch<listRecordCountsApiArtistsRecordCountsGetResponse>(getListRecordCountsApiArtistsRecordCountsGetUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListRecordCountsApiArtistsRecordCountsGetQueryKey = () => {
+    return [
+    `/api/artists/record-counts`
+    ] as const;
+    }
+
+
+export const getListRecordCountsApiArtistsRecordCountsGetQueryOptions = <TData = Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListRecordCountsApiArtistsRecordCountsGetQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>> = ({ signal }) => listRecordCountsApiArtistsRecordCountsGet({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListRecordCountsApiArtistsRecordCountsGetQueryResult = NonNullable<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>>
+export type ListRecordCountsApiArtistsRecordCountsGetQueryError = unknown
+
+
+export function useListRecordCountsApiArtistsRecordCountsGet<TData = Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>,
+          TError,
+          Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListRecordCountsApiArtistsRecordCountsGet<TData = Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>,
+          TError,
+          Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListRecordCountsApiArtistsRecordCountsGet<TData = Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Record Counts
+ */
+
+export function useListRecordCountsApiArtistsRecordCountsGet<TData = Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListRecordCountsApiArtistsRecordCountsGetQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+export type getArtistApiArtistsSpotifyIdGetResponse200 = {
+  data: ArtistRead
+  status: 200
+}
+
+export type getArtistApiArtistsSpotifyIdGetResponse422 = {
+  data: HTTPValidationError
+  status: 422
+}
+
+export type getArtistApiArtistsSpotifyIdGetResponseSuccess = (getArtistApiArtistsSpotifyIdGetResponse200) & {
+  headers: Headers;
+};
+export type getArtistApiArtistsSpotifyIdGetResponseError = (getArtistApiArtistsSpotifyIdGetResponse422) & {
+  headers: Headers;
+};
+
+export type getArtistApiArtistsSpotifyIdGetResponse = (getArtistApiArtistsSpotifyIdGetResponseSuccess | getArtistApiArtistsSpotifyIdGetResponseError)
+
+export const getGetArtistApiArtistsSpotifyIdGetUrl = (spotifyId: string,) => {
+
+
+
+
+  return `/api/artists/${spotifyId}`
+}
+
+/**
+ * 単一 artist を取り、image_url が NULL なら Spotify から補完する。
+
+ArtistDetailModal を開いた時に呼ぶ「lazy photo hydration」エンドポイント。
+Spotify 側エラーは service 層で握り潰されるので、画像が無い場合は
+image_url=null のまま返る (UI 側で initials fallback)。
+ * @summary Get Artist
+ */
+export const getArtistApiArtistsSpotifyIdGet = async (spotifyId: string, options?: RequestInit): Promise<getArtistApiArtistsSpotifyIdGetResponse> => {
+
+  return customFetch<getArtistApiArtistsSpotifyIdGetResponse>(getGetArtistApiArtistsSpotifyIdGetUrl(spotifyId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetArtistApiArtistsSpotifyIdGetQueryKey = (spotifyId: string,) => {
+    return [
+    `/api/artists/${spotifyId}`
+    ] as const;
+    }
+
+
+export const getGetArtistApiArtistsSpotifyIdGetQueryOptions = <TData = Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>, TError = HTTPValidationError>(spotifyId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetArtistApiArtistsSpotifyIdGetQueryKey(spotifyId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>> = ({ signal }) => getArtistApiArtistsSpotifyIdGet(spotifyId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(spotifyId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetArtistApiArtistsSpotifyIdGetQueryResult = NonNullable<Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>>
+export type GetArtistApiArtistsSpotifyIdGetQueryError = HTTPValidationError
+
+
+export function useGetArtistApiArtistsSpotifyIdGet<TData = Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>, TError = HTTPValidationError>(
+ spotifyId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>,
+          TError,
+          Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetArtistApiArtistsSpotifyIdGet<TData = Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>, TError = HTTPValidationError>(
+ spotifyId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>,
+          TError,
+          Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetArtistApiArtistsSpotifyIdGet<TData = Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>, TError = HTTPValidationError>(
+ spotifyId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get Artist
+ */
+
+export function useGetArtistApiArtistsSpotifyIdGet<TData = Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>, TError = HTTPValidationError>(
+ spotifyId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistApiArtistsSpotifyIdGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetArtistApiArtistsSpotifyIdGetQueryOptions(spotifyId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+

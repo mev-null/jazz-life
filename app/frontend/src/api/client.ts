@@ -11,6 +11,7 @@
 import { API_BASE, USE_MOCK } from "../lib/env";
 import type {
   Artist,
+  ArtistRecordCount,
   Concert,
   ListResponse,
   Release,
@@ -18,7 +19,9 @@ import type {
 } from "../types/api";
 
 import {
+  getArtistApiArtistsSpotifyIdGet,
   listArtistsApiArtistsGet,
+  listRecordCountsApiArtistsRecordCountsGet,
   upsertArtistApiArtistsPost,
 } from "./generated/artists/artists";
 import {
@@ -57,6 +60,47 @@ export async function getArtists(): Promise<ListResponse<Artist>> {
   if (USE_MOCK) return artistsMock as ListResponse<Artist>;
   const res = await listArtistsApiArtistsGet();
   return res.data as ListResponse<Artist>;
+}
+
+/**
+ * 単一 artist の lazy fetch。ArtistDetailModal を開いた時に呼び、
+ * backend 側で image_url が NULL なら Spotify から補完されて返ってくる。
+ *
+ * mock モードでは artists.json から spotify_id 一致を引くだけで Spotify は
+ * 叩かない (実 API 切替時にだけ画像 hydration が走る)。
+ */
+export async function getArtist(spotifyId: string): Promise<Artist | null> {
+  if (USE_MOCK) {
+    const mock = artistsMock as ListResponse<Artist>;
+    return mock.items.find((a) => a.spotify_id === spotifyId) ?? null;
+  }
+  const res = await getArtistApiArtistsSpotifyIdGet(spotifyId);
+  if (res.status === 200) {
+    return res.data as Artist;
+  }
+  return null;
+}
+
+/**
+ * artist_id ごとの所有レコード件数を集計して返す軽量エンドポイント。
+ * ArtistsPage 一覧の件数列に使うため、records 本体は取らずに件数だけ先取りする。
+ */
+export async function getRecordCounts(): Promise<ListResponse<ArtistRecordCount>> {
+  if (USE_MOCK) {
+    const records = (vinylRecordsMock as ListResponse<VinylRecord>).items;
+    const counts = new Map<string, number>();
+    for (const r of records) {
+      counts.set(r.artist_id, (counts.get(r.artist_id) ?? 0) + 1);
+    }
+    return {
+      items: [...counts.entries()].map(([artist_id, count]) => ({
+        artist_id,
+        count,
+      })),
+    };
+  }
+  const res = await listRecordCountsApiArtistsRecordCountsGet();
+  return res.data as ListResponse<ArtistRecordCount>;
 }
 
 /**

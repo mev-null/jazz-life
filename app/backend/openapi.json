@@ -199,6 +199,71 @@
         }
       }
     },
+    "/api/artists/record-counts": {
+      "get": {
+        "tags": [
+          "artists"
+        ],
+        "summary": "List Record Counts",
+        "description": "artist_id ごとの所有レコード数を集計して返す。\n\nArtistsPage 一覧の件数列専用。records 全件取得を避けて軽量化する。",
+        "operationId": "list_record_counts_api_artists_record_counts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResponse_ArtistRecordCount_"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/artists/{spotify_id}": {
+      "get": {
+        "tags": [
+          "artists"
+        ],
+        "summary": "Get Artist",
+        "description": "単一 artist を取り、image_url が NULL なら Spotify から補完する。\n\nArtistDetailModal を開いた時に呼ぶ「lazy photo hydration」エンドポイント。\nSpotify 側エラーは service 層で握り潰されるので、画像が無い場合は\nimage_url=null のまま返る (UI 側で initials fallback)。",
+        "operationId": "get_artist_api_artists__spotify_id__get",
+        "parameters": [
+          {
+            "name": "spotify_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Spotify Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtistRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/records": {
       "get": {
         "tags": [
@@ -524,6 +589,25 @@
         ],
         "title": "ArtistRead"
       },
+      "ArtistRecordCount": {
+        "properties": {
+          "artist_id": {
+            "type": "string",
+            "title": "Artist Id"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artist_id",
+          "count"
+        ],
+        "title": "ArtistRecordCount",
+        "description": "ArtistsPage 一覧の件数列に渡す軽量行。\n\nrecords 本体は ArtistDetailModal を開くまで fetch しない方針のため、\n一覧では「N records」表示だけ別エンドポイント `/api/artists/record-counts`\nから先に取れるようにする。"
+      },
       "AuthUserRead": {
         "properties": {
           "spotify_id": {
@@ -582,6 +666,22 @@
           "items"
         ],
         "title": "ListResponse[ArtistRead]"
+      },
+      "ListResponse_ArtistRecordCount_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ArtistRecordCount"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ListResponse[ArtistRecordCount]"
       },
       "ListResponse_SpotifyAlbumSummary_": {
         "properties": {
@@ -835,8 +935,8 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 5.0,
-                "minimum": 1.0
+                "maximum": 5,
+                "minimum": 1
               },
               {
                 "type": "null"
@@ -1208,8 +1308,8 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 5.0,
-                "minimum": 1.0
+                "maximum": 5,
+                "minimum": 1
               },
               {
                 "type": "null"

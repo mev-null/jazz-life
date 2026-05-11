@@ -1,12 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import {
-  getArtists,
-  getConcerts,
-  getReleases,
-  getVinylRecords,
-} from "../api/client";
+import { getArtists, getRecordCounts } from "../api/client";
 import { ArtistDetailModal } from "../components/artists/ArtistDetailModal";
 import {
   FeedDetailModal,
@@ -17,18 +12,18 @@ import {
   RecordFormModal,
   type FormMode,
 } from "../components/records/RecordFormModal";
-import { findArtistInConcert } from "../lib/matchArtist";
 import { useReadState } from "../lib/useReadState";
 import type { Artist, Concert, Release, VinylRecord } from "../types/api";
 
 export function ArtistsPage() {
   const artistsQ = useQuery({ queryKey: ["artists"], queryFn: getArtists });
-  const recordsQ = useQuery({
-    queryKey: ["records"],
-    queryFn: getVinylRecords,
+  // 件数は専用エンドポイント /api/artists/record-counts で受け取る。
+  // records 本体は ArtistDetailModal を開いた時にだけ fetch する設計のため、
+  // 一覧では集計値だけを軽量に取得する。
+  const recordCountsQ = useQuery({
+    queryKey: ["record-counts"],
+    queryFn: getRecordCounts,
   });
-  const releasesQ = useQuery({ queryKey: ["releases"], queryFn: getReleases });
-  const concertsQ = useQuery({ queryKey: ["concerts"], queryFn: getConcerts });
 
   const [openArtist, setOpenArtist] = useState<Artist | null>(null);
   const [openRecord, setOpenRecord] = useState<VinylRecord | null>(null);
@@ -40,8 +35,14 @@ export function ArtistsPage() {
   const artistById = (id: string) =>
     artistsQ.data?.items.find((a) => a.spotify_id === id);
 
-  const recordsCountByArtist = (artistId: string) =>
-    recordsQ.data?.items.filter((r) => r.artist_id === artistId).length ?? 0;
+  // ListResponse 形式から spotify_id -> count の lookup に変換 (一覧 render のたびに走る)。
+  const countsByArtistId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of recordCountsQ.data?.items ?? []) {
+      map.set(c.artist_id, c.count);
+    }
+    return map;
+  }, [recordCountsQ.data]);
 
   // FeedDetailModal toggle state
   const openFeedKey = openFeedItem
@@ -65,10 +66,9 @@ export function ArtistsPage() {
     });
   }
 
-  function handleConcertClick(c: Concert) {
+  function handleConcertClick(c: Concert, matchedArtist?: Artist) {
     markRead(`concert:${c.id}`);
-    const matched = findArtistInConcert(c, artistsQ.data?.items ?? []);
-    setOpenFeedItem({ kind: "concert", data: c, artist: matched });
+    setOpenFeedItem({ kind: "concert", data: c, artist: matchedArtist });
   }
 
   return (
@@ -90,7 +90,7 @@ export function ArtistsPage() {
         {artistsQ.data && (
           <ul className="divide-y divide-ink-faint/30">
             {artistsQ.data.items.map((a, i) => {
-              const count = recordsCountByArtist(a.spotify_id);
+              const count = countsByArtistId.get(a.spotify_id) ?? 0;
               return (
                 <li key={a.spotify_id}>
                   <button
@@ -115,9 +115,6 @@ export function ArtistsPage() {
 
       <ArtistDetailModal
         artist={openArtist}
-        records={recordsQ.data?.items ?? []}
-        releases={releasesQ.data?.items ?? []}
-        concerts={concertsQ.data?.items ?? []}
         onClose={() => setOpenArtist(null)}
         onRecordClick={(r) => setOpenRecord(r)}
         onReleaseClick={handleReleaseClick}

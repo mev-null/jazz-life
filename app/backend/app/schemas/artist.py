@@ -20,6 +20,18 @@ class ArtistRead(BaseModel):
     added_at: datetime
 
 
+class ArtistRecordCount(BaseModel):
+    """ArtistsPage 一覧の件数列に渡す軽量行。
+
+    records 本体は ArtistDetailModal を開くまで fetch しない方針のため、
+    一覧では「N records」表示だけ別エンドポイント `/api/artists/record-counts`
+    から先に取れるようにする。
+    """
+
+    artist_id: str
+    count: int
+
+
 class ArtistCreate(BaseModel):
     """新規 artist 作成リクエスト。upsert 動作 (spotify_id 既存なら既存を返す)。
 

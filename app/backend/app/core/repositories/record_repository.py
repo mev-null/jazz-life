@@ -19,6 +19,17 @@ class RecordRepository:
         stmt = select(VinylRecord).order_by(col(VinylRecord.display_order).asc())
         return list(self.session.exec(stmt).all())
 
+    def count_by_artist(self) -> dict[str, int]:
+        """artist_id ごとの所有レコード数を集計して返す。
+
+        ArtistsPage 一覧の「N records」表示用。records 本体は ArtistDetailModal
+        を開くまで取らない設計に振ったので、件数だけを集約で先に返す軽量
+        エンドポイントの裏側として使う。
+        """
+        stmt = select(VinylRecord.artist_id, func.count()).group_by(col(VinylRecord.artist_id))
+        rows = self.session.exec(stmt).all()
+        return {artist_id: count for artist_id, count in rows}
+
     def get(self, id: uuid.UUID) -> VinylRecord | None:
         return self.session.get(VinylRecord, id)
 

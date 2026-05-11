@@ -16,6 +16,9 @@ class RecordService:
     def list_all(self) -> list[VinylRecord]:
         return self.repo.list_all()
 
+    def count_by_artist(self) -> dict[str, int]:
+        return self.repo.count_by_artist()
+
     def create(self, data: VinylRecordCreate) -> VinylRecord:
         self._ensure_artist_exists(data.artist_id)
         # Serialize display_order assignment across concurrent POSTs. Released

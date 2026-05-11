@@ -28,8 +28,11 @@ logger = logging.getLogger("uvicorn.error")
 
 SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
 SPOTIFY_SEARCH_URL = "https://api.spotify.com/v1/search"
+SPOTIFY_ARTISTS_URL = "https://api.spotify.com/v1/artists"
 
 _TOKEN_EXPIRY_MARGIN_SECONDS = 60
+# GET /v1/artists?ids=... の上限。Spotify 公式仕様。
+_ARTISTS_BATCH_LIMIT = 50
 
 
 @dataclass
@@ -88,6 +91,65 @@ class SpotifyAppClient:
         payload = res.json()
         items = (payload.get("albums") or {}).get("items") or []
         return [_to_summary(item) for item in items]
+
+    def get_artists_images(self, ids: list[str]) -> dict[str, str | None]:
+        """`GET /v1/artists?ids=...` で複数アーティストの画像 URL をまとめて取る。
+
+        Spotify は一度に 50 件まで受け付けるので超える場合はチャンク分割する。
+        戻り値は `{ spotify_id: image_url or None }`。Spotify から `null`
+        (ID 不正) が返ったエントリや、`images` が空のアーティストは `None`
+        を入れて返し、呼び出し側で「未取得」と「画像なし」を区別する必要は
+        生じないようにする (どちらも DB 上は image_url=None のまま据え置きで
+        良い)。
+        """
+        deduped = [i for i in dict.fromkeys(ids) if i]
+        if not deduped:
+            return {}
+        token = self._get_app_token()
+        result: dict[str, str | None] = {}
+        for start in range(0, len(deduped), _ARTISTS_BATCH_LIMIT):
+            chunk = deduped[start : start + _ARTISTS_BATCH_LIMIT]
+            try:
+                with httpx.Client(timeout=10.0) as client:
+                    res = client.get(
+                        SPOTIFY_ARTISTS_URL,
+                        headers={"Authorization": f"Bearer {token}"},
+                        params={"ids": ",".join(chunk)},
+                    )
+            except httpx.HTTPError as exc:
+                raise SpotifyApiError("failed to reach Spotify artists endpoint") from exc
+            if res.status_code == 429:
+                raise SpotifyApiError("spotify rate limit exceeded", status_code=429)
+            if res.status_code != 200:
+                try:
+                    err_body = res.json()
+                    err_detail = err_body.get("error")
+                except ValueError:
+                    err_detail = None
+                logger.warning(
+                    "spotify artists endpoint returned %s ids=%d error=%s",
+                    res.status_code,
+                    len(chunk),
+                    err_detail,
+                )
+                raise SpotifyApiError(
+                    f"spotify artists endpoint returned {res.status_code}",
+                    status_code=res.status_code,
+                )
+            payload = res.json()
+            entries = payload.get("artists") or []
+            for entry in entries:
+                if not entry:
+                    # Spotify は ID 不正時に null を返す。呼び出し側がチャンクに
+                    # 入れた順序は保てないので、id 取り出しは entry["id"] に頼る。
+                    continue
+                artist_id = entry.get("id")
+                if not artist_id:
+                    continue
+                images = entry.get("images") or []
+                image_url = images[0].get("url") if images else None
+                result[artist_id] = image_url
+        return result
 
     def _get_app_token(self) -> str:
         cached = self._cached
