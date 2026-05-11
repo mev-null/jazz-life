@@ -157,6 +157,46 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "artists"
+        ],
+        "summary": "Upsert Artist",
+        "description": "spotify_id をキーに upsert。既存なら既存を返す (200)。\n\nPhase B-3 PR-2: RecordFormModal が Spotify album を選んだ時、その album の\nartist がまだ DB に無い場合に呼び出す。重複 POST でも 409 を返さない冪等設計。",
+        "operationId": "upsert_artist_api_artists_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArtistCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtistRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/records": {
@@ -316,9 +356,9 @@
             "required": false,
             "schema": {
               "type": "integer",
-              "maximum": 50,
+              "maximum": 10,
               "minimum": 1,
-              "default": 20,
+              "default": 10,
               "title": "Limit"
             }
           }
@@ -394,6 +434,49 @@
   },
   "components": {
     "schemas": {
+      "ArtistCreate": {
+        "properties": {
+          "spotify_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Spotify Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "spotify",
+              "manual"
+            ],
+            "title": "Source",
+            "default": "spotify"
+          }
+        },
+        "type": "object",
+        "required": [
+          "spotify_id",
+          "name"
+        ],
+        "title": "ArtistCreate",
+        "description": "新規 artist 作成リクエスト。upsert 動作 (spotify_id 既存なら既存を返す)。\n\nPhase B-3 PR-2 の RecordFormModal が Spotify album を選んだ時、\nその album の artist がまだ DB に無い場合に呼び出す。"
+      },
       "ArtistRead": {
         "properties": {
           "spotify_id": {
@@ -573,6 +656,17 @@
             },
             "type": "array",
             "title": "Artist Names"
+          },
+          "primary_artist_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Artist Id"
           }
         },
         "type": "object",
@@ -581,10 +675,11 @@
           "name",
           "release_date",
           "image_url",
-          "artist_names"
+          "artist_names",
+          "primary_artist_id"
         ],
         "title": "SpotifyAlbumSummary",
-        "description": "Spotify album search 結果の 1 件を表す DTO。\n\n`vinyl_records` への投入で必要なフィールドだけを露出する:\n`spotify_album_id` (= id) / `title` (= name) / `original_release_date` (= release_date)\n/ `image_url` / 表示用の `artist_names`。"
+        "description": "Spotify album search 結果の 1 件を表す DTO。\n\n`vinyl_records` への投入で必要なフィールドだけを露出する:\n`spotify_album_id` (= id) / `title` (= name) / `original_release_date` (= release_date)\n/ `image_url` / 表示用の `artist_names` / artist auto-upsert 用の `primary_artist_id`。\n\n`primary_artist_id` は album.artists[0].id (Spotify artist ID)。RecordFormModal が\nalbum 選択時に artists テーブルへ upsert する際、name 一致ではなく Spotify 正規 ID で\n識別するために用いる。album に artists が無いケース (極めて稀) のみ null。"
       },
       "ValidationError": {
         "properties": {

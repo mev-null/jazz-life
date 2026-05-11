@@ -5,21 +5,28 @@
  * OpenAPI spec version: 0.1.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
+  ArtistCreate,
+  ArtistRead,
+  HTTPValidationError,
   ListResponseArtistRead
 } from '../model';
 
@@ -142,3 +149,96 @@ export function useListArtistsApiArtistsGet<TData = Awaited<ReturnType<typeof li
 
 
 
+export type upsertArtistApiArtistsPostResponse200 = {
+  data: ArtistRead
+  status: 200
+}
+
+export type upsertArtistApiArtistsPostResponse422 = {
+  data: HTTPValidationError
+  status: 422
+}
+
+export type upsertArtistApiArtistsPostResponseSuccess = (upsertArtistApiArtistsPostResponse200) & {
+  headers: Headers;
+};
+export type upsertArtistApiArtistsPostResponseError = (upsertArtistApiArtistsPostResponse422) & {
+  headers: Headers;
+};
+
+export type upsertArtistApiArtistsPostResponse = (upsertArtistApiArtistsPostResponseSuccess | upsertArtistApiArtistsPostResponseError)
+
+export const getUpsertArtistApiArtistsPostUrl = () => {
+
+
+
+
+  return `/api/artists`
+}
+
+/**
+ * spotify_id をキーに upsert。既存なら既存を返す (200)。
+
+Phase B-3 PR-2: RecordFormModal が Spotify album を選んだ時、その album の
+artist がまだ DB に無い場合に呼び出す。重複 POST でも 409 を返さない冪等設計。
+ * @summary Upsert Artist
+ */
+export const upsertArtistApiArtistsPost = async (artistCreate: ArtistCreate, options?: RequestInit): Promise<upsertArtistApiArtistsPostResponse> => {
+
+  return customFetch<upsertArtistApiArtistsPostResponse>(getUpsertArtistApiArtistsPostUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      artistCreate,)
+  }
+);}
+
+
+
+
+export const getUpsertArtistApiArtistsPostMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertArtistApiArtistsPost>>, TError,{data: ArtistCreate}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertArtistApiArtistsPost>>, TError,{data: ArtistCreate}, TContext> => {
+
+const mutationKey = ['upsertArtistApiArtistsPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertArtistApiArtistsPost>>, {data: ArtistCreate}> = (props) => {
+          const {data} = props ?? {};
+
+          return  upsertArtistApiArtistsPost(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpsertArtistApiArtistsPostMutationResult = NonNullable<Awaited<ReturnType<typeof upsertArtistApiArtistsPost>>>
+    export type UpsertArtistApiArtistsPostMutationBody = ArtistCreate
+    export type UpsertArtistApiArtistsPostMutationError = HTTPValidationError
+
+    /**
+ * @summary Upsert Artist
+ */
+export const useUpsertArtistApiArtistsPost = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertArtistApiArtistsPost>>, TError,{data: ArtistCreate}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof upsertArtistApiArtistsPost>>,
+        TError,
+        {data: ArtistCreate},
+        TContext
+      > => {
+      return useMutation(getUpsertArtistApiArtistsPostMutationOptions(options), queryClient);
+    }
