@@ -2,8 +2,9 @@ import uuid
 
 from fastapi import APIRouter, Depends, status
 
+from app.models.user import User
 from app.routers._handlers import http_errors
-from app.routers.deps import get_record_service
+from app.routers.deps import get_current_user, get_record_service
 from app.schemas.common import ListResponse
 from app.schemas.record import VinylRecordCreate, VinylRecordRead, VinylRecordUpdate
 from app.services.record_service import RecordService
@@ -23,9 +24,12 @@ def list_records(
 def create_record(
     body: VinylRecordCreate,
     service: RecordService = Depends(get_record_service),
+    current_user: User = Depends(get_current_user),
 ) -> VinylRecordRead:
+    """record を 1 件作成。RecordService.create が同時に user_follows に
+    auto-follow を入れるので、続く release sync で正しく対象になる。"""
     with http_errors():
-        record = service.create(body)
+        record = service.create(body, current_user.id)
         return VinylRecordRead.model_validate(record)
 
 

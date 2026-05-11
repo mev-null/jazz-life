@@ -10,6 +10,7 @@ from tests.conftest import make_settings
 
 _SEARCH_URL_PATTERN = re.compile(r"^https://api\.spotify\.com/v1/search")
 _ARTISTS_URL_PATTERN = re.compile(r"^https://api\.spotify\.com/v1/artists")
+_ARTIST_ALBUMS_URL_PATTERN = re.compile(r"^https://api\.spotify\.com/v1/artists/[^/]+/albums")
 
 
 def _token_response(expires_in: int = 3600) -> dict[str, Any]:
@@ -252,3 +253,261 @@ def test_get_artists_images_429_raises(httpx_mock: HTTPXMock) -> None:
     with pytest.raises(SpotifyApiError) as exc_info:
         _make_client().get_artists_images(["art-1"])
     assert exc_info.value.status_code == 429
+
+
+# ---- get_artist_albums ----
+
+
+def _album_ingest(
+    id_: str = "alb-1",
+    name: str = "Some Album",
+    album_type: str = "album",
+    release_date: str = "2026-01-15",
+    release_date_precision: str = "day",
+    image_url: str | None = "https://i.scdn.co/image/alb1.jpg",
+) -> dict[str, Any]:
+    return {
+        "id": id_,
+        "name": name,
+        "album_type": album_type,
+        "release_date": release_date,
+        "release_date_precision": release_date_precision,
+        "images": [{"url": image_url, "width": 640, "height": 640}] if image_url else [],
+    }
+
+
+def _albums_page(items: list[dict[str, Any]]) -> dict[str, Any]:
+    # /v1/artists/{id}/albums の limit は Spotify 公式仕様で max 10。
+    return {"items": items, "limit": 10, "offset": 0, "total": len(items)}
+
+
+def test_get_artist_albums_basic_200(httpx_mock: HTTPXMock) -> None:
+    from datetime import date
+
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    httpx_mock.add_response(
+        url=_ARTIST_ALBUMS_URL_PATTERN,
+        method="GET",
+        json=_albums_page([_album_ingest()]),
+    )
+
+    items = _make_client().get_artist_albums("art-1")
+
+    assert len(items) == 1
+    a = items[0]
+    assert a.id == "alb-1"
+    assert a.name == "Some Album"
+    assert a.album_type == "album"
+    assert a.release_date == date(2026, 1, 15)
+    assert a.image_url == "https://i.scdn.co/image/alb1.jpg"
+    assert a.artist_id == "art-1"
+
+
+def test_get_artist_albums_paginates_at_page_limit(httpx_mock: HTTPXMock) -> None:
+    """このエンドポイントの limit は Spotify 公式仕様で max 10。
+
+    1 ページ目を 10 件返した場合のみ次ページを取りに行き、未満なら終端する。
+    """
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    # 1 ページ目 10 件 (limit と一致 → 次ページへ)
+    httpx_mock.add_response(
+        url=_ARTIST_ALBUMS_URL_PATTERN,
+        method="GET",
+        json={
+            "items": [_album_ingest(id_=f"alb-{i}") for i in range(10)],
+            "limit": 10,
+            "offset": 0,
+            "total": 11,
+        },
+    )
+    # 2 ページ目 1 件 (limit 未満 → 終端)
+    httpx_mock.add_response(
+        url=_ARTIST_ALBUMS_URL_PATTERN,
+        method="GET",
+        json={
+            "items": [_album_ingest(id_="alb-10")],
+            "limit": 10,
+            "offset": 10,
+            "total": 11,
+        },
+    )
+
+    items = _make_client().get_artist_albums("art-1")
+
+    assert len(items) == 11
+    album_reqs = [r for r in httpx_mock.get_requests() if "/albums" in r.url.path]
+    assert len(album_reqs) == 2
+    assert album_reqs[0].url.params.get("offset") == "0"
+    assert album_reqs[1].url.params.get("offset") == "10"
+    # limit が正しく渡されていることも確認 (Spotify が拒否する 50 等を送らないこと)
+    assert album_reqs[0].url.params.get("limit") == "10"
+
+
+def test_get_artist_albums_applies_since_date_cutoff(httpx_mock: HTTPXMock) -> None:
+    from datetime import date
+
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    httpx_mock.add_response(
+        url=_ARTIST_ALBUMS_URL_PATTERN,
+        method="GET",
+        json=_albums_page(
+            [
+                _album_ingest(id_="old", release_date="2020-01-01"),
+                _album_ingest(id_="new", release_date="2026-01-15"),
+            ]
+        ),
+    )
+
+    items = _make_client().get_artist_albums("art-1", since_date=date(2025, 1, 1))
+
+    assert {i.id for i in items} == {"new"}
+
+
+def test_get_artist_albums_applies_until_date_cutoff(httpx_mock: HTTPXMock) -> None:
+    from datetime import date
+
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    httpx_mock.add_response(
+        url=_ARTIST_ALBUMS_URL_PATTERN,
+        method="GET",
+        json=_albums_page(
+            [
+                _album_ingest(id_="ok", release_date="2026-01-15"),
+                _album_ingest(id_="future", release_date="2099-12-31"),
+            ]
+        ),
+    )
+
+    items = _make_client().get_artist_albums("art-1", until_date=date(2030, 1, 1))
+
+    assert {i.id for i in items} == {"ok"}
+
+
+def test_get_artist_albums_normalizes_year_and_month_precision(
+    httpx_mock: HTTPXMock,
+) -> None:
+    """`release_date_precision=year` は YYYY-01-01、`month` は YYYY-MM-01 に丸める。"""
+    from datetime import date
+
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    httpx_mock.add_response(
+        url=_ARTIST_ALBUMS_URL_PATTERN,
+        method="GET",
+        json=_albums_page(
+            [
+                _album_ingest(
+                    id_="y",
+                    release_date="1959",
+                    release_date_precision="year",
+                ),
+                _album_ingest(
+                    id_="m",
+                    release_date="1962-08",
+                    release_date_precision="month",
+                ),
+            ]
+        ),
+    )
+
+    items = _make_client().get_artist_albums("art-1")
+
+    by_id = {i.id: i for i in items}
+    assert by_id["y"].release_date == date(1959, 1, 1)
+    assert by_id["m"].release_date == date(1962, 8, 1)
+
+
+def test_get_artist_albums_skips_unparseable_release_date(
+    httpx_mock: HTTPXMock,
+) -> None:
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    httpx_mock.add_response(
+        url=_ARTIST_ALBUMS_URL_PATTERN,
+        method="GET",
+        json=_albums_page(
+            [
+                _album_ingest(id_="ok"),
+                _album_ingest(id_="bad", release_date="not-a-date"),
+            ]
+        ),
+    )
+
+    items = _make_client().get_artist_albums("art-1")
+
+    assert {i.id for i in items} == {"ok"}
+
+
+def test_get_artist_albums_filters_unexpected_album_type(
+    httpx_mock: HTTPXMock,
+) -> None:
+    """include_groups=album,single で叩いてるが、Spotify が compilation を混ぜて
+    返すケースに備えてクライアント側でも弾く (定義的な防御)。"""
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    httpx_mock.add_response(
+        url=_ARTIST_ALBUMS_URL_PATTERN,
+        method="GET",
+        json=_albums_page(
+            [
+                _album_ingest(id_="alb", album_type="album"),
+                _album_ingest(id_="comp", album_type="compilation"),
+            ]
+        ),
+    )
+
+    items = _make_client().get_artist_albums("art-1")
+
+    assert {i.id for i in items} == {"alb"}
+
+
+def test_get_artist_albums_passes_include_groups_and_market(
+    httpx_mock: HTTPXMock,
+) -> None:
+    """include_groups は album,single 固定、market は JP 固定で叩く。
+
+    market を渡さないと Spotify が同一アルバムをリージョン別に重複返却して
+    リリース件数が膨張するため、JP 固定で dedup させる前提。
+    """
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    httpx_mock.add_response(
+        url=_ARTIST_ALBUMS_URL_PATTERN,
+        method="GET",
+        json=_albums_page([_album_ingest()]),
+    )
+
+    _make_client().get_artist_albums("art-1")
+
+    album_reqs = [r for r in httpx_mock.get_requests() if "/albums" in r.url.path]
+    assert album_reqs[0].url.params.get("include_groups") == "album,single"
+    assert album_reqs[0].url.params.get("market") == "JP"
+
+
+def test_get_artist_albums_429_raises(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    httpx_mock.add_response(url=_ARTIST_ALBUMS_URL_PATTERN, method="GET", status_code=429)
+
+    with pytest.raises(SpotifyApiError) as exc_info:
+        _make_client().get_artist_albums("art-1")
+    assert exc_info.value.status_code == 429
+
+
+def test_get_artist_albums_404_returns_empty_not_raise(httpx_mock: HTTPXMock) -> None:
+    """404 は invalid artist_id / market 該当無しの両方で起こりうるので空配列で抜ける。
+
+    sync 全体を「全件失敗」にせず、他のアーティストの ingest を続行できるよう
+    にするための防御的挙動 (実際に backend ログで `artist_id=7HRgLn... 404` が
+    観測されたので追加)。
+    """
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    httpx_mock.add_response(url=_ARTIST_ALBUMS_URL_PATTERN, method="GET", status_code=404)
+
+    result = _make_client().get_artist_albums("art-bogus")
+
+    assert result == []
+
+
+def test_get_artist_albums_500_raises(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    httpx_mock.add_response(url=_ARTIST_ALBUMS_URL_PATTERN, method="GET", status_code=500)
+
+    with pytest.raises(SpotifyApiError) as exc_info:
+        _make_client().get_artist_albums("art-1")
+    assert exc_info.value.status_code == 500

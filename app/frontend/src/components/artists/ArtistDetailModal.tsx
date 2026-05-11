@@ -228,7 +228,7 @@ export function ArtistDetailModal({
   });
   const releasesQ = useQuery({
     queryKey: ["releases"],
-    queryFn: getReleases,
+    queryFn: () => getReleases(),
     enabled: artistId !== null,
   });
   const concertsQ = useQuery({

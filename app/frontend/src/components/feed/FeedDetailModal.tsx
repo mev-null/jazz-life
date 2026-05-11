@@ -12,6 +12,10 @@ type Props = {
   isRead?: boolean;
   onToggleRead?: () => void;
   onClose: () => void;
+  // Release 詳細時に表示する「買った/ほしい」ボタンの押下ハンドラ。
+  // FeedPage 側で modal を閉じてから RecordFormModal を defaults 付きで開く責務を持つ。
+  // 省略可 (Concert detail でも同 modal を使うため)。
+  onCollectFromRelease?: (release: Release, status: "owned" | "wanted") => void;
 };
 
 function safeHostname(url: string): string {
@@ -54,9 +58,11 @@ function ExternalLink({ href, label }: { href: string; label: string }) {
 function ReleaseDetail({
   release,
   artist,
+  onCollect,
 }: {
   release: Release;
   artist?: Artist;
+  onCollect?: (status: "owned" | "wanted") => void;
 }) {
   const spotifyUrl = `https://open.spotify.com/album/${release.spotify_id}`;
   return (
@@ -75,7 +81,26 @@ function ReleaseDetail({
         <Field label="Type" value={release.album_type} />
       </div>
 
-      <footer className="border-t border-ink/15 pt-4">
+      {onCollect && (
+        <div className="flex gap-3 border-t border-ink/15 pt-4">
+          <button
+            type="button"
+            onClick={() => onCollect("owned")}
+            className="flex-1 cursor-pointer bg-ink/10 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/20"
+          >
+            買った
+          </button>
+          <button
+            type="button"
+            onClick={() => onCollect("wanted")}
+            className="flex-1 cursor-pointer border border-ink/20 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
+          >
+            ほしい
+          </button>
+        </div>
+      )}
+
+      <footer className={`${onCollect ? "mt-4" : ""} border-t border-ink/15 pt-4`}>
         <div className="mb-1 italic text-sm text-ink-mute">Source</div>
         <ExternalLink href={spotifyUrl} label="Spotify" />
       </footer>
@@ -138,6 +163,7 @@ export function FeedDetailModal({
   isRead,
   onToggleRead,
   onClose,
+  onCollectFromRelease,
 }: Props) {
   if (!item) return null;
 
@@ -145,7 +171,15 @@ export function FeedDetailModal({
     <ModalShell onClose={onClose}>
       <div className="max-h-[85vh] w-[min(90vw,480px)] overflow-y-auto bg-paper p-8 text-left text-ink shadow-xl ring-1 ring-ink/10">
         {item.kind === "release" ? (
-          <ReleaseDetail release={item.data} artist={item.artist} />
+          <ReleaseDetail
+            release={item.data}
+            artist={item.artist}
+            onCollect={
+              onCollectFromRelease
+                ? (status) => onCollectFromRelease(item.data, status)
+                : undefined
+            }
+          />
         ) : (
           <ConcertDetail concert={item.data} artist={item.artist} />
         )}

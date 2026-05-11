@@ -21,10 +21,19 @@ import { ModalShell } from "../ModalShell";
 export type FormMode =
   | {
     kind: "add";
-    // ArtistDetailModal から呼ぶ際に artist と status を事前確定するための
-    // 任意デフォルト。UI には status コントロールを出さず、ここで指定された
-    // ものを create payload に流し込む。
-    defaults?: { artistId?: string; status?: VinylRecordCreateStatus };
+    // ArtistDetailModal / FeedDetailModal から呼ぶ際の事前デフォルト。
+    // - artistId / status: 必須に近い (どこから呼ぶかで決まる)
+    // - title / imageUrl / spotifyAlbumId / originalReleaseDate: FeedDetailModal の
+    //   「買った/ほしい」経路で Release のメタデータを流し込む用 (ユーザが
+    //   そのまま保存してもよし、編集してもよし)
+    defaults?: {
+      artistId?: string;
+      status?: VinylRecordCreateStatus;
+      title?: string;
+      imageUrl?: string | null;
+      spotifyAlbumId?: string | null;
+      originalReleaseDate?: string | null;
+    };
   }
   | { kind: "edit"; record: VinylRecord };
 
@@ -111,25 +120,29 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
       setPreviewUrl(r.image_url);
       setSpotifyAlbumId(r.spotify_album_id);
     } else {
-      setTitle("");
+      const d = mode.defaults;
+      setTitle(d?.title ?? "");
       // add mode: defaults.artistId が渡されていればその場で artists を引いて
       // name も埋める。artists 未到着のケースは下の追い焚き effect が補完する。
-      const defaultArtistId = mode.defaults?.artistId ?? "";
+      const defaultArtistId = d?.artistId ?? "";
       setArtistId(defaultArtistId);
       setArtistQuery(
         defaultArtistId
           ? artists.find((a) => a.spotify_id === defaultArtistId)?.name ?? ""
           : "",
       );
-      setReleaseDate("");
+      setReleaseDate(d?.originalReleaseDate ?? "");
       setPressingInfo("");
       setPurchaseStore("");
       setPurchaseDate("");
       setMemo("");
       setFavoriteTracks("");
-      setExistingImageUrl(null);
-      setPreviewUrl(null);
-      setSpotifyAlbumId(null);
+      // Release 由来の image URL は Spotify CDN なので blob revoke 不要。
+      // existingImageUrl / previewUrl の両方にセットして form 上にプレビュー表示する。
+      const defaultImage = d?.imageUrl ?? null;
+      setExistingImageUrl(defaultImage);
+      setPreviewUrl(defaultImage);
+      setSpotifyAlbumId(d?.spotifyAlbumId ?? null);
     }
     setPendingFile(null);
     setSpotifyResults([]);

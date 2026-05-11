@@ -289,6 +289,7 @@
           "records"
         ],
         "summary": "Create Record",
+        "description": "record を 1 件作成。RecordService.create が同時に user_follows に\nauto-follow を入れるので、続く release sync で正しく対象になる。",
         "operationId": "create_record_api_records_post",
         "requestBody": {
           "content": {
@@ -360,6 +361,143 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VinylRecordRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/releases": {
+      "get": {
+        "tags": [
+          "releases"
+        ],
+        "summary": "List Releases",
+        "operationId": "list_releases_api_releases_get",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResponse_ReleaseRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/releases/sync-status": {
+      "get": {
+        "tags": [
+          "releases"
+        ],
+        "summary": "Get Sync Status",
+        "operationId": "get_sync_status_api_releases_sync_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncStatusRead"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/releases/sync": {
+      "post": {
+        "tags": [
+          "releases"
+        ],
+        "summary": "Trigger Sync",
+        "description": "フォロー中アーティスト全件の releases を Spotify から取り込む。\n\nPhase B-3 では同期実行 (long poll、数十秒の可能性)。Phase B-4 で\nAPScheduler の日次バッチに移行する前提のため、ここは shim 実装。",
+        "operationId": "trigger_sync_api_releases_sync_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/SyncRunRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunResult"
                 }
               }
             }
@@ -683,6 +821,22 @@
         ],
         "title": "ListResponse[ArtistRecordCount]"
       },
+      "ListResponse_ReleaseRead_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ListResponse[ReleaseRead]"
+      },
       "ListResponse_SpotifyAlbumSummary_": {
         "properties": {
           "items": {
@@ -714,6 +868,74 @@
           "items"
         ],
         "title": "ListResponse[VinylRecordRead]"
+      },
+      "ReleaseRead": {
+        "properties": {
+          "spotify_id": {
+            "type": "string",
+            "title": "Spotify Id"
+          },
+          "artist_id": {
+            "type": "string",
+            "title": "Artist Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "album_type": {
+            "type": "string",
+            "enum": [
+              "album",
+              "single"
+            ],
+            "title": "Album Type"
+          },
+          "release_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Release Date"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "is_read": {
+            "type": "boolean",
+            "title": "Is Read"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "spotify_id",
+          "artist_id",
+          "title",
+          "album_type",
+          "release_date",
+          "image_url",
+          "is_read",
+          "read_at"
+        ],
+        "title": "ReleaseRead"
       },
       "SpotifyAlbumSummary": {
         "properties": {
@@ -777,6 +999,125 @@
         ],
         "title": "SpotifyAlbumSummary",
         "description": "Spotify album search 結果の 1 件を表す DTO。\n\n`vinyl_records` への投入で必要なフィールドだけを露出する:\n`spotify_album_id` (= id) / `title` (= name) / `original_release_date` (= release_date)\n/ `image_url` / 表示用の `artist_names` / artist auto-upsert 用の `primary_artist_id`。\n\n`primary_artist_id` は album.artists[0].id (Spotify artist ID)。RecordFormModal が\nalbum 選択時に artists テーブルへ upsert する際、name 一致ではなく Spotify 正規 ID で\n識別するために用いる。album に artists が無いケース (極めて稀) のみ null。"
+      },
+      "SyncRunRequest": {
+        "properties": {
+          "since_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since Date"
+          },
+          "until_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until Date"
+          }
+        },
+        "type": "object",
+        "title": "SyncRunRequest",
+        "description": "`POST /api/releases/sync` の任意 body。\n\n省略時は service 側で `today - 365d` / `today + 30d` を採用する。"
+      },
+      "SyncRunResult": {
+        "properties": {
+          "artists_total": {
+            "type": "integer",
+            "title": "Artists Total"
+          },
+          "artists_succeeded": {
+            "type": "integer",
+            "title": "Artists Succeeded"
+          },
+          "albums_ingested": {
+            "type": "integer",
+            "title": "Albums Ingested"
+          },
+          "first_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artists_total",
+          "artists_succeeded",
+          "albums_ingested",
+          "first_error"
+        ],
+        "title": "SyncRunResult",
+        "description": "`POST /api/releases/sync` のレスポンス。\n\nartists_total = フォロー中アーティスト数 (= sync 対象の母数)。\nartists_succeeded = Spotify からアルバム取得に成功した数。\nalbums_ingested = 取り込んだ release 行数 (upsert 含む)。\nfirst_error = 最初に発生したエラー (続行可能だったもの)。null なら全件成功。"
+      },
+      "SyncStatusRead": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "last_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Attempt At"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "last_success_at",
+          "last_attempt_at",
+          "last_error"
+        ],
+        "title": "SyncStatusRead",
+        "description": "`/api/releases/sync-status` のレスポンス。\n\nフロント Feed 側で「最終同期日時 / エラー状態」を表示するため (ADR-000 §314)。\nRow が無い (一度も sync していない) ケースでは全フィールドが null になる。"
       },
       "ValidationError": {
         "properties": {

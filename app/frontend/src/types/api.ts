@@ -5,6 +5,10 @@
 export type {
   ArtistRead as Artist,
   ArtistRecordCount,
+  ReleaseRead as Release,
+  ReleaseReadAlbumType as AlbumType,
+  SyncRunResult,
+  SyncStatusRead as SyncStatus,
   VinylRecordRead as VinylRecord,
 } from "../api/generated/model";
 
@@ -18,18 +22,6 @@ export type ArtistAlias = {
   artist_id: string;
   alias_name: string;
   created_at: string;
-};
-
-// ---------- 新譜（backend 未実装）----------
-export type AlbumType = "album" | "single" | "compilation" | "appears_on";
-
-export type Release = {
-  spotify_id: string;
-  artist_id: string;
-  title: string;
-  album_type: AlbumType;
-  release_date: string; // ISO 8601 date
-  image_url: string | null;
 };
 
 // ---------- 公演（backend 未実装）----------
@@ -56,14 +48,6 @@ export type Concert = {
 export type ConcertArtist = {
   concert_id: string;
   artist_id: string;
-};
-
-// ---------- 同期ステータス（backend 未実装）----------
-export type SyncStatus = {
-  source: string;
-  last_success_at: string | null;
-  last_attempt_at: string | null;
-  last_error: string | null;
 };
 
 // ---------- 認証（backend 未実装）----------

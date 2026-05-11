@@ -178,6 +178,8 @@ export const getCreateRecordApiRecordsPostUrl = () => {
 }
 
 /**
+ * record を 1 件作成。RecordService.create が同時に user_follows に
+auto-follow を入れるので、続く release sync で正しく対象になる。
  * @summary Create Record
  */
 export const createRecordApiRecordsPost = async (vinylRecordCreate: VinylRecordCreate, options?: RequestInit): Promise<createRecordApiRecordsPostResponse> => {

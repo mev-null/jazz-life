@@ -5,12 +5,16 @@ from app.core.db import get_session
 from app.core.exceptions import AuthError
 from app.core.repositories.artist_repository import ArtistRepository
 from app.core.repositories.record_repository import RecordRepository
+from app.core.repositories.release_repository import ReleaseRepository
+from app.core.repositories.sync_status_repository import SyncStatusRepository
+from app.core.repositories.user_follow_repository import UserFollowRepository
 from app.core.repositories.user_repository import UserRepository
 from app.core.settings import Settings, get_settings
 from app.models.user import User
 from app.services.artist_service import ArtistService
 from app.services.auth_service import AuthService
 from app.services.record_service import RecordService
+from app.services.release_service import ReleaseService
 from app.services.spotify_app_client import SpotifyAppClient
 from app.services.spotify_oauth_client import SpotifyOAuthClient
 
@@ -29,11 +33,37 @@ def get_record_repository(session: Session = Depends(get_session)) -> RecordRepo
     return RecordRepository(session)
 
 
+def get_user_follow_repository(
+    session: Session = Depends(get_session),
+) -> UserFollowRepository:
+    return UserFollowRepository(session)
+
+
 def get_record_service(
     repo: RecordRepository = Depends(get_record_repository),
     artist_repo: ArtistRepository = Depends(get_artist_repository),
+    follow_repo: UserFollowRepository = Depends(get_user_follow_repository),
 ) -> RecordService:
-    return RecordService(repo, artist_repo)
+    return RecordService(repo, artist_repo, follow_repo)
+
+
+def get_release_repository(session: Session = Depends(get_session)) -> ReleaseRepository:
+    return ReleaseRepository(session)
+
+
+def get_sync_status_repository(
+    session: Session = Depends(get_session),
+) -> SyncStatusRepository:
+    return SyncStatusRepository(session)
+
+
+def get_release_service(
+    release_repo: ReleaseRepository = Depends(get_release_repository),
+    follow_repo: UserFollowRepository = Depends(get_user_follow_repository),
+    record_repo: RecordRepository = Depends(get_record_repository),
+    sync_repo: SyncStatusRepository = Depends(get_sync_status_repository),
+) -> ReleaseService:
+    return ReleaseService(release_repo, follow_repo, record_repo, sync_repo)
 
 
 def get_user_repository(session: Session = Depends(get_session)) -> UserRepository:
