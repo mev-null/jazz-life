@@ -12,6 +12,13 @@
       "version": "latest"
     }
   },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code"
+      ]
+    }
+  },
   "forwardPorts": [
     8000,
     5173,
