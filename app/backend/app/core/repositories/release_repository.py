@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import Session, and_, col, select
@@ -9,6 +9,26 @@ from app.models.release import Release
 class ReleaseRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    def get(self, spotify_id: str) -> Release | None:
+        return self.session.get(Release, spotify_id)
+
+    def set_read_status(self, spotify_id: str, is_read: bool) -> Release | None:
+        """`is_read` フラグを書き換えて `read_at` も連動させる。
+
+        - True にしたら `read_at` を now() に
+        - False に戻したら `read_at` を None に
+        該当 release が無ければ None を返す。
+        """
+        row = self.session.get(Release, spotify_id)
+        if row is None:
+            return None
+        row.is_read = is_read
+        row.read_at = datetime.now(UTC) if is_read else None
+        self.session.add(row)
+        self.session.commit()
+        self.session.refresh(row)
+        return row
 
     def list_window(self, from_date: date, to_date: date) -> list[Release]:
         """`release_date` が `[from_date, to_date]` の Release を新しい順で返す。

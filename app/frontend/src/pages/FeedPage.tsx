@@ -6,6 +6,7 @@ import {
   getConcerts,
   getReleaseSyncStatus,
   getReleases,
+  setReleaseRead,
   triggerReleaseSync,
 } from "../api/client";
 import {
@@ -103,21 +104,47 @@ export function FeedPage() {
     },
   });
 
+  // release の既読化は backend (release.is_read / read_at) を真とする mutation。
+  // concert は ADR が backend 化未定なので localStorage 続行。
+  const setReleaseReadMutation = useMutation({
+    mutationFn: ({ id, isRead }: { id: string; isRead: boolean }) =>
+      setReleaseRead(id, isRead),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["releases"] });
+    },
+  });
+
   const [openItem, setOpenItem] = useState<FeedItem | null>(null);
   const [formMode, setFormMode] = useState<FormMode | null>(null);
   const { isRead, markRead, markUnread } = useReadState();
 
-  const openKey = openItem
+  // 開いている release の最新版を releases.data から look up する。
+  // toggleOpenRead で mutation を打つと releases query が invalidate される
+  // ので、reopen しなくても modal の表示が backend の is_read を追従する。
+  const openRelease =
+    openItem?.kind === "release"
+      ? releases.data?.items.find(
+          (r) => r.spotify_id === openItem.data.spotify_id,
+        ) ?? openItem.data
+      : null;
+  const openIsRead = openItem
     ? openItem.kind === "release"
-      ? `release:${openItem.data.spotify_id}`
-      : `concert:${openItem.data.id}`
-    : null;
-  const openIsRead = openKey ? isRead(openKey) : false;
+      ? Boolean(openRelease?.is_read)
+      : isRead(`concert:${openItem.data.id}`)
+    : false;
 
   function toggleOpenRead() {
-    if (!openKey) return;
-    if (openIsRead) markUnread(openKey);
-    else markRead(openKey);
+    if (!openItem) return;
+    if (openItem.kind === "release") {
+      setReleaseReadMutation.mutate({
+        id: openItem.data.spotify_id,
+        isRead: !openIsRead,
+      });
+    } else {
+      const key = `concert:${openItem.data.id}`;
+      if (openIsRead) markUnread(key);
+      else markRead(key);
+    }
   }
 
   const artistById = (id: string) =>
@@ -126,8 +153,11 @@ export function FeedPage() {
   const matchArtistFromConcert = (concert: Concert) =>
     findArtistInConcert(concert, artists.data?.items ?? []);
 
-  function openRelease(r: Release) {
-    markRead(`release:${r.spotify_id}`);
+  function handleReleaseRowClick(r: Release) {
+    // クリックしたら既読化 (既に既読なら no-op)。modal は別途開く。
+    if (!r.is_read) {
+      setReleaseReadMutation.mutate({ id: r.spotify_id, isRead: true });
+    }
     setOpenItem({
       kind: "release",
       data: r,
@@ -226,8 +256,8 @@ export function FeedPage() {
                     release={r}
                     artist={artistById(r.artist_id)}
                     isPast={false}
-                    isRead={isRead(`release:${r.spotify_id}`)}
-                    onClick={() => openRelease(r)}
+                    isRead={r.is_read}
+                    onClick={() => handleReleaseRowClick(r)}
                   />
                 ))}
               </div>
@@ -241,8 +271,8 @@ export function FeedPage() {
                     release={r}
                     artist={artistById(r.artist_id)}
                     isPast={true}
-                    isRead={isRead(`release:${r.spotify_id}`)}
-                    onClick={() => openRelease(r)}
+                    isRead={r.is_read}
+                    onClick={() => handleReleaseRowClick(r)}
                   />
                 ))}
               </div>

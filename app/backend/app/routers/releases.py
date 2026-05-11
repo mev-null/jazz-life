@@ -9,12 +9,14 @@
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.core.repositories.release_repository import ReleaseRepository
 from app.core.repositories.sync_status_repository import SyncStatusRepository
 from app.models.user import User
 from app.routers.deps import (
     get_current_user,
+    get_release_repository,
     get_release_service,
     get_spotify_app_client,
     get_sync_status_repository,
@@ -22,6 +24,7 @@ from app.routers.deps import (
 from app.schemas.common import ListResponse
 from app.schemas.release import (
     ReleaseRead,
+    ReleaseReadStatusUpdate,
     SyncRunRequest,
     SyncRunResult,
     SyncStatusRead,
@@ -74,6 +77,29 @@ def get_sync_status(
             last_error=None,
         )
     return SyncStatusRead.model_validate(row)
+
+
+@router.patch("/{spotify_id}/read", response_model=ReleaseRead)
+def set_release_read_status(
+    spotify_id: str,
+    payload: ReleaseReadStatusUpdate,
+    repo: ReleaseRepository = Depends(get_release_repository),
+    _: User = Depends(get_current_user),
+) -> ReleaseRead:
+    """release の既読フラグをトグル (Feed の未読 dot 用)。
+
+    Phase B-3 で localStorage ベースの既読を backend (release.is_read / read_at)
+    に移行する経路。`is_read=true` で `read_at=now()`、`false` で `read_at=null`
+    に連動して書き換える。auth 必須 (単一ユーザだが将来 multi-user 化で current
+    user が要るため最初から固定)。
+    """
+    row = repo.set_read_status(spotify_id, payload.is_read)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"release spotify_id={spotify_id} not found",
+        )
+    return ReleaseRead.model_validate(row)
 
 
 @router.post("/sync", response_model=SyncRunResult, status_code=status.HTTP_200_OK)

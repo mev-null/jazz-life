@@ -6,9 +6,11 @@ import { ReleaseJacket } from "./ReleaseJacket";
  * Feed と ArtistDetailModal の Activity セクションで共有する Release 行。
  * 左 64px のジャケット + 右にタイトル / アーティスト / album_type / 日付。
  *
- * 「未読 dot」「past か (= 灰色化)」は呼び出し側で組み立てて渡す。
- * 未読判定は useReadState ベースで呼び出し側のローカル state に依存するため、
- * このコンポーネントはなるべく素の表示に徹する。
+ * 視覚仕様:
+ * - 未読 dot は行頭 (ジャケットの左中央脇) に置く。ジャケット右上に重ねると
+ *   ジャケ自体が小さい時に画と被って読みにくい
+ * - 既読は album 全体を半透明化して未読を相対的に強調する
+ * - `isPast` は別軸 (灰色文字) で扱う
  */
 export function ReleaseRow({
   release,
@@ -27,13 +29,13 @@ export function ReleaseRow({
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full cursor-pointer items-stretch gap-4 py-3 text-left text-sm transition-opacity hover:opacity-80 ${isPast ? "text-ink-mute" : ""}`}
+      className={`flex w-full cursor-pointer items-stretch gap-3 py-3 text-left text-sm transition-opacity hover:opacity-80 ${isPast ? "text-ink-mute" : ""} ${isRead ? "opacity-55" : ""}`}
     >
+      <span className="flex w-2 shrink-0 items-center justify-center">
+        {!isRead && <span className="block h-2 w-2 rounded-full bg-ink/70" />}
+      </span>
       <div className="relative aspect-square w-16 shrink-0 overflow-hidden ring-1 ring-ink/10">
         <ReleaseJacket release={release} />
-        {!isRead && (
-          <span className="absolute right-1 top-1 block h-1.5 w-1.5 rounded-full bg-ink" />
-        )}
       </div>
       <div className="flex min-w-0 flex-1 flex-col justify-center">
         <div className="truncate font-medium">{release.title}</div>

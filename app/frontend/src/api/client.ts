@@ -35,6 +35,7 @@ import {
 import {
   getSyncStatusApiReleasesSyncStatusGet,
   listReleasesApiReleasesGet,
+  setReleaseReadStatusApiReleasesSpotifyIdReadPatch,
   triggerSyncApiReleasesSyncPost,
 } from "./generated/releases/releases";
 import { searchAlbumsApiSpotifyAlbumsSearchGet } from "./generated/spotify/spotify";
@@ -196,6 +197,37 @@ export async function getReleases(
   if (to) params.to = to;
   const res = await listReleasesApiReleasesGet(params);
   return res.data as ListResponse<Release>;
+}
+
+/**
+ * release の既読フラグを切り替える (PATCH 経由)。auth 必須。
+ *
+ * frontend では「Feed の release 行をクリック」 / 「FeedDetailModal で
+ * mark as read / unread」のタイミングで呼ぶ。release.is_read が backend
+ * 永続化されるので、ブラウザを跨いでも既読状態が保持される (localStorage
+ * 時代との違い)。
+ *
+ * mock 時はネットワークを叩かず、入力された is_read 状態をそのまま返す。
+ */
+export async function setReleaseRead(
+  spotifyId: string,
+  isRead: boolean,
+): Promise<Release> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 20));
+    const mock = (releasesMock as ListResponse<Release>).items.find(
+      (r) => r.spotify_id === spotifyId,
+    );
+    return {
+      ...(mock ?? ({} as Release)),
+      is_read: isRead,
+      read_at: isRead ? new Date().toISOString() : null,
+    };
+  }
+  const res = await setReleaseReadStatusApiReleasesSpotifyIdReadPatch(spotifyId, {
+    is_read: isRead,
+  });
+  return res.data as Release;
 }
 
 /**

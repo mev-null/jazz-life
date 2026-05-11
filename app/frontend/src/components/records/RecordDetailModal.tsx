@@ -127,10 +127,10 @@ export function RecordDetailModal({
           markOwned.mutate(record.id);
         }}
         disabled={markOwned.isPending}
-        aria-label="買った"
+        aria-label="On the shelf"
         className="shrink-0 cursor-pointer bg-ink/10 px-3 py-1.5 text-sm text-ink transition-colors hover:bg-ink/20 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {markOwned.isPending ? "Moving…" : "買った"}
+        {markOwned.isPending ? "Moving…" : "On the shelf"}
       </button>
     ) : undefined;
 

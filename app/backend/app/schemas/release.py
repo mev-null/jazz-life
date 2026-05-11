@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 # Phase B-3 では Get Artist's Albums の include_groups を `album,single` に絞って
 # ingest しているので、UI 側でも 2 値だけが流れてくる前提。compilation /
@@ -60,3 +60,13 @@ class SyncRunRequest(BaseModel):
 
     since_date: date | None = None
     until_date: date | None = None
+
+
+class ReleaseReadStatusUpdate(BaseModel):
+    """`PATCH /api/releases/{spotify_id}/read` の body。
+
+    既読 / 未読のトグル用。True で既読 (read_at が now)、False で未読
+    (read_at が null)。
+    """
+
+    is_read: bool = Field(...)
