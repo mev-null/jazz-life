@@ -1,0 +1,16 @@
+# Devcontainer-only compose stack.
+# VS Code / Codespaces はここで定義する `workspace` サービスにアタッチする。
+# アプリ本体 (db / backend / frontend) は ../app/docker-compose.yml で別プロジェクト
+# として起動し、ホストの docker daemon 経由で参照する (docker-outside-of-docker)。
+services:
+  workspace:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # リポジトリ全体を workspace 内の同一パスにマウントする。
+    # ホスト VM 上のパス /workspaces/jazz-life と container 内のパスを一致させる
+    # ことで、container 内から `docker compose` を実行したときに bind mount の
+    # パス解決 (./data 等) がホスト daemon 側でも正しく効く。
+    volumes:
+      - ..:/workspaces/jazz-life:cached
+    command: sleep infinity

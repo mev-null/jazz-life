@@ -1,23 +1,21 @@
 {
-  "name": "FastAPI + React",
-  "image": "mcr.microsoft.com/devcontainers/base:bookworm",
+  "name": "jazz-life",
+  // dockerComposeFile パターン: workspace サービスにアタッチ。
+  // db / backend / frontend は ../app/docker-compose.yml 側で別プロジェクトとして
+  // 動かし、postStartCommand から `docker compose up -d` で立ち上げる。
+  // workspace 内で secrets が露出するので compose interpolation も自然に効く。
+  "dockerComposeFile": ["docker-compose.devcontainer.yml"],
+  "service": "workspace",
+  "workspaceFolder": "/workspaces/jazz-life",
+  // workspace を止めるとアプリ側にも触らないので不要な再起動を避ける。
+  "shutdownAction": "stopCompose",
+
   "features": {
-    "ghcr.io/devcontainers/features/python:1": {
-      "version": "3.11"
-    },
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "20",
-      "nodeGypDependencies": false
-    },
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/devcontainers/features/sshd:1": {
-      "version": "latest"
-    }
+    // ホスト daemon と通信する docker CLI を入れる。dind より高速・軽量。
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
   },
-  "forwardPorts": [
-    8000,
-    5173
-  ],
+
+  "forwardPorts": [8000, 5173, 5432],
   "portsAttributes": {
     "8000": {
       "label": "FastAPI Backend",
@@ -26,8 +24,13 @@
     "5173": {
       "label": "React Frontend",
       "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "Postgres",
+      "onAutoForward": "silent"
     }
   },
+
   "containerEnv": {
     "SPOTIFY_REDIRECT_URI": "http://127.0.0.1:8000/api/auth/callback",
     "FRONTEND_BASE_URL": "http://127.0.0.1:5173",
@@ -52,5 +55,10 @@
       "description": "Fernet key for encrypting Spotify refresh_token"
     }
   },
-  "postCreateCommand": "echo 'jazz-life devcontainer ready.'"
+
+  // 初回作成時: app stack を build + up。secrets は workspace shell に存在するので
+  // compose interpolation で backend/frontend に流れる。
+  "postCreateCommand": "cd /workspaces/jazz-life/app && docker compose up -d",
+  // 以降の Codespace 再開時: 既存イメージで再起動するだけ (高速)。
+  "postStartCommand": "cd /workspaces/jazz-life/app && docker compose up -d"
 }

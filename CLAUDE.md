@@ -34,6 +34,10 @@
 
 ```
 jazz-life/
+├── .devcontainer/              Codespaces / VS Code dev container 定義
+│   ├── devcontainer.json       dockerComposeFile パターン (service=workspace、postStart で app stack を up)
+│   ├── docker-compose.devcontainer.yml  workspace サービス定義 (sleep infinity)
+│   └── Dockerfile              workspace イメージ (python:3.11-bookworm + node20 + uv + make)
 ├── docs/                       ADR・設計ドキュメント（要件のソース・オブ・トゥルース）
 ├── app/                        全アプリ成果物。docker compose の作業ディレクトリ
 │   ├── docker-compose.yml      共通定義（db / backend / frontend）
@@ -76,10 +80,12 @@ jazz-life/
 
 ## よく使うコマンド
 
+> Codespace 起動時に `.devcontainer/devcontainer.json` の postStartCommand が `docker compose up -d` を自動で実行するので、通常は `make up` を手動で叩く必要はない。再ビルドや停止のときだけ使う。
+
 すべて `cd app` してから:
 
 ```bash
-make up          # 全サービス起動（HMR 有効）
+make up          # 全サービス起動（HMR 有効。手動で再起動したいときに使う）
 make down        # 停止
 make logs        # 全ログ follow
 make spec        # 起動中の backend から OpenAPI spec を取得して backend/openapi.json に保存（要 backend 起動）
