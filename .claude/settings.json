@@ -95,7 +95,22 @@
       "Bash(identify app/frontend/public/favicon.png)",
       "Bash(python3 -c \"from PIL import Image; print\\('Pillow', Image.__version__\\)\")",
       "Bash(unset VIRTUAL_ENV)",
-      "Bash(git config *)"
+      "Bash(git config *)",
+      "Bash(which gh; ls /usr/local/bin/gh /home/vscode/.local/bin/gh 2>/dev/null; echo \"---ADR sizes---\"; wc -l docs/003-artist-management.md docs/010-place.md; echo \"---ADR 003 head---\"; head -25 docs/003-artist-management.md)",
+      "Read(//usr/local/bin/**)",
+      "Bash(apt list *)",
+      "Bash(apt-cache search *)",
+      "Bash(sudo -n true)",
+      "Bash(set -e)",
+      "Bash(curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg)",
+      "Bash(sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg)",
+      "Bash(sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg)",
+      "Bash(dpkg --print-architecture)",
+      "Bash(echo \"deb [arch=$\\(dpkg --print-architecture\\) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\")",
+      "Bash(sudo tee /etc/apt/sources.list.d/github-cli.list)",
+      "Bash(sudo apt-get update -qq)",
+      "Bash(sudo apt-get install -y gh)",
+      "Bash(gh --version)"
     ]
   }
 }
