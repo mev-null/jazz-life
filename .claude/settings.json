@@ -106,10 +106,32 @@
       "Bash(echo \"exit=$?\")",
       "Bash(git rm *)",
       "Bash(git mv *)",
-      "Bash(gh run *)"
+      "Bash(gh run *)",
+      "Bash(git lfs *)",
+      "Bash(xargs -I{} git check-attr filter -- {})",
+      "Bash(grep -v 'unspecified$')",
+      "Bash(rm .git/hooks/pre-push && git push origin backend/b-3-spotify-oauth 2>&1 | tail -20)",
+      "Read(//etc/ssh/**)",
+      "Bash(netstat -tlnp)",
+      "Bash(code --list-extensions)",
+      "Bash(git ls-remote *)",
+      "Read(//usr/local/bin/**)",
+      "Bash(apt list *)",
+      "Bash(curl -sS -o /dev/null -w \"backend healthz: %{http_code}\\\\n\" http://localhost:8000/healthz)",
+      "Bash(curl -sS -o /dev/null -w \"frontend root: %{http_code}\\\\n\" http://localhost:5173/)",
+      "Bash(gh codespace *)",
+      "Bash(netstat -tln)",
+      "Bash(curl -sS -o /tmp/front.html -w \"%{http_code}\\\\n\" http://localhost:5173/)",
+      "Bash(curl -sS -o /dev/null -w \"fakehost: %{http_code}\\\\n\" -H \"Host: fantastic-waddle-97jpxv67x9g6h75w-5173.app.github.dev\" http://localhost:5173/)",
+      "Bash(curl -sS -o /dev/null -w \"fakehost backend: %{http_code}\\\\n\" -H \"Host: fantastic-waddle-97jpxv67x9g6h75w-8000.app.github.dev\" http://localhost:8000/healthz)",
+      "Bash(curl -sS -o /dev/null -w \"frontend with codespace host: %{http_code}\\\\n\" -H \"Host: fantastic-waddle-97jpxv67x9g6h75w-5173.app.github.dev\" http://localhost:5173/)",
+      "Bash(curl -sS -o /dev/null -w \"127.0.0.1 healthz: %{http_code}\\\\n\" http://127.0.0.1:8000/healthz)",
+      "Bash(curl -sS -o /dev/null -w \"127.0.0.1 root: %{http_code}\\\\n\" http://127.0.0.1:8000/)",
+      "Bash(curl -sS -o /dev/null -w \"127.0.0.1 docs: %{http_code}\\\\n\" http://127.0.0.1:8000/docs)"
     ],
     "additionalDirectories": [
-      "/tmp"
+      "/tmp",
+      "/workspaces/jazz-life/.git/hooks"
     ]
   }
 }
