@@ -4,11 +4,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   createVinylRecord,
+  searchSpotifyAlbums,
   updateVinylRecord,
   uploadJacket,
+  upsertArtist,
 } from "../../api/client";
 import type { Artist, VinylRecord } from "../../types/api";
 import type {
+  SpotifyAlbumSummary,
   VinylRecordCreate,
   VinylRecordUpdate,
 } from "../../api/generated/model";
@@ -33,7 +36,11 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
   const isEdit = mode?.kind === "edit";
 
   const [title, setTitle] = useState("");
+  // artistId は spotify_id を保持。artistQuery は input に表示する name の現値。
+  // 両者は手動入力 (typeahead クリック or Spotify album 選択) のいずれかで同期する。
   const [artistId, setArtistId] = useState("");
+  const [artistQuery, setArtistQuery] = useState("");
+  const [artistDropdownOpen, setArtistDropdownOpen] = useState(false);
   const [releaseDate, setReleaseDate] = useState("");
   const [pressingInfo, setPressingInfo] = useState("");
   const [purchaseStore, setPurchaseStore] = useState("");
@@ -41,11 +48,18 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
   const [memo, setMemo] = useState("");
   const [favoriteTracks, setFavoriteTracks] = useState("");
 
-  // image: existing url (from record) and pending file (new selection)
+  // image: existing url (from record / Spotify) と pending file (new selection)
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const previewBlobRef = useRef<string | null>(null);
+
+  // Spotify album search result (album selection で image_url / spotify_album_id を流し込む)
+  const [spotifyAlbumId, setSpotifyAlbumId] = useState<string | null>(null);
+  const [spotifyResults, setSpotifyResults] = useState<SpotifyAlbumSummary[]>([]);
+  const [spotifyOpen, setSpotifyOpen] = useState(false);
+  const [spotifySearching, setSpotifySearching] = useState(false);
+  const [spotifyError, setSpotifyError] = useState<string | null>(null);
 
   const create = useMutation({
     mutationFn: createVinylRecord,
@@ -77,6 +91,9 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
       const r = mode.record;
       setTitle(r.title);
       setArtistId(r.artist_id);
+      setArtistQuery(
+        artists.find((a) => a.spotify_id === r.artist_id)?.name ?? "",
+      );
       setReleaseDate(r.original_release_date ?? "");
       setPressingInfo(r.pressing_info ?? "");
       setPurchaseStore(r.purchase_store ?? "");
@@ -85,9 +102,11 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
       setFavoriteTracks(r.favorite_tracks ?? "");
       setExistingImageUrl(r.image_url);
       setPreviewUrl(r.image_url);
+      setSpotifyAlbumId(r.spotify_album_id);
     } else {
       setTitle("");
       setArtistId(""); // 別 effect が artists 到着後に補完する
+      setArtistQuery("");
       setReleaseDate("");
       setPressingInfo("");
       setPurchaseStore("");
@@ -96,8 +115,13 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
       setFavoriteTracks("");
       setExistingImageUrl(null);
       setPreviewUrl(null);
+      setSpotifyAlbumId(null);
     }
     setPendingFile(null);
+    setSpotifyResults([]);
+    setSpotifyOpen(false);
+    setSpotifyError(null);
+    setArtistDropdownOpen(false);
     // pending blob はモーダル切替（mode→null 含む）/ unmount で確実に解放する
     return () => {
       if (previewBlobRef.current) {
@@ -107,14 +131,14 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
     };
   }, [mode]);
 
-  // add モード時、ユーザが未選択かつ artists が利用可能になったら先頭をデフォルトに。
-  // edit モード or 既にユーザが選択済みの場合は触らない。
+  // edit モードで開いた時、artists が後から到着するパターンでも artistQuery を
+  // 補完する。add モードでは空のままにし、ユーザの自由入力 / Spotify 選択で埋める。
   useEffect(() => {
-    if (mode?.kind !== "add") return;
-    if (artistId) return;
-    if (artists.length === 0) return;
-    setArtistId(artists[0].spotify_id);
-  }, [mode, artists, artistId]);
+    if (mode?.kind !== "edit") return;
+    if (artistQuery) return;
+    const name = artists.find((a) => a.spotify_id === mode.record.artist_id)?.name;
+    if (name) setArtistQuery(name);
+  }, [mode, artists, artistQuery]);
 
   if (!mode) return null;
 
@@ -140,6 +164,99 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
     setExistingImageUrl(null);
   }
 
+  async function handleSpotifySearch() {
+    if (!title.trim()) return;
+    setSpotifySearching(true);
+    setSpotifyError(null);
+    setSpotifyOpen(true);
+    try {
+      // artistQuery が入っていればそれを refine 用に Spotify に渡す。
+      // typeahead 選択 / 自由入力どちらでも、現在の表示値をそのまま使う。
+      const refineArtist = artistQuery.trim() || undefined;
+      const items = await searchSpotifyAlbums(title.trim(), refineArtist);
+      setSpotifyResults(items);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSpotifyError(msg);
+      setSpotifyResults([]);
+    } finally {
+      setSpotifySearching(false);
+    }
+  }
+
+  async function handleSelectSpotifyAlbum(album: SpotifyAlbumSummary) {
+    setTitle(album.name);
+    setSpotifyAlbumId(album.id);
+    if (album.release_date) setReleaseDate(album.release_date);
+    if (album.image_url) {
+      // Spotify CDN の URL を既存 image として preview に流し込む。
+      // pending file があれば user 選択を優先して上書きしない。
+      if (previewBlobRef.current) {
+        URL.revokeObjectURL(previewBlobRef.current);
+        previewBlobRef.current = null;
+      }
+      setPendingFile(null);
+      setExistingImageUrl(album.image_url);
+      setPreviewUrl(album.image_url);
+    }
+    // 正規 Spotify artist ID で artists を識別する。
+    // album.primary_artist_id が無い (極めて稀) 場合はフォーム上は name だけ反映する。
+    const primaryArtistName = album.artist_names[0];
+    const primaryArtistId = album.primary_artist_id;
+    if (primaryArtistId && primaryArtistName) {
+      const existing = artists.find((a) => a.spotify_id === primaryArtistId);
+      if (existing) {
+        setArtistId(existing.spotify_id);
+        setArtistQuery(existing.name);
+      } else {
+        try {
+          const created = await upsertArtist({
+            spotify_id: primaryArtistId,
+            name: primaryArtistName,
+            image_url: null,
+            source: "spotify",
+          });
+          setArtistId(created.spotify_id);
+          setArtistQuery(created.name);
+          queryClient.invalidateQueries({ queryKey: ["artists"] });
+        } catch {
+          // upsert に失敗しても UI 上は name だけ反映して、保存時に backend に
+          // バリデーションさせる。
+          setArtistQuery(primaryArtistName);
+        }
+      }
+    } else if (primaryArtistName) {
+      setArtistQuery(primaryArtistName);
+    }
+    setSpotifyOpen(false);
+  }
+
+  // Artist input の現値で部分一致 filter した候補。typeahead dropdown 表示用。
+  const artistMatches = artistQuery.trim()
+    ? artists
+      .filter((a) =>
+        a.name.toLowerCase().includes(artistQuery.trim().toLowerCase()),
+      )
+      .slice(0, 8)
+    : artists.slice(0, 8);
+
+  function handleSelectArtistFromDropdown(artist: Artist) {
+    setArtistId(artist.spotify_id);
+    setArtistQuery(artist.name);
+    setArtistDropdownOpen(false);
+  }
+
+  function handleArtistInputChange(value: string) {
+    setArtistQuery(value);
+    // 既存 artist を入力中の name と完全一致した場合は artistId を保持。
+    // それ以外は artistId を一旦クリアし、Spotify album 選択 / dropdown 選択で
+    // 改めてセットする方針 (中途半端な不一致 ID で保存しないため)。
+    const match = artists.find(
+      (a) => a.name.toLowerCase() === value.trim().toLowerCase(),
+    );
+    setArtistId(match?.spotify_id ?? "");
+  }
+
   const submitting =
     create.isPending || update.isPending || upload.isPending;
 
@@ -162,6 +279,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
         artist_id: artistId,
         title: title.trim(),
         image_url: imageUrl,
+        spotify_album_id: spotifyAlbumId,
         original_release_date: releaseDate.trim() || null,
         pressing_info: pressingInfo.trim() || null,
         purchase_date: purchaseDate || null,
@@ -173,9 +291,14 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
     } else {
       // add: id は backend が UUID v7 で採番するため、まず POST して採番された
       // id を受け取り、必要があれば jacket をその id 宛にアップロードする。
+      // Spotify から選んだ album があれば source = "spotify" にして image_url も同梱。
+      // pendingFile があれば後段の jacket upload で image_url が上書きされる。
       const createInput: VinylRecordCreate = {
         artist_id: artistId,
         title: title.trim(),
+        spotify_album_id: spotifyAlbumId,
+        source: spotifyAlbumId ? "spotify" : "manual",
+        image_url: pendingFile ? null : existingImageUrl,
         original_release_date: releaseDate.trim() || null,
         pressing_info: pressingInfo.trim() || null,
         purchase_date: purchaseDate || null,
@@ -248,34 +371,110 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
             </div>
           </div>
 
-          <label className="block">
-            <span className={labelClass}>Title</span>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              autoFocus
-              autoComplete="off"
-              className={inputClass}
-            />
-          </label>
-
-          <label className="block">
-            <span className={labelClass}>Artist</span>
-            <select
-              value={artistId}
-              onChange={(e) => setArtistId(e.target.value)}
-              required
-              className={inputClass}
-            >
-              {artists.map((a) => (
-                <option key={a.spotify_id} value={a.spotify_id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div>
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <span className={labelClass}>Title</span>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                  autoFocus
+                  autoComplete="off"
+                  className={inputClass}
+                />
+              </div>
+              <div className="relative flex-1">
+                <span className={labelClass}>Artist</span>
+                <input
+                  type="text"
+                  value={artistQuery}
+                  onChange={(e) => handleArtistInputChange(e.target.value)}
+                  onFocus={() => setArtistDropdownOpen(true)}
+                  onBlur={() =>
+                    // クリック反映のため少し遅らせる (dropdown 内の button click が
+                    // 走る前に blur で閉じてしまうのを回避)
+                    setTimeout(() => setArtistDropdownOpen(false), 150)
+                  }
+                  required
+                  autoComplete="off"
+                  placeholder="既存から選ぶ or Spotify 検索で追加"
+                  className={inputClass}
+                />
+                {artistDropdownOpen && artistMatches.length > 0 && (
+                  <ul className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-y-auto border border-ink/10 bg-paper">
+                    {artistMatches.map((a) => (
+                      <li key={a.spotify_id}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => handleSelectArtistFromDropdown(a)}
+                          className="block w-full px-3 py-1.5 text-left text-sm text-ink transition-colors hover:bg-ink/5"
+                        >
+                          {a.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleSpotifySearch}
+                disabled={!title.trim() || spotifySearching}
+                className="shrink-0 bg-ink/10 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {spotifySearching ? "Searching…" : "Search"}
+              </button>
+            </div>
+            {spotifyOpen && (
+              <div className="mt-3 max-h-72 overflow-y-auto border border-ink/10 bg-paper">
+                {spotifyError ? (
+                  <div className="p-3 text-sm italic text-ink-mute">
+                    {spotifyError}
+                  </div>
+                ) : !spotifySearching && spotifyResults.length === 0 ? (
+                  <div className="p-3 text-sm italic text-ink-mute">
+                    no results
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-ink/10">
+                    {spotifyResults.map((album) => (
+                      <li key={album.id}>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectSpotifyAlbum(album)}
+                          className="flex w-full items-center gap-3 p-2 text-left transition-colors hover:bg-ink/5"
+                        >
+                          <div className="aspect-square w-12 shrink-0 overflow-hidden bg-ink/5">
+                            {album.image_url ? (
+                              <img
+                                src={album.image_url}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            ) : null}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm text-ink">
+                              {album.name}
+                            </div>
+                            <div className="truncate text-xs italic text-ink-mute">
+                              {album.artist_names.join(", ")}
+                              {album.release_date
+                                ? ` · ${album.release_date}`
+                                : ""}
+                            </div>
+                          </div>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <label className="block">
