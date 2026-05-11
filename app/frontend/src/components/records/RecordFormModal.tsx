@@ -214,7 +214,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
             spotify_id: primaryArtistId,
             name: primaryArtistName,
             image_url: null,
-            source: "spotify",
+            source: "spotify_dynamic",
           });
           setArtistId(created.spotify_id);
           setArtistQuery(created.name);

@@ -78,8 +78,7 @@ export async function upsertArtist(input: ArtistCreate): Promise<Artist> {
       spotify_id: input.spotify_id,
       name: input.name,
       image_url: input.image_url ?? null,
-      followed: false,
-      source: input.source ?? "spotify",
+      source: input.source ?? "spotify_dynamic",
       added_at: now,
     } as Artist;
   }
@@ -118,6 +117,7 @@ export async function createVinylRecord(
       artist_id: input.artist_id,
       spotify_album_id: input.spotify_album_id ?? null,
       source: input.source ?? "manual",
+      status: input.status ?? "owned",
       title: input.title,
       image_url: input.image_url ?? null,
       original_release_date: input.original_release_date ?? null,

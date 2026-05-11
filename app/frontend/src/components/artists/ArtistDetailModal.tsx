@@ -166,7 +166,7 @@ export function ArtistDetailModal({
               {artist.name}
             </div>
             <div className="mt-1 text-sm italic text-ink-mute">
-              {artist.followed ? "followed" : "manual"}
+              {artist.source}
             </div>
           </div>
           <ArtistAvatar artist={artist} />

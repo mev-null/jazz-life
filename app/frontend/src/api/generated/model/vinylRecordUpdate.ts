@@ -9,6 +9,7 @@ export interface VinylRecordUpdate {
   artist_id?: string | null;
   spotify_album_id?: string | null;
   source?: 'spotify' | 'manual' | null;
+  status?: 'owned' | 'wanted' | null;
   title?: string | null;
   image_url?: string | null;
   original_release_date?: string | null;

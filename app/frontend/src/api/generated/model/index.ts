@@ -23,6 +23,8 @@ export * from './validationError';
 export * from './validationErrorCtx';
 export * from './vinylRecordCreate';
 export * from './vinylRecordCreateSource';
+export * from './vinylRecordCreateStatus';
 export * from './vinylRecordRead';
 export * from './vinylRecordReadSource';
+export * from './vinylRecordReadStatus';
 export * from './vinylRecordUpdate';
