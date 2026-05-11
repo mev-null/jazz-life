@@ -13,13 +13,16 @@ unexport VIRTUAL_ENV
 
 .DEFAULT_GOAL := help
 .PHONY: help \
-        run sync sync-dev add lock \
+        dev run sync sync-dev add lock \
         test lint lint-fix fmt typecheck check \
         shell logs restart db-shell \
         migrate migration migrate-down
 
 help:
 	@echo "backend targets:"
+	@echo ""
+	@echo "  起動 (docker, 通常の開発はこっち)"
+	@echo "    dev                 backend コンテナをフォアグラウンドで起動 (HMR + ログ)"
 	@echo ""
 	@echo "  起動 (host, no docker)"
 	@echo "    run                 uvicorn を host で --reload 起動"
@@ -48,6 +51,12 @@ help:
 	@echo "    migration MSG=...   autogenerate でマイグレーション生成"
 	@echo "    migrate             head までアップグレード"
 	@echo "    migrate-down        1 つダウングレード"
+
+# ---------- 起動（docker, foreground） ----------
+# 通常の開発はこれを別ターミナルで叩いて動かす。Ctrl-C で停止すると container も止まる。
+# 初回は image build が走るので時間がかかる。db は devcontainer postStartCommand で既に上がっている前提。
+dev:
+	cd $(COMPOSE_DIR) && docker compose up --build backend
 
 # ---------- 起動（host） ----------
 run:

@@ -3,6 +3,7 @@ from app.models.concert import Concert, ConcertArtist, Venue
 from app.models.record import VinylRecord
 from app.models.release import Release
 from app.models.sync import SyncStatus
+from app.models.user import User
 
 __all__ = [
     "Artist",
@@ -13,4 +14,5 @@ __all__ = [
     "Concert",
     "ConcertArtist",
     "SyncStatus",
+    "User",
 ]

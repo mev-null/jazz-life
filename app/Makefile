@@ -1,6 +1,11 @@
-.PHONY: up down logs ps spec gen migrate
+.PHONY: up down logs ps spec gen migrate db
 
-# 開発環境を起動（HMR 有効、override.yml が自動マージされる）
+# db だけ起動（devcontainer の postStartCommand と同じ動作。手動で再起動したい時用）
+# backend / frontend は cd app/backend && make dev / cd app/frontend && make dev で個別に起動する。
+db:
+	docker compose up -d db
+
+# 全サービスを detached でまとめて起動したい時の従来動作（CI や検証用）。
 up:
 	docker compose up -d --build
 
@@ -8,7 +13,7 @@ up:
 down:
 	docker compose down
 
-# ログを追う
+# ログを追う（detached で動かしてる時用）
 logs:
 	docker compose logs -f
 

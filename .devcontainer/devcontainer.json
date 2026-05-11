@@ -1,0 +1,71 @@
+{
+  "name": "jazz-life",
+  "dockerComposeFile": [
+    "docker-compose.devcontainer.yml"
+  ],
+  "service": "workspace",
+  "workspaceFolder": "/workspaces/jazz-life",
+  "shutdownAction": "stopCompose",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/sshd:1": {
+      "version": "latest"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code"
+      ]
+    }
+  },
+  "forwardPorts": [
+    8000,
+    5173,
+    5432
+  ],
+  "portsAttributes": {
+    "8000": {
+      "label": "FastAPI Backend",
+      "onAutoForward": "notify"
+    },
+    "5173": {
+      "label": "React Frontend",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "Postgres",
+      "onAutoForward": "silent"
+    }
+  },
+  "containerEnv": {
+    "SPOTIFY_REDIRECT_URI": "http://127.0.0.1:8000/api/auth/callback",
+    "FRONTEND_BASE_URL": "http://127.0.0.1:5173",
+    "COOKIE_SECURE": "false",
+    "VITE_API_BASE": "http://127.0.0.1:8000",
+    "VITE_USE_MOCK": "false"
+  },
+  "secrets": {
+    "SPOTIFY_CLIENT_ID": {
+      "description": "Spotify app Client ID"
+    },
+    "SPOTIFY_CLIENT_SECRET": {
+      "description": "Spotify app Client Secret"
+    },
+    "ALLOWED_SPOTIFY_USER_ID": {
+      "description": "Owner's Spotify user ID"
+    },
+    "JWT_SECRET": {
+      "description": "JWT signing key"
+    },
+    "REFRESH_TOKEN_KEY": {
+      "description": "Fernet key for encrypting Spotify refresh_token"
+    }
+  },
+  // 起動時間短縮のため Codespace 起動では db のみ自動で上げる。
+  // backend / frontend は別ターミナルで `cd app/backend && make dev` /
+  // `cd app/frontend && make dev` をそれぞれ手動で叩いてフォアグラウンドで動かす。
+  // secrets は workspace shell に揃っているので、後から起動しても compose interpolation で渡る。
+  "postCreateCommand": "cd /workspaces/jazz-life/app && docker compose up -d db",
+  "postStartCommand": "cd /workspaces/jazz-life/app && docker compose up -d db"
+}

@@ -34,12 +34,16 @@
 
 ```
 jazz-life/
+├── .devcontainer/              Codespaces / VS Code dev container 定義
+│   ├── devcontainer.json       dockerComposeFile パターン (service=workspace、postStart で app stack を up)
+│   ├── docker-compose.devcontainer.yml  workspace サービス定義 (sleep infinity)
+│   └── Dockerfile              workspace イメージ (python:3.11-bookworm + node20 + uv + make)
 ├── docs/                       ADR・設計ドキュメント（要件のソース・オブ・トゥルース）
 ├── app/                        全アプリ成果物。docker compose の作業ディレクトリ
 │   ├── docker-compose.yml      共通定義（db / backend / frontend）
 │   ├── docker-compose.override.yml  dev 用上書き（HMR、bind mount）
 │   ├── Makefile                up / down / logs / gen
-│   ├── .env / .env.example     Spotify クレデンシャル / DATABASE_URL
+│   (環境変数は .devcontainer/devcontainer.json で集約管理、.env は廃止)
 │   ├── db/init/                Postgres initdb スクリプト（jazz_test 作成）
 │   ├── data/                   永続化先（jacket 画像等。DB は named volume）
 │   ├── backend/
@@ -76,24 +80,36 @@ jazz-life/
 
 ## よく使うコマンド
 
-すべて `cd app` してから:
+> Codespace 起動時に `.devcontainer/devcontainer.json` の postStartCommand が `docker compose up -d db` を自動で実行するので、db だけは常に上がっている。backend / frontend は開発を始める時に各サブディレクトリで `make dev` を叩いて手動で起動する運用（別ターミナル × 2）。
+
+backend（`cd app/backend`）:
 
 ```bash
-make up          # 全サービス起動（HMR 有効）
-make down        # 停止
-make logs        # 全ログ follow
-make spec        # 起動中の backend から OpenAPI spec を取得して backend/openapi.json に保存（要 backend 起動）
-make gen         # backend/openapi.json から TS 型 + react-query hooks 生成（backend 不要）
-```
-
-backend 単体（`cd app/backend`）:
-
-```bash
-make help            # ターゲット一覧
+make dev             # コンテナを foreground で起動（HMR + ログ。Ctrl-C で停止）
+make help            # 全ターゲット
 make sync-dev        # host venv 構築（IDE 補完用にも必須）
 make check           # lint + typecheck + test 一括
-make logs            # backend だけのログ
+make logs            # 稼働中の backend ログを follow
 make shell           # コンテナに bash で入る
+```
+
+frontend（`cd app/frontend`）:
+
+```bash
+make dev             # コンテナを foreground で起動（HMR + ログ。Ctrl-C で停止）
+make typecheck       # npm run typecheck
+make gen             # npm run gen (orval)
+```
+
+スタック全体（`cd app`）:
+
+```bash
+make db          # db だけ起動（postStartCommand と同じ。手動で再起動したい時用）
+make up          # 全サービスを detached でまとめて起動（CI / 一括検証用）
+make down        # 停止
+make logs        # 全ログ follow（detached 起動時用）
+make spec        # 起動中の backend から OpenAPI spec を取得して backend/openapi.json に保存（要 backend 起動）
+make gen         # backend/openapi.json から TS 型 + react-query hooks 生成（backend 不要）
 ```
 
 ## 開発ルール（守る）
@@ -118,7 +134,7 @@ make shell           # コンテナに bash で入る
 
 ## やってはいけないこと
 
-- `.env` / `.venv/` / `node_modules/` / `app/data/*.db` をコミットしない（`.gitignore` で防御済み）
+- `.venv/` / `node_modules/` / `app/data/*.db` をコミットしない（`.gitignore` で防御済み）。シークレットは `.env` ではなく **Codespaces user secrets** に置き、`.devcontainer/devcontainer.json` の `secrets` 宣言経由で container に流す
 - `src/api/generated/` を `.gitignore` に追加しない（ADR-002 §2.7）
 - backend と frontend を同一 PR で混ぜない（例外: 機能完結 1 PR は許容、PR description で明示）
 - ホスト直接実行は `cd app/backend` してから（`uv` は host にもインストール済み、pyproject は backend ディレクトリ）
@@ -147,4 +163,4 @@ make shell           # コンテナに bash で入る
 | Phase B 開始時の方針再評価（PostgreSQL / クリーンアーキ / orval / UUID v7 / 寛容 PUT） | [docs/002-phase-b-decisions.md](docs/002-phase-b-decisions.md) |
 | 起動・依存・型生成コマンド | [app/Makefile](app/Makefile) / [app/backend/Makefile](app/backend/Makefile) |
 | PR 概要のテンプレート | `.claude/skills/pr-summary/SKILL.md` 経由（`/pr-summary`） |
-| 環境変数の意味 | [app/.env.example](app/.env.example) |
+| 環境変数の意味 | [.devcontainer/devcontainer.json](.devcontainer/devcontainer.json)（公開デフォルト + Codespaces secret 宣言） |
