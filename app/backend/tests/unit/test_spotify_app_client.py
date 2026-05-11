@@ -156,13 +156,12 @@ def test_album_without_images_returns_null_image_url(httpx_mock: HTTPXMock) -> N
 
 
 # ---- get_artists_images ----
+# 実装は `GET /v1/artists/{id}` を 1 id ずつ叩くループ (batch endpoint
+# `GET /v1/artists?ids=...` は Spotify Development Mode app だと 403 を返す
+# ため。詳細は spotify_app_client.py の get_artists_images docstring 参照)。
 
 
-def _artists_response(entries: list[dict[str, Any] | None]) -> dict[str, Any]:
-    return {"artists": entries}
-
-
-def _artist_entry(
+def _single_artist_response(
     id_: str = "art-1",
     image_url: str | None = "https://i.scdn.co/image/art1.jpg",
 ) -> dict[str, Any]:
@@ -176,9 +175,14 @@ def _artist_entry(
 def test_get_artists_images_returns_first_image(httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
     httpx_mock.add_response(
-        url=_ARTISTS_URL_PATTERN,
+        url="https://api.spotify.com/v1/artists/art-1",
         method="GET",
-        json=_artists_response([_artist_entry("art-1"), _artist_entry("art-2", image_url=None)]),
+        json=_single_artist_response("art-1"),
+    )
+    httpx_mock.add_response(
+        url="https://api.spotify.com/v1/artists/art-2",
+        method="GET",
+        json=_single_artist_response("art-2", image_url=None),
     )
 
     result = _make_client().get_artists_images(["art-1", "art-2"])
@@ -190,55 +194,55 @@ def test_get_artists_images_returns_first_image(httpx_mock: HTTPXMock) -> None:
 
 
 def test_get_artists_images_empty_input_skips_network(httpx_mock: HTTPXMock) -> None:
-    # 空入力でトークン / artists どちらも叩かないこと。
-    # pytest-httpx は teardown で「未使用 mock があれば失敗」させるので、
-    # add_response しないことで「呼び出さなければ成功」を表現する。
+    # 空入力ではトークン / artist endpoint いずれも叩かない。
     assert _make_client().get_artists_images([]) == {}
 
 
 def test_get_artists_images_dedupes_input(httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
     httpx_mock.add_response(
-        url=_ARTISTS_URL_PATTERN,
+        url="https://api.spotify.com/v1/artists/art-1",
         method="GET",
-        json=_artists_response([_artist_entry("art-1")]),
+        json=_single_artist_response("art-1"),
     )
 
     _make_client().get_artists_images(["art-1", "art-1", ""])
 
-    req = next(r for r in httpx_mock.get_requests() if r.url.path == "/v1/artists")
-    assert req.url.params.get("ids") == "art-1"
+    # art-1 は 1 回しか叩かれない (dedup) + 空文字は捨てる。
+    artist_reqs = [r for r in httpx_mock.get_requests() if "/v1/artists/" in r.url.path]
+    assert len(artist_reqs) == 1
 
 
-def test_get_artists_images_chunks_above_50(httpx_mock: HTTPXMock) -> None:
+def test_get_artists_images_loops_per_id(httpx_mock: HTTPXMock) -> None:
+    """51 ids 投入 → 51 リクエスト (単発ループ)。batch 化はしない。"""
     httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
-    # 51 ids → 50 + 1 の 2 リクエストに分かれる。
     ids = [f"art-{i}" for i in range(51)]
-    httpx_mock.add_response(
-        url=_ARTISTS_URL_PATTERN,
-        method="GET",
-        json=_artists_response([_artist_entry(i) for i in ids[:50]]),
-    )
-    httpx_mock.add_response(
-        url=_ARTISTS_URL_PATTERN,
-        method="GET",
-        json=_artists_response([_artist_entry(ids[50])]),
-    )
+    for aid in ids:
+        httpx_mock.add_response(
+            url=f"https://api.spotify.com/v1/artists/{aid}",
+            method="GET",
+            json=_single_artist_response(aid),
+        )
 
     result = _make_client().get_artists_images(ids)
 
-    artists_reqs = [r for r in httpx_mock.get_requests() if r.url.path == "/v1/artists"]
-    assert len(artists_reqs) == 2
+    artist_reqs = [r for r in httpx_mock.get_requests() if "/v1/artists/" in r.url.path]
+    assert len(artist_reqs) == 51
     assert len(result) == 51
 
 
-def test_get_artists_images_skips_null_entries(httpx_mock: HTTPXMock) -> None:
-    # Spotify は ID 不正時に null を返す。dict にエントリを作らずスキップする。
+def test_get_artists_images_skips_404(httpx_mock: HTTPXMock) -> None:
+    """invalid ID は 404 で skip、他は継続。"""
     httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
     httpx_mock.add_response(
-        url=_ARTISTS_URL_PATTERN,
+        url="https://api.spotify.com/v1/artists/art-1",
         method="GET",
-        json=_artists_response([_artist_entry("art-1"), None]),
+        json=_single_artist_response("art-1"),
+    )
+    httpx_mock.add_response(
+        url="https://api.spotify.com/v1/artists/bogus",
+        method="GET",
+        status_code=404,
     )
 
     result = _make_client().get_artists_images(["art-1", "bogus"])
@@ -248,7 +252,9 @@ def test_get_artists_images_skips_null_entries(httpx_mock: HTTPXMock) -> None:
 
 def test_get_artists_images_429_raises(httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
-    httpx_mock.add_response(url=_ARTISTS_URL_PATTERN, method="GET", status_code=429)
+    httpx_mock.add_response(
+        url="https://api.spotify.com/v1/artists/art-1", method="GET", status_code=429
+    )
 
     with pytest.raises(SpotifyApiError) as exc_info:
         _make_client().get_artists_images(["art-1"])

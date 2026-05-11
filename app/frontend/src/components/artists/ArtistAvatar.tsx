@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { avatarTintByString } from "../../lib/palette";
 import type { Artist } from "../../types/api";
 
@@ -9,15 +11,19 @@ function initials(name: string): string {
 }
 
 /**
- * Artist の正方形アバター。image_url があれば画像、無ければ spotify_id ハッシュ
- * 由来の色背景 + イニシャル fallback。
+ * Artist の正方形アバター。
  *
- * `size` で表示サイズを切り替える:
+ * 表示の決定木:
+ * - image_url が無い、または画像読み込みに失敗 (`onError` 発火) → イニシャル
+ * - image_url 有り、ロード中含めて成功経路 → 画像 (まだ来てない間は背景色のみ
+ *   見えてイニシャルは出さない: 「成功するはずの画像」の前にチラつかせない)
+ *
+ * 共通の色背景 (spotify_id ハッシュ由来) は `<div>` に常に乗せて、画像ロード
+ * 中の素の白枠を防ぐ役を兼ねさせる。
+ *
+ * `size`:
  * - "sm": 一覧行用 (40px 相当)
  * - "lg": detail modal ヘッダ用 (80px 相当)
- *
- * 共通レイアウト要件 (正方形, 余白詰め) はここで持つ。呼び出し側は外側の
- * gap / shrink で並べる。
  */
 export function ArtistAvatar({
   artist,
@@ -26,31 +32,35 @@ export function ArtistAvatar({
   artist: Artist;
   size?: "sm" | "lg";
 }) {
+  const [imageError, setImageError] = useState(false);
   const sizeClass = size === "sm" ? "w-10" : "w-20";
   const textClass = size === "sm" ? "text-xs" : "text-base";
-  if (artist.image_url) {
-    return (
-      <img
-        src={artist.image_url}
-        alt=""
-        className={`aspect-square ${sizeClass} shrink-0 object-cover`}
-      />
-    );
-  }
   const bg = avatarTintByString(artist.spotify_id);
   // palette の warm 系 (#b08a3a) は文字を黒、それ以外は紙色に倒して可読性を担保。
   const isWarm = bg === "#b08a3a";
+  const showImage = artist.image_url && !imageError;
   return (
     <div
-      className={`flex aspect-square ${sizeClass} shrink-0 items-center justify-center`}
+      className={`relative aspect-square ${sizeClass} shrink-0 overflow-hidden`}
       style={{
         backgroundColor: bg,
         color: isWarm ? "#1a1714" : "#f4efe3",
       }}
     >
-      <span className={`${textClass} font-medium tracking-wide`}>
-        {initials(artist.name)}
-      </span>
+      {showImage ? (
+        <img
+          src={artist.image_url ?? undefined}
+          alt=""
+          onError={() => setImageError(true)}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <span
+          className={`absolute inset-0 flex items-center justify-center ${textClass} font-medium tracking-wide`}
+        >
+          {initials(artist.name)}
+        </span>
+      )}
     </div>
   );
 }

@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { getArtists, getRecordCounts } from "../api/client";
-import { ArtistAvatar } from "../components/artists/ArtistAvatar";
 import { ArtistDetailModal } from "../components/artists/ArtistDetailModal";
 import {
   FeedDetailModal,
@@ -117,21 +116,17 @@ export function ArtistsPage() {
         )}
         {artistsQ.data && (
           <ul className="divide-y divide-ink-faint/30">
-            {artistsQ.data.items.map((a, i) => {
+            {artistsQ.data.items.map((a) => {
               const count = countsByArtistId.get(a.spotify_id) ?? 0;
               return (
                 <li key={a.spotify_id}>
                   <button
                     type="button"
                     onClick={() => setOpenArtist(a)}
-                    className="flex w-full cursor-pointer items-center gap-3 py-3 text-left text-sm transition-opacity hover:opacity-70"
+                    className="flex w-full cursor-pointer items-baseline gap-3 py-3 text-left text-sm transition-opacity hover:opacity-70"
                   >
-                    <span className="w-6 shrink-0 text-ink-faint tabular-nums">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <ArtistAvatar artist={a} size="sm" />
-                    <span className="flex-1 font-medium">{a.name}</span>
-                    <span className="text-ink-mute tabular-nums">
+                    <span className="pl-[3px] font-medium">{a.name}</span>
+                    <span className="ml-auto pr-[3px] text-ink-mute tabular-nums">
                       {count} {count === 1 ? "record" : "records"}
                     </span>
                   </button>

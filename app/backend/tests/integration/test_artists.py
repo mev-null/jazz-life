@@ -180,18 +180,16 @@ def test_get_artist_hydrates_image_from_spotify(
     session.add(Artist(spotify_id="art-99", name="To Be Hydrated", image_url=None))
     session.commit()
     httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    # get_artists_images は単発 GET /v1/artists/{id} をループする実装
+    # (batch endpoint は Spotify Development Mode app で 403 になるため)
     httpx_mock.add_response(
-        url=_ARTISTS_URL_PATTERN,
+        url="https://api.spotify.com/v1/artists/art-99",
         method="GET",
-        json=_artists_response(
-            [
-                {
-                    "id": "art-99",
-                    "name": "To Be Hydrated",
-                    "images": [{"url": "https://i.scdn.co/image/art99.jpg"}],
-                }
-            ]
-        ),
+        json={
+            "id": "art-99",
+            "name": "To Be Hydrated",
+            "images": [{"url": "https://i.scdn.co/image/art99.jpg"}],
+        },
     )
 
     res = spotify_client.get("/api/artists/art-99")
@@ -235,7 +233,9 @@ def test_get_artist_swallows_spotify_error(
     session.add(Artist(spotify_id="art-fail", name="Spotify Down", image_url=None))
     session.commit()
     httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
-    httpx_mock.add_response(url=_ARTISTS_URL_PATTERN, method="GET", status_code=500)
+    httpx_mock.add_response(
+        url="https://api.spotify.com/v1/artists/art-fail", method="GET", status_code=500
+    )
 
     res = spotify_client.get("/api/artists/art-fail")
 

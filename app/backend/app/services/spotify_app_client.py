@@ -29,12 +29,10 @@ logger = logging.getLogger("uvicorn.error")
 
 SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
 SPOTIFY_SEARCH_URL = "https://api.spotify.com/v1/search"
-SPOTIFY_ARTISTS_URL = "https://api.spotify.com/v1/artists"
+SPOTIFY_ARTIST_URL_TEMPLATE = "https://api.spotify.com/v1/artists/{id}"
 SPOTIFY_ARTIST_ALBUMS_URL_TEMPLATE = "https://api.spotify.com/v1/artists/{id}/albums"
 
 _TOKEN_EXPIRY_MARGIN_SECONDS = 60
-# GET /v1/artists?ids=... の上限。Spotify 公式仕様。
-_ARTISTS_BATCH_LIMIT = 50
 # GET /v1/artists/{id}/albums の 1 ページ最大件数。Spotify 公式仕様で
 # このエンドポイントだけ上限 10 (default 5)。他の Spotify endpoint は 50 まで
 # 行けるが、ここで 50 を渡すと 400 "Invalid limit" が返るので注意。
@@ -126,33 +124,39 @@ class SpotifyAppClient:
         return [_to_summary(item) for item in items]
 
     def get_artists_images(self, ids: list[str]) -> dict[str, str | None]:
-        """`GET /v1/artists?ids=...` で複数アーティストの画像 URL をまとめて取る。
+        """各アーティストの画像 URL をまとめて取って `{ spotify_id: url or None }` を返す。
 
-        Spotify は一度に 50 件まで受け付けるので超える場合はチャンク分割する。
-        戻り値は `{ spotify_id: image_url or None }`。Spotify から `null`
-        (ID 不正) が返ったエントリや、`images` が空のアーティストは `None`
-        を入れて返し、呼び出し側で「未取得」と「画像なし」を区別する必要は
-        生じないようにする (どちらも DB 上は image_url=None のまま据え置きで
-        良い)。
+        実装は `GET /v1/artists/{id}` を id ごとに 1 回ずつ叩く形にしてある。
+        batch 版 (`GET /v1/artists?ids=...`) は Spotify 公式 doc 上は app token
+        で叩ける建付けだが、2024 年の API restriction (Development Mode の
+        Spotify app) で 403 Forbidden を返してくる。単一取得 (`/v1/artists/{id}`)
+        は引き続き許可されているので、確実に動くこちらを採用する。Extended
+        Quota Mode を取れたら batch に戻して N 倍速くできる余地あり。
+
+        404 (artist_id が Spotify 上に存在しない) は warn ログを残してその id
+        だけスキップする。同じバッチ内の他の id は影響を受けない。
         """
         deduped = [i for i in dict.fromkeys(ids) if i]
         if not deduped:
             return {}
         token = self._get_app_token()
         result: dict[str, str | None] = {}
-        for start in range(0, len(deduped), _ARTISTS_BATCH_LIMIT):
-            chunk = deduped[start : start + _ARTISTS_BATCH_LIMIT]
+        for artist_id in deduped:
+            url = SPOTIFY_ARTIST_URL_TEMPLATE.format(id=artist_id)
             try:
                 with httpx.Client(timeout=10.0) as client:
-                    res = client.get(
-                        SPOTIFY_ARTISTS_URL,
-                        headers={"Authorization": f"Bearer {token}"},
-                        params={"ids": ",".join(chunk)},
-                    )
+                    res = client.get(url, headers={"Authorization": f"Bearer {token}"})
             except httpx.HTTPError as exc:
-                raise SpotifyApiError("failed to reach Spotify artists endpoint") from exc
+                raise SpotifyApiError("failed to reach Spotify artist endpoint") from exc
             if res.status_code == 429:
                 raise SpotifyApiError("spotify rate limit exceeded", status_code=429)
+            if res.status_code == 404:
+                # 不正な ID は単一取得だけスキップして他の id 処理を継続する。
+                logger.warning(
+                    "spotify artist 404 artist_id=%s — skipping in image hydration",
+                    artist_id,
+                )
+                continue
             if res.status_code != 200:
                 try:
                     err_body = res.json()
@@ -160,28 +164,22 @@ class SpotifyAppClient:
                 except ValueError:
                     err_detail = None
                 logger.warning(
-                    "spotify artists endpoint returned %s ids=%d error=%s",
+                    "spotify artist endpoint returned %s artist_id=%s error=%s",
                     res.status_code,
-                    len(chunk),
+                    artist_id,
                     err_detail,
                 )
                 raise SpotifyApiError(
-                    f"spotify artists endpoint returned {res.status_code}",
+                    f"spotify artist endpoint returned {res.status_code}",
                     status_code=res.status_code,
                 )
-            payload = res.json()
-            entries = payload.get("artists") or []
-            for entry in entries:
-                if not entry:
-                    # Spotify は ID 不正時に null を返す。呼び出し側がチャンクに
-                    # 入れた順序は保てないので、id 取り出しは entry["id"] に頼る。
-                    continue
-                artist_id = entry.get("id")
-                if not artist_id:
-                    continue
-                images = entry.get("images") or []
-                image_url = images[0].get("url") if images else None
-                result[artist_id] = image_url
+            entry = res.json() or {}
+            entry_id = entry.get("id")
+            if not entry_id:
+                continue
+            images = entry.get("images") or []
+            image_url = images[0].get("url") if images else None
+            result[entry_id] = image_url
         return result
 
     def get_artist_albums(
