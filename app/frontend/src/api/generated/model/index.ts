@@ -7,6 +7,8 @@
 
 export * from './artistRead';
 export * from './artistReadSource';
+export * from './authUserRead';
+export * from './callbackApiAuthCallbackGetParams';
 export * from './healthzHealthzGet200';
 export * from './hTTPValidationError';
 export * from './listResponseArtistRead';
