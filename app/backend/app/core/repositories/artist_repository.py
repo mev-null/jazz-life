@@ -21,3 +21,9 @@ class ArtistRepository:
     def bulk_insert(self, rows: list[Artist]) -> None:
         self.session.add_all(rows)
         self.session.commit()
+
+    def add(self, artist: Artist) -> Artist:
+        self.session.add(artist)
+        self.session.commit()
+        self.session.refresh(artist)
+        return artist
