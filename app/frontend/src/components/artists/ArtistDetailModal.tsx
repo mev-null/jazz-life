@@ -15,6 +15,7 @@ import type {
 } from "../../types/api";
 import { ModalShell } from "../ModalShell";
 import { TodayDivider } from "../feed/TodayDivider";
+import { AddRecordTile } from "../records/AddRecordTile";
 import { JacketArt } from "../records/JacketCard";
 
 function initials(name: string): string {
@@ -119,6 +120,9 @@ type Props = {
   onRecordClick: (record: VinylRecord) => void;
   onReleaseClick: (release: Release) => void;
   onConcertClick: (concert: Concert) => void;
+  // セクションのグリッド末尾に出る「＋」タイル（hover 表示）からの追加導線。
+  // 呼び出し側で RecordFormModal を defaults 付きで開く責務を持つ。
+  onAddRecord: (artist: Artist, status: "owned" | "wanted") => void;
 };
 
 export function ArtistDetailModal({
@@ -130,6 +134,7 @@ export function ArtistDetailModal({
   onRecordClick,
   onReleaseClick,
   onConcertClick,
+  onAddRecord,
 }: Props) {
   if (!artist) return null;
 
@@ -181,23 +186,23 @@ export function ArtistDetailModal({
               {ownedRecords.length}
             </span>
           </h3>
-          {ownedRecords.length > 0 ? (
-            <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
-              {ownedRecords.map((r) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => onRecordClick(r)}
-                  aria-label={r.title}
-                  className="block aspect-square w-full cursor-pointer appearance-none bg-transparent p-0 transition-opacity hover:opacity-90"
-                >
-                  <JacketArt record={r} />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-2 text-sm italic text-ink-faint">none owned</p>
-          )}
+          <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
+            {ownedRecords.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => onRecordClick(r)}
+                aria-label={r.title}
+                className="block aspect-square w-full cursor-pointer appearance-none bg-transparent p-0 transition-opacity hover:opacity-90"
+              >
+                <JacketArt record={r} />
+              </button>
+            ))}
+            <AddRecordTile
+              onClick={() => onAddRecord(artist, "owned")}
+              prominent={ownedRecords.length === 0}
+            />
+          </div>
         </section>
 
         {/* Want list (wanted) — Home からは見えず、ここでだけ参照する */}
@@ -208,23 +213,23 @@ export function ArtistDetailModal({
               {wantedRecords.length}
             </span>
           </h3>
-          {wantedRecords.length > 0 ? (
-            <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
-              {wantedRecords.map((r) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => onRecordClick(r)}
-                  aria-label={r.title}
-                  className="block aspect-square w-full cursor-pointer appearance-none bg-transparent p-0 transition-opacity hover:opacity-90"
-                >
-                  <JacketArt record={r} />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-2 text-sm italic text-ink-faint">none wanted</p>
-          )}
+          <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
+            {wantedRecords.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => onRecordClick(r)}
+                aria-label={r.title}
+                className="block aspect-square w-full cursor-pointer appearance-none bg-transparent p-0 transition-opacity hover:opacity-90"
+              >
+                <JacketArt record={r} />
+              </button>
+            ))}
+            <AddRecordTile
+              onClick={() => onAddRecord(artist, "wanted")}
+              prominent={wantedRecords.length === 0}
+            />
+          </div>
         </section>
 
         {/* Activity (releases + concerts unified timeline) */}

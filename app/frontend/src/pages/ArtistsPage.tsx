@@ -13,6 +13,10 @@ import {
   type FeedItem,
 } from "../components/feed/FeedDetailModal";
 import { RecordDetailModal } from "../components/records/RecordDetailModal";
+import {
+  RecordFormModal,
+  type FormMode,
+} from "../components/records/RecordFormModal";
 import { findArtistInConcert } from "../lib/matchArtist";
 import { useReadState } from "../lib/useReadState";
 import type { Artist, Concert, Release, VinylRecord } from "../types/api";
@@ -29,6 +33,7 @@ export function ArtistsPage() {
   const [openArtist, setOpenArtist] = useState<Artist | null>(null);
   const [openRecord, setOpenRecord] = useState<VinylRecord | null>(null);
   const [openFeedItem, setOpenFeedItem] = useState<FeedItem | null>(null);
+  const [formMode, setFormMode] = useState<FormMode | null>(null);
 
   const { isRead, markRead, markUnread } = useReadState();
 
@@ -117,6 +122,12 @@ export function ArtistsPage() {
         onRecordClick={(r) => setOpenRecord(r)}
         onReleaseClick={handleReleaseClick}
         onConcertClick={handleConcertClick}
+        onAddRecord={(a, status) =>
+          setFormMode({
+            kind: "add",
+            defaults: { artistId: a.spotify_id, status },
+          })
+        }
       />
 
       <RecordDetailModal
@@ -125,6 +136,12 @@ export function ArtistsPage() {
           openRecord ? artistById(openRecord.artist_id)?.name : undefined
         }
         onClose={() => setOpenRecord(null)}
+      />
+
+      <RecordFormModal
+        mode={formMode}
+        artists={artistsQ.data?.items ?? []}
+        onClose={() => setFormMode(null)}
       />
 
       <FeedDetailModal

@@ -13,12 +13,19 @@ import type { Artist, VinylRecord } from "../../types/api";
 import type {
   SpotifyAlbumSummary,
   VinylRecordCreate,
+  VinylRecordCreateStatus,
   VinylRecordUpdate,
 } from "../../api/generated/model";
 import { ModalShell } from "../ModalShell";
 
 export type FormMode =
-  | { kind: "add" }
+  | {
+    kind: "add";
+    // ArtistDetailModal から呼ぶ際に artist と status を事前確定するための
+    // 任意デフォルト。UI には status コントロールを出さず、ここで指定された
+    // ものを create payload に流し込む。
+    defaults?: { artistId?: string; status?: VinylRecordCreateStatus };
+  }
   | { kind: "edit"; record: VinylRecord };
 
 type Props = {
@@ -105,8 +112,15 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
       setSpotifyAlbumId(r.spotify_album_id);
     } else {
       setTitle("");
-      setArtistId(""); // 別 effect が artists 到着後に補完する
-      setArtistQuery("");
+      // add mode: defaults.artistId が渡されていればその場で artists を引いて
+      // name も埋める。artists 未到着のケースは下の追い焚き effect が補完する。
+      const defaultArtistId = mode.defaults?.artistId ?? "";
+      setArtistId(defaultArtistId);
+      setArtistQuery(
+        defaultArtistId
+          ? artists.find((a) => a.spotify_id === defaultArtistId)?.name ?? ""
+          : "",
+      );
       setReleaseDate("");
       setPressingInfo("");
       setPurchaseStore("");
@@ -137,6 +151,17 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
     if (mode?.kind !== "edit") return;
     if (artistQuery) return;
     const name = artists.find((a) => a.spotify_id === mode.record.artist_id)?.name;
+    if (name) setArtistQuery(name);
+  }, [mode, artists, artistQuery]);
+
+  // add モードで defaults.artistId が指定されている場合、artists が後から到着
+  // するパターン用に name を補完する。
+  useEffect(() => {
+    if (mode?.kind !== "add") return;
+    const defaultArtistId = mode.defaults?.artistId;
+    if (!defaultArtistId) return;
+    if (artistQuery) return;
+    const name = artists.find((a) => a.spotify_id === defaultArtistId)?.name;
     if (name) setArtistQuery(name);
   }, [mode, artists, artistQuery]);
 
@@ -298,6 +323,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
         title: title.trim(),
         spotify_album_id: spotifyAlbumId,
         source: spotifyAlbumId ? "spotify" : "manual",
+        status: mode.defaults?.status,
         image_url: pendingFile ? null : existingImageUrl,
         original_release_date: releaseDate.trim() || null,
         pressing_info: pressingInfo.trim() || null,
@@ -328,7 +354,11 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
         className="max-h-[90vh] w-[min(90vw,560px)] overflow-y-auto bg-paper p-8 text-left text-ink shadow-xl ring-1 ring-ink/10"
       >
         <h2 className="border-b border-ink/15 pb-3 text-lg font-medium">
-          {isEdit ? "Edit Record" : "Add a Record"}
+          {isEdit
+            ? "Edit Record"
+            : mode.kind === "add" && mode.defaults?.status === "wanted"
+              ? "Add to Want List"
+              : "Add a Record"}
         </h2>
 
         <div className="mt-6 space-y-5">
