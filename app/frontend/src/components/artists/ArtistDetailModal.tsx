@@ -133,7 +133,7 @@ export function ArtistDetailModal({
 }: Props) {
   if (!artist) return null;
 
-  // ADR-003: status='owned' は Records (所有) セクション、'wanted' は Want list セクションに分ける。
+  // ADR-003: own → want → activity の 3 セクション構造。
   const artistRecords = records.filter((r) => r.artist_id === artist.spotify_id);
   const ownedRecords = artistRecords.filter((r) => r.status === "owned");
   const wantedRecords = artistRecords.filter((r) => r.status === "wanted");
