@@ -5,6 +5,7 @@ import { formatLongDate } from "../../lib/dates";
 import { formatVenue } from "../../lib/formatVenue";
 import type { Artist, Concert, Release } from "../../types/api";
 import { ModalShell } from "../ModalShell";
+import { ReleaseJacket } from "./ReleaseJacket";
 
 export type FeedItem =
   | { kind: "release"; data: Release; artist?: Artist }
@@ -90,12 +91,17 @@ function ReleaseDetail({
   const spotifyUrl = `https://open.spotify.com/album/${release.spotify_id}`;
   return (
     <>
-      <header className="border-b border-ink/15 pb-4">
-        <div className="text-2xl font-medium leading-tight">
-          {release.title}
+      <header className="flex items-start gap-4 border-b border-ink/15 pb-4">
+        <div className="min-w-0 flex-1">
+          <div className="text-2xl font-medium leading-tight">
+            {release.title}
+          </div>
+          <div className="mt-1 text-base text-ink-mute">
+            {artist?.name ?? "—"}
+          </div>
         </div>
-        <div className="mt-1 text-base text-ink-mute">
-          {artist?.name ?? "—"}
+        <div className="aspect-square w-20 shrink-0 overflow-hidden ring-1 ring-ink/10">
+          <ReleaseJacket release={release} />
         </div>
       </header>
 
@@ -108,17 +114,17 @@ function ReleaseDetail({
         <div className="flex gap-3 border-t border-ink/15 pt-4">
           <button
             type="button"
-            onClick={() => onCollect("owned")}
-            className="flex-1 cursor-pointer bg-ink/10 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/20"
-          >
-            買った
-          </button>
-          <button
-            type="button"
             onClick={() => onCollect("wanted")}
             className="flex-1 cursor-pointer border border-ink/20 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/5"
           >
-            ほしい
+            On the hunt
+          </button>
+          <button
+            type="button"
+            onClick={() => onCollect("owned")}
+            className="flex-1 cursor-pointer bg-ink/10 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/20"
+          >
+            On the shelf
           </button>
         </div>
       )}
@@ -132,7 +138,7 @@ function ReleaseDetail({
             disabled={promoteToOwned.isPending}
             className="flex-1 cursor-pointer bg-ink/10 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/20 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {promoteToOwned.isPending ? "Moving…" : "買った"}
+            {promoteToOwned.isPending ? "Moving…" : "On the shelf"}
           </button>
         </div>
       )}
@@ -228,7 +234,7 @@ export function FeedDetailModal({
             <button
               type="button"
               onClick={onToggleRead}
-              className="text-xs italic text-ink-mute transition-colors hover:text-ink"
+              className={`text-sm italic transition-colors hover:text-ink ${isRead ? "text-ink" : "text-ink-mute"}`}
             >
               {isRead ? "mark as unread" : "mark as read"}
             </button>

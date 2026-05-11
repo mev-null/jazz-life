@@ -21,20 +21,19 @@ import type {
   Release,
   VinylRecord,
 } from "../../types/api";
-import { useReadState } from "../../lib/useReadState";
 import { InlineConfirm } from "../InlineConfirm";
 import { ModalShell } from "../ModalShell";
 import { ReleaseRow } from "../feed/ReleaseRow";
 import { TodayDivider } from "../feed/TodayDivider";
 import { AddRecordTile } from "../records/AddRecordTile";
 import { JacketArt } from "../records/JacketCard";
+import { RecordsAllModal } from "../records/RecordsAllModal";
 import { ArtistAvatar } from "./ArtistAvatar";
-import { ArtistRecordsAllModal } from "./ArtistRecordsAllModal";
 
 // detail modal のセクションが「拡大表示」(別 modal で全件) に切り替わる件数閾値。
-// 4 = sm+ の grid 1 行に収まる枚数。これ以上は detail 内グリッドに「+」を出さず、
-// 4 件だけプレビューして "view all" 経由で拡大表示へ誘導する。
-const SECTION_PREVIEW_LIMIT = 4;
+// 8 = sm+ の 4 列 grid で 2 行分。これ以上溜まったらグリッド内の「+」タイルは
+// 隠して "view all" 経由で拡大表示モーダルに誘導する。
+const SECTION_PREVIEW_LIMIT = 8;
 
 type TimelineItem =
   | { kind: "release"; data: Release; date: string }
@@ -100,26 +99,24 @@ function ActivityRow({
   index,
   isPast,
   artist,
-  isRead,
   onClick,
 }: {
   item: TimelineItem;
   index: number;
   isPast: boolean;
   artist: Artist;
-  isRead: (key: string) => boolean;
   onClick: () => void;
 }) {
-  // release は Feed と共通の jacket-style 行で表示する。concert は既存の
-  // テキスト index 行 (TimelineRow) を使い続ける。混在で行高が違うが、
-  // 「ジャケットあり = リリース、無し = 公演」 と直感的に区別できる方を優先。
+  // release は backend (is_read) を真として表示。concert は読了状態を
+  // この行レベルで表現していない (TimelineRow に isRead プロパティ無し)。
+  // 必要になったら useReadState 由来の bool をここに足す。
   if (item.kind === "release") {
     return (
       <ReleaseRow
         release={item.data}
         artist={artist}
         isPast={isPast}
-        isRead={isRead(`release:${item.data.spotify_id}`)}
+        isRead={item.data.is_read}
         onClick={onClick}
       />
     );
@@ -222,8 +219,6 @@ export function ArtistDetailModal({
   useEffect(() => {
     setExpandedSection(null);
   }, [artist?.spotify_id]);
-  // Activity に release を出すとき、Feed と同じ既読状態 (localStorage 共有) を尊重する。
-  const { isRead } = useReadState();
   const queryClient = useQueryClient();
   const unfollow = useMutation({
     mutationFn: unfollowArtist,
@@ -308,18 +303,18 @@ export function ArtistDetailModal({
           <ArtistAvatar artist={displayArtist} />
         </header>
 
-        {/* Records (owned) */}
+        {/* Owned records */}
         <RecordsSection
-          label="Records"
+          label="On the shelf"
           records={ownedRecords}
           onRecordClick={onRecordClick}
           onAddRecord={() => onAddRecord(artist, "owned")}
           onViewAll={() => setExpandedSection("owned")}
         />
 
-        {/* Want list (wanted) — Home からは見えず、ここでだけ参照する */}
+        {/* Wanted records — Home からは見えず、ここでだけ参照する */}
         <RecordsSection
-          label="Want list"
+          label="On the hunt"
           records={wantedRecords}
           onRecordClick={onRecordClick}
           onAddRecord={() => onAddRecord(artist, "wanted")}
@@ -344,7 +339,6 @@ export function ArtistDetailModal({
                     index={i + 1}
                     isPast={false}
                     artist={artist}
-                    isRead={isRead}
                     onClick={() => handleClick(item)}
                   />
                 ))}
@@ -362,7 +356,6 @@ export function ArtistDetailModal({
                     index={tp.upcoming.length + i + 1}
                     isPast={true}
                     artist={artist}
-                    isRead={isRead}
                     onClick={() => handleClick(item)}
                   />
                 ))}
@@ -394,13 +387,13 @@ export function ArtistDetailModal({
         </section>
       </div>
       {expandedSection !== null && (
-        <ArtistRecordsAllModal
-          artist={displayArtist}
+        <RecordsAllModal
+          prefix={displayArtist.name}
+          label={expandedSection === "owned" ? "On the shelf" : "On the hunt"}
           records={expandedSection === "owned" ? ownedRecords : wantedRecords}
-          status={expandedSection}
           onClose={() => setExpandedSection(null)}
           onRecordClick={onRecordClick}
-          onAddRecord={onAddRecord}
+          onAddRecord={() => onAddRecord(artist, expandedSection)}
         />
       )}
     </ModalShell>

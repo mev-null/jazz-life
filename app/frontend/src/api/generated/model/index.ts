@@ -22,6 +22,7 @@ export * from './listResponseSpotifyAlbumSummary';
 export * from './listResponseVinylRecordRead';
 export * from './releaseRead';
 export * from './releaseReadAlbumType';
+export * from './releaseReadStatusUpdate';
 export * from './rootGet200';
 export * from './searchAlbumsApiSpotifyAlbumsSearchGetParams';
 export * from './spotifyAlbumSummary';

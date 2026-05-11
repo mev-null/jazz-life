@@ -315,3 +315,47 @@ def test_post_sync_marks_error_when_all_artists_fail(
     status_res = authed_client.get("/api/releases/sync-status").json()
     assert status_res["last_success_at"] is None
     assert status_res["last_error"] is not None
+
+
+# ---- PATCH /api/releases/{spotify_id}/read ----
+
+
+def test_set_read_requires_auth(unauthed_client: TestClient) -> None:
+    res = unauthed_client.patch("/api/releases/whatever/read", json={"is_read": True})
+    assert res.status_code == 401
+
+
+def test_set_read_unknown_id_returns_404(authed_client: TestClient) -> None:
+    res = authed_client.patch("/api/releases/ghost/read", json={"is_read": True})
+    assert res.status_code == 404
+
+
+def test_set_read_true_then_false(authed_client: TestClient, session: Session) -> None:
+    """is_read=true で read_at が now、false に戻すと read_at=null。"""
+    now = datetime.now(UTC)
+    session.add(Artist(spotify_id="art-r", name="A", added_at=now))
+    session.commit()
+    session.add(
+        Release(
+            spotify_id="rel-1",
+            artist_id="art-r",
+            title="x",
+            album_type="album",
+            release_date=date(2026, 1, 1),
+        )
+    )
+    session.commit()
+
+    # 既読化
+    res = authed_client.patch("/api/releases/rel-1/read", json={"is_read": True})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["is_read"] is True
+    assert body["read_at"] is not None
+
+    # 未読に戻す
+    res2 = authed_client.patch("/api/releases/rel-1/read", json={"is_read": False})
+    assert res2.status_code == 200
+    body2 = res2.json()
+    assert body2["is_read"] is False
+    assert body2["read_at"] is None

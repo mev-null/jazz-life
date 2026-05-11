@@ -1,7 +1,12 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { getFollowedArtists, getRecordCounts } from "../api/client";
+import {
+  getConcerts,
+  getFollowedArtists,
+  getRecordCounts,
+  getReleases,
+} from "../api/client";
 import { ArtistDetailModal } from "../components/artists/ArtistDetailModal";
 import {
   FeedDetailModal,
@@ -12,6 +17,7 @@ import {
   RecordFormModal,
   type FormMode,
 } from "../components/records/RecordFormModal";
+import { concertMatchesArtist } from "../lib/matchArtist";
 import { useReadState } from "../lib/useReadState";
 import type { Artist, Concert, Release, VinylRecord } from "../types/api";
 
@@ -31,6 +37,14 @@ export function ArtistsPage() {
     queryKey: ["record-counts"],
     queryFn: getRecordCounts,
   });
+  // 行頭の「未読黒豆」表示用。release は backend (is_read)、concert は
+  // localStorage (useReadState) を見る。FeedPage / ArtistDetailModal と
+  // 同じ query key なのでキャッシュは共有される。
+  const releasesQ = useQuery({
+    queryKey: ["releases"],
+    queryFn: () => getReleases(),
+  });
+  const concertsQ = useQuery({ queryKey: ["concerts"], queryFn: getConcerts });
 
   const [openArtist, setOpenArtist] = useState<Artist | null>(null);
   const [openRecord, setOpenRecord] = useState<VinylRecord | null>(null);
@@ -50,6 +64,24 @@ export function ArtistsPage() {
     }
     return map;
   }, [recordCountsQ.data]);
+
+  // artist_id -> 未読 release または未読 concert が 1 件でもあるか。
+  // concert は単一 artist に紐付かない (タイトル文字列マッチ) ので、各 concert を
+  // 全 artist と突き合わせて該当 artist の set に積む。
+  const unreadArtistIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of releasesQ.data?.items ?? []) {
+      if (!r.is_read) set.add(r.artist_id);
+    }
+    const artistList = artistsQ.data?.items ?? [];
+    for (const c of concertsQ.data?.items ?? []) {
+      if (isRead(`concert:${c.id}`)) continue;
+      for (const a of artistList) {
+        if (concertMatchesArtist(c, a)) set.add(a.spotify_id);
+      }
+    }
+    return set;
+  }, [releasesQ.data, concertsQ.data, artistsQ.data, isRead]);
 
   // FeedDetailModal toggle state
   const openFeedKey = openFeedItem
@@ -125,14 +157,20 @@ export function ArtistsPage() {
           <ul className="divide-y divide-ink-faint/30">
             {artistsQ.data.items.map((a) => {
               const count = countsByArtistId.get(a.spotify_id) ?? 0;
+              const hasUnread = unreadArtistIds.has(a.spotify_id);
               return (
                 <li key={a.spotify_id}>
                   <button
                     type="button"
                     onClick={() => setOpenArtist(a)}
-                    className="flex w-full cursor-pointer items-baseline gap-3 py-3 text-left text-sm transition-opacity hover:opacity-70"
+                    className="flex w-full cursor-pointer items-center gap-2 py-3 text-left text-sm transition-opacity hover:opacity-70"
                   >
-                    <span className="pl-[3px] font-medium">{a.name}</span>
+                    <span className="flex w-2 shrink-0 items-center justify-center">
+                      {hasUnread && (
+                        <span className="block h-1 w-1 rounded-full bg-ink/70" />
+                      )}
+                    </span>
+                    <span className="font-medium">{a.name}</span>
                     <span className="ml-auto pr-[3px] text-ink-mute tabular-nums">
                       {count} {count === 1 ? "record" : "records"}
                     </span>

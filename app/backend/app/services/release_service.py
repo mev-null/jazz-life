@@ -90,6 +90,16 @@ class ReleaseService:
                 logger.warning("release sync failed for artist_id=%s: %s", artist_id, exc)
                 if first_error is None:
                     first_error = f"{artist_id}: {exc}"
+                if exc.status_code == 429:
+                    # Spotify rate limit (rolling 30s window) を踏んだ。残りの artist を
+                    # 続けて叩いてもどの request も 429 で返ってくるだけで、limit window
+                    # を延ばしてしまうので即中断する。残りは次回 sync で取り込む。
+                    # https://developer.spotify.com/documentation/web-api/concepts/rate-limits
+                    logger.warning(
+                        "release sync stopped early due to spotify rate limit; "
+                        "remaining artists deferred to next sync"
+                    )
+                    break
                 continue
             rows = [_to_release(item) for item in ingests]
             self.release_repo.upsert_many(rows)

@@ -27,6 +27,8 @@ import type {
   HTTPValidationError,
   ListReleasesApiReleasesGetParams,
   ListResponseReleaseRead,
+  ReleaseRead,
+  ReleaseReadStatusUpdate,
   SyncRunRequest,
   SyncRunResult,
   SyncStatusRead
@@ -277,7 +279,103 @@ export function useGetSyncStatusApiReleasesSyncStatusGet<TData = Awaited<ReturnT
 
 
 
-export type triggerSyncApiReleasesSyncPostResponse200 = {
+export type setReleaseReadStatusApiReleasesSpotifyIdReadPatchResponse200 = {
+  data: ReleaseRead
+  status: 200
+}
+
+export type setReleaseReadStatusApiReleasesSpotifyIdReadPatchResponse422 = {
+  data: HTTPValidationError
+  status: 422
+}
+
+export type setReleaseReadStatusApiReleasesSpotifyIdReadPatchResponseSuccess = (setReleaseReadStatusApiReleasesSpotifyIdReadPatchResponse200) & {
+  headers: Headers;
+};
+export type setReleaseReadStatusApiReleasesSpotifyIdReadPatchResponseError = (setReleaseReadStatusApiReleasesSpotifyIdReadPatchResponse422) & {
+  headers: Headers;
+};
+
+export type setReleaseReadStatusApiReleasesSpotifyIdReadPatchResponse = (setReleaseReadStatusApiReleasesSpotifyIdReadPatchResponseSuccess | setReleaseReadStatusApiReleasesSpotifyIdReadPatchResponseError)
+
+export const getSetReleaseReadStatusApiReleasesSpotifyIdReadPatchUrl = (spotifyId: string,) => {
+
+
+
+
+  return `/api/releases/${spotifyId}/read`
+}
+
+/**
+ * release の既読フラグをトグル (Feed の未読 dot 用)。
+
+Phase B-3 で localStorage ベースの既読を backend (release.is_read / read_at)
+に移行する経路。`is_read=true` で `read_at=now()`、`false` で `read_at=null`
+に連動して書き換える。auth 必須 (単一ユーザだが将来 multi-user 化で current
+user が要るため最初から固定)。
+ * @summary Set Release Read Status
+ */
+export const setReleaseReadStatusApiReleasesSpotifyIdReadPatch = async (spotifyId: string,
+    releaseReadStatusUpdate: ReleaseReadStatusUpdate, options?: RequestInit): Promise<setReleaseReadStatusApiReleasesSpotifyIdReadPatchResponse> => {
+
+  return customFetch<setReleaseReadStatusApiReleasesSpotifyIdReadPatchResponse>(getSetReleaseReadStatusApiReleasesSpotifyIdReadPatchUrl(spotifyId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      releaseReadStatusUpdate,)
+  }
+);}
+
+
+
+
+export const getSetReleaseReadStatusApiReleasesSpotifyIdReadPatchMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setReleaseReadStatusApiReleasesSpotifyIdReadPatch>>, TError,{spotifyId: string;data: ReleaseReadStatusUpdate}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setReleaseReadStatusApiReleasesSpotifyIdReadPatch>>, TError,{spotifyId: string;data: ReleaseReadStatusUpdate}, TContext> => {
+
+const mutationKey = ['setReleaseReadStatusApiReleasesSpotifyIdReadPatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setReleaseReadStatusApiReleasesSpotifyIdReadPatch>>, {spotifyId: string;data: ReleaseReadStatusUpdate}> = (props) => {
+          const {spotifyId,data} = props ?? {};
+
+          return  setReleaseReadStatusApiReleasesSpotifyIdReadPatch(spotifyId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetReleaseReadStatusApiReleasesSpotifyIdReadPatchMutationResult = NonNullable<Awaited<ReturnType<typeof setReleaseReadStatusApiReleasesSpotifyIdReadPatch>>>
+    export type SetReleaseReadStatusApiReleasesSpotifyIdReadPatchMutationBody = ReleaseReadStatusUpdate
+    export type SetReleaseReadStatusApiReleasesSpotifyIdReadPatchMutationError = HTTPValidationError
+
+    /**
+ * @summary Set Release Read Status
+ */
+export const useSetReleaseReadStatusApiReleasesSpotifyIdReadPatch = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setReleaseReadStatusApiReleasesSpotifyIdReadPatch>>, TError,{spotifyId: string;data: ReleaseReadStatusUpdate}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof setReleaseReadStatusApiReleasesSpotifyIdReadPatch>>,
+        TError,
+        {spotifyId: string;data: ReleaseReadStatusUpdate},
+        TContext
+      > => {
+      return useMutation(getSetReleaseReadStatusApiReleasesSpotifyIdReadPatchMutationOptions(options), queryClient);
+    }
+    export type triggerSyncApiReleasesSyncPostResponse200 = {
   data: SyncRunResult
   status: 200
 }
