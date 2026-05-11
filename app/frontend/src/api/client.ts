@@ -28,6 +28,7 @@ import {
 } from "./generated/artists/artists";
 import {
   createRecordApiRecordsPost,
+  deleteRecordApiRecordsIdDelete,
   listRecordsApiRecordsGet,
   updateRecordApiRecordsIdPut,
 } from "./generated/records/records";
@@ -244,6 +245,23 @@ export async function createVinylRecord(
   }
   const res = await createRecordApiRecordsPost(input);
   return res.data as VinylRecord;
+}
+
+/**
+ * 1 件削除。auth 必須 (backend で get_current_user ガード済み)。
+ *
+ * user_follows は触らないので、最後の 1 件を消しても follow と sync 対象は
+ * 残ったまま。「興味なくなった」を反映したい場合は将来 unfollow UI を別途。
+ */
+export async function deleteVinylRecord(id: string): Promise<void> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 30));
+    const idx = mockRecordsStore.findIndex((r) => r.id === id);
+    if (idx < 0) throw new Error(`record not found: ${id}`);
+    mockRecordsStore.splice(idx, 1);
+    return;
+  }
+  await deleteRecordApiRecordsIdDelete(id);
 }
 
 export async function updateVinylRecord(

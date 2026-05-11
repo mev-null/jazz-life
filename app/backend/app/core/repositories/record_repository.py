@@ -33,6 +33,13 @@ class RecordRepository:
     def get(self, id: uuid.UUID) -> VinylRecord | None:
         return self.session.get(VinylRecord, id)
 
+    def delete(self, record: VinylRecord) -> None:
+        """1 件を hard delete。user_follows は触らない方針 (record の生死と
+        フォロー状態を独立スコープに保つ)。soft delete は導入していないので
+        単純な物理削除で OK。"""
+        self.session.delete(record)
+        self.session.commit()
+
     def add(self, record: VinylRecord) -> VinylRecord:
         return self._persist(record)
 

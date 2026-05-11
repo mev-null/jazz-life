@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   createVinylRecord,
+  deleteVinylRecord,
   searchSpotifyAlbums,
   updateVinylRecord,
   uploadJacket,
@@ -97,6 +98,14 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
       queryClient.invalidateQueries({ queryKey: ["records"] }),
   });
 
+  // 編集モードの「削除」ボタン。1 クリック目で confirm 状態に切り替え、2
+  // クリック目で実際に DELETE を打つ (誤タップ防止のため独立ステートで管理)。
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const remove = useMutation({
+    mutationFn: deleteVinylRecord,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["records"] }),
+  });
+
   // load fields when modal opens / mode changes.
   // 依存は mode のみ。artists を deps に入れると、TanStack Query の refetch で
   // artists 参照が変わった際に effect が再走 → ユーザの編集中の入力が初期値に
@@ -149,6 +158,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
     setSpotifyOpen(false);
     setSpotifyError(null);
     setArtistDropdownOpen(false);
+    setConfirmDelete(false);
     // pending blob はモーダル切替（mode→null 含む）/ unmount で確実に解放する
     return () => {
       if (previewBlobRef.current) {
@@ -594,7 +604,36 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
           </label>
         </div>
 
-        <div className="mt-8 flex justify-end gap-6 text-sm">
+        <div className="mt-8 flex items-center gap-6 text-sm">
+          {isEdit && mode.kind === "edit" && (
+            // 編集モードのみ Delete ボタンを左端に出す。1 クリック目で confirm
+            // ラベルに切り替え、2 クリック目で実際に DELETE する誤タップガード。
+            <button
+              type="button"
+              onClick={() => {
+                if (!confirmDelete) {
+                  setConfirmDelete(true);
+                  return;
+                }
+                remove.mutate(mode.record.id, {
+                  onSuccess: () => {
+                    previewBlobRef.current = null;
+                    onClose();
+                  },
+                });
+              }}
+              disabled={submitting || remove.isPending}
+              className={`mr-auto cursor-pointer italic transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                confirmDelete ? "text-ink underline" : "text-ink-mute hover:text-ink"
+              }`}
+            >
+              {remove.isPending
+                ? "Deleting…"
+                : confirmDelete
+                  ? "Really delete?"
+                  : "Delete"}
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}

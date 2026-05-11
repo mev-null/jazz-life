@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { getArtists, getRecordCounts } from "../api/client";
+import { ArtistAvatar } from "../components/artists/ArtistAvatar";
 import { ArtistDetailModal } from "../components/artists/ArtistDetailModal";
 import {
   FeedDetailModal,
@@ -71,6 +72,33 @@ export function ArtistsPage() {
     setOpenFeedItem({ kind: "concert", data: c, artist: matchedArtist });
   }
 
+  function handleEditOpenRecord() {
+    // HomePage と同じパターン: 詳細を閉じてから edit form を開く。
+    if (!openRecord) return;
+    setFormMode({ kind: "edit", record: openRecord });
+    setOpenRecord(null);
+  }
+
+  /**
+   * Activity の release を開いた状態で「買った/ほしい」を押した時のハンドラ。
+   * FeedPage と同じ動作: FeedDetailModal を閉じてから RecordFormModal を
+   * release のメタデータ pre-fill で開く。
+   */
+  function handleCollectFromRelease(r: Release, status: "owned" | "wanted") {
+    setOpenFeedItem(null);
+    setFormMode({
+      kind: "add",
+      defaults: {
+        artistId: r.artist_id,
+        status,
+        title: r.title,
+        imageUrl: r.image_url,
+        spotifyAlbumId: r.spotify_id,
+        originalReleaseDate: r.release_date,
+      },
+    });
+  }
+
   return (
     <section>
       <h1 className="flex items-baseline gap-3 text-base">
@@ -96,11 +124,12 @@ export function ArtistsPage() {
                   <button
                     type="button"
                     onClick={() => setOpenArtist(a)}
-                    className="flex w-full cursor-pointer items-baseline gap-3 py-3 text-left text-sm transition-opacity hover:opacity-70"
+                    className="flex w-full cursor-pointer items-center gap-3 py-3 text-left text-sm transition-opacity hover:opacity-70"
                   >
                     <span className="w-6 shrink-0 text-ink-faint tabular-nums">
                       {String(i + 1).padStart(2, "0")}
                     </span>
+                    <ArtistAvatar artist={a} size="sm" />
                     <span className="flex-1 font-medium">{a.name}</span>
                     <span className="text-ink-mute tabular-nums">
                       {count} {count === 1 ? "record" : "records"}
@@ -133,6 +162,7 @@ export function ArtistsPage() {
           openRecord ? artistById(openRecord.artist_id)?.name : undefined
         }
         onClose={() => setOpenRecord(null)}
+        onEdit={handleEditOpenRecord}
       />
 
       <RecordFormModal
@@ -146,6 +176,7 @@ export function ArtistsPage() {
         isRead={openFeedIsRead}
         onToggleRead={toggleOpenFeedRead}
         onClose={() => setOpenFeedItem(null)}
+        onCollectFromRelease={handleCollectFromRelease}
       />
     </section>
   );

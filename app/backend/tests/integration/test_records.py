@@ -247,6 +247,65 @@ def test_put_to_unknown_artist_returns_404(authed_records_client: TestClient) ->
     assert res.status_code == 404
 
 
+# ---- DELETE /api/records/{id} ----
+
+
+def test_delete_returns_204_and_removes(authed_records_client: TestClient) -> None:
+    created = authed_records_client.post("/api/records", json=_new_record_payload()).json()
+
+    res = authed_records_client.delete(f"/api/records/{created['id']}")
+    assert res.status_code == 204
+    # GET 一覧から消えていること
+    assert authed_records_client.get("/api/records").json()["items"] == []
+
+
+def test_delete_requires_auth(unauthed_client: TestClient, session: Session) -> None:
+    """delete も POST と同様に auth ガード。
+
+    record は authed client を使わず直接 INSERT する (両 fixture を同テストで
+    使うと dependency_overrides が積み重なって auth ガードが効かなくなる)。
+    """
+    from app.models.record import VinylRecord
+
+    _seed_artists_for_records(session)
+    now = dt.datetime.now(dt.UTC)
+    record = VinylRecord(
+        artist_id=BILL_EVANS_ID,
+        title="x",
+        source="manual",
+        status="owned",
+        display_order=1,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+
+    res = unauthed_client.delete(f"/api/records/{record.id}")
+    assert res.status_code == 401
+
+
+def test_delete_unknown_id_returns_404(authed_records_client: TestClient) -> None:
+    res = authed_records_client.delete(f"/api/records/{uuid.uuid4()}")
+    assert res.status_code == 404
+
+
+def test_delete_does_not_touch_user_follows(
+    authed_records_client: TestClient, session: Session
+) -> None:
+    """delete で record は消えるが user_follows 行は残る。"""
+    created = authed_records_client.post("/api/records", json=_new_record_payload()).json()
+    user_id = _seed_user_id(session)
+    assert UserFollowRepository(session).list_artist_ids(user_id) == [BILL_EVANS_ID]
+
+    res = authed_records_client.delete(f"/api/records/{created['id']}")
+    assert res.status_code == 204
+
+    # follow は残る
+    assert UserFollowRepository(session).list_artist_ids(user_id) == [BILL_EVANS_ID]
+
+
 def test_concurrent_create_assigns_unique_display_order(engine: Engine) -> None:
     """Parallel POSTs each get a distinct display_order via the advisory lock."""
     with Session(engine) as bootstrap:

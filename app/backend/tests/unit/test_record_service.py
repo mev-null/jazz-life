@@ -147,3 +147,35 @@ def test_update_swap_to_unknown_artist_raises_not_found(session: Session) -> Non
 
     with pytest.raises(NotFoundError, match="artist"):
         service.update_partial(record.id, VinylRecordUpdate(artist_id="ghost_artist"))
+
+
+def test_delete_removes_record(session: Session) -> None:
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+    record = service.create(VinylRecordCreate(artist_id=artist_id, title="A"), user_id)
+
+    service.delete(record.id)
+
+    assert RecordRepository(session).get(record.id) is None
+
+
+def test_delete_unknown_id_raises_not_found(session: Session) -> None:
+    service = _service(session)
+    with pytest.raises(NotFoundError, match="vinyl_record"):
+        service.delete(uuid.uuid4())
+
+
+def test_delete_leaves_user_follows_intact(session: Session) -> None:
+    """最後の record を消しても user_follows 行は残る (auto-unfollow しない方針)。"""
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+    record = service.create(VinylRecordCreate(artist_id=artist_id, title="A"), user_id)
+    # 事前確認: auto-follow で 1 行入ってる
+    assert UserFollowRepository(session).list_artist_ids(user_id) == [artist_id]
+
+    service.delete(record.id)
+
+    # delete 後も follow は残る
+    assert UserFollowRepository(session).list_artist_ids(user_id) == [artist_id]

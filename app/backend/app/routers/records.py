@@ -42,3 +42,18 @@ def update_record(
     with http_errors():
         record = service.update_partial(id, body)
         return VinylRecordRead.model_validate(record)
+
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_record(
+    id: uuid.UUID,
+    service: RecordService = Depends(get_record_service),
+    _: User = Depends(get_current_user),
+) -> None:
+    """record を物理削除。auth 必須 (POST と揃える)。
+
+    user_follows は意図的に触らないので、最後の 1 件を消しても follow は残り、
+    次の sync では引き続き対象になる。
+    """
+    with http_errors():
+        service.delete(id)

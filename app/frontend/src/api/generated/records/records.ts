@@ -331,3 +331,95 @@ export const useUpdateRecordApiRecordsIdPut = <TError = HTTPValidationError,
       > => {
       return useMutation(getUpdateRecordApiRecordsIdPutMutationOptions(options), queryClient);
     }
+    export type deleteRecordApiRecordsIdDeleteResponse204 = {
+  data: void
+  status: 204
+}
+
+export type deleteRecordApiRecordsIdDeleteResponse422 = {
+  data: HTTPValidationError
+  status: 422
+}
+
+export type deleteRecordApiRecordsIdDeleteResponseSuccess = (deleteRecordApiRecordsIdDeleteResponse204) & {
+  headers: Headers;
+};
+export type deleteRecordApiRecordsIdDeleteResponseError = (deleteRecordApiRecordsIdDeleteResponse422) & {
+  headers: Headers;
+};
+
+export type deleteRecordApiRecordsIdDeleteResponse = (deleteRecordApiRecordsIdDeleteResponseSuccess | deleteRecordApiRecordsIdDeleteResponseError)
+
+export const getDeleteRecordApiRecordsIdDeleteUrl = (id: string,) => {
+
+
+
+
+  return `/api/records/${id}`
+}
+
+/**
+ * record を物理削除。auth 必須 (POST と揃える)。
+
+user_follows は意図的に触らないので、最後の 1 件を消しても follow は残り、
+次の sync では引き続き対象になる。
+ * @summary Delete Record
+ */
+export const deleteRecordApiRecordsIdDelete = async (id: string, options?: RequestInit): Promise<deleteRecordApiRecordsIdDeleteResponse> => {
+
+  return customFetch<deleteRecordApiRecordsIdDeleteResponse>(getDeleteRecordApiRecordsIdDeleteUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteRecordApiRecordsIdDeleteMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRecordApiRecordsIdDelete>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteRecordApiRecordsIdDelete>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteRecordApiRecordsIdDelete'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteRecordApiRecordsIdDelete>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteRecordApiRecordsIdDelete(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteRecordApiRecordsIdDeleteMutationResult = NonNullable<Awaited<ReturnType<typeof deleteRecordApiRecordsIdDelete>>>
+
+    export type DeleteRecordApiRecordsIdDeleteMutationError = HTTPValidationError
+
+    /**
+ * @summary Delete Record
+ */
+export const useDeleteRecordApiRecordsIdDelete = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRecordApiRecordsIdDelete>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteRecordApiRecordsIdDelete>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeleteRecordApiRecordsIdDeleteMutationOptions(options), queryClient);
+    }

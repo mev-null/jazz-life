@@ -1,3 +1,6 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { getVinylRecords, updateVinylRecord } from "../../api/client";
 import { formatLongDate } from "../../lib/dates";
 import { formatVenue } from "../../lib/formatVenue";
 import type { Artist, Concert, Release } from "../../types/api";
@@ -58,12 +61,32 @@ function ExternalLink({ href, label }: { href: string; label: string }) {
 function ReleaseDetail({
   release,
   artist,
+  onClose,
   onCollect,
 }: {
   release: Release;
   artist?: Artist;
+  onClose: () => void;
   onCollect?: (status: "owned" | "wanted") => void;
 }) {
+  // 同じ album (spotify_album_id) の record が既にコレクションにある場合の挙動:
+  // - status=owned : 既に持ってるので両ボタン非表示
+  // - status=wanted: 物理的にまだ持ってないので「買った」だけ出して upgrade に使う
+  // - 無し         : 両ボタン (parent onCollect で新規追加)
+  const queryClient = useQueryClient();
+  const recordsQ = useQuery({ queryKey: ["records"], queryFn: getVinylRecords });
+  const existing = (recordsQ.data?.items ?? []).find(
+    (r) => r.spotify_album_id === release.spotify_id,
+  );
+  const promoteToOwned = useMutation({
+    mutationFn: (id: string) => updateVinylRecord(id, { status: "owned" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["records"] });
+      onClose();
+    },
+  });
+  const showAddButtons = onCollect && existing === undefined;
+  const showPromoteButton = existing?.status === "wanted";
   const spotifyUrl = `https://open.spotify.com/album/${release.spotify_id}`;
   return (
     <>
@@ -81,7 +104,7 @@ function ReleaseDetail({
         <Field label="Type" value={release.album_type} />
       </div>
 
-      {onCollect && (
+      {showAddButtons && (
         <div className="flex gap-3 border-t border-ink/15 pt-4">
           <button
             type="button"
@@ -99,8 +122,24 @@ function ReleaseDetail({
           </button>
         </div>
       )}
+      {showPromoteButton && existing && (
+        // 既に「ほしい」登録済 → 物理購入後の upgrade 専用ボタン。
+        // 新規 record を作らず、既存の wanted を status=owned に flip する。
+        <div className="flex border-t border-ink/15 pt-4">
+          <button
+            type="button"
+            onClick={() => promoteToOwned.mutate(existing.id)}
+            disabled={promoteToOwned.isPending}
+            className="flex-1 cursor-pointer bg-ink/10 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {promoteToOwned.isPending ? "Moving…" : "買った"}
+          </button>
+        </div>
+      )}
 
-      <footer className={`${onCollect ? "mt-4" : ""} border-t border-ink/15 pt-4`}>
+      <footer
+        className={`${showAddButtons || showPromoteButton ? "mt-4" : ""} border-t border-ink/15 pt-4`}
+      >
         <div className="mb-1 italic text-sm text-ink-mute">Source</div>
         <ExternalLink href={spotifyUrl} label="Spotify" />
       </footer>
@@ -174,6 +213,7 @@ export function FeedDetailModal({
           <ReleaseDetail
             release={item.data}
             artist={item.artist}
+            onClose={onClose}
             onCollect={
               onCollectFromRelease
                 ? (status) => onCollectFromRelease(item.data, status)

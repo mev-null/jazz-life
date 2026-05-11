@@ -376,6 +376,41 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "records"
+        ],
+        "summary": "Delete Record",
+        "description": "record を物理削除。auth 必須 (POST と揃える)。\n\nuser_follows は意図的に触らないので、最後の 1 件を消しても follow は残り、\n次の sync では引き続き対象になる。",
+        "operationId": "delete_record_api_records__id__delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/releases": {

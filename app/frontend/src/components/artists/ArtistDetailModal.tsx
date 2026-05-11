@@ -14,57 +14,25 @@ import {
 } from "../../lib/dates";
 import { formatVenue } from "../../lib/formatVenue";
 import { concertMatchesArtist } from "../../lib/matchArtist";
-import { avatarTintByString } from "../../lib/palette";
 import type {
   Artist,
   Concert,
   Release,
   VinylRecord,
 } from "../../types/api";
+import { useReadState } from "../../lib/useReadState";
 import { ModalShell } from "../ModalShell";
+import { ReleaseRow } from "../feed/ReleaseRow";
 import { TodayDivider } from "../feed/TodayDivider";
 import { AddRecordTile } from "../records/AddRecordTile";
 import { JacketArt } from "../records/JacketCard";
+import { ArtistAvatar } from "./ArtistAvatar";
 import { ArtistRecordsAllModal } from "./ArtistRecordsAllModal";
 
 // detail modal のセクションが「拡大表示」(別 modal で全件) に切り替わる件数閾値。
 // 4 = sm+ の grid 1 行に収まる枚数。これ以上は detail 内グリッドに「+」を出さず、
 // 4 件だけプレビューして "view all" 経由で拡大表示へ誘導する。
 const SECTION_PREVIEW_LIMIT = 4;
-
-function initials(name: string): string {
-  const words = name.trim().split(/\s+/);
-  if (words.length === 0) return "—";
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
-}
-
-function ArtistAvatar({ artist }: { artist: Artist }) {
-  if (artist.image_url) {
-    return (
-      <img
-        src={artist.image_url}
-        alt=""
-        className="aspect-square w-20 shrink-0 object-cover"
-      />
-    );
-  }
-  const bg = avatarTintByString(artist.spotify_id);
-  const isWarm = bg === "#b08a3a";
-  return (
-    <div
-      className="flex aspect-square w-20 shrink-0 items-center justify-center"
-      style={{
-        backgroundColor: bg,
-        color: isWarm ? "#1a1714" : "#f4efe3",
-      }}
-    >
-      <span className="text-base font-medium tracking-wide">
-        {initials(artist.name)}
-      </span>
-    </div>
-  );
-}
 
 type TimelineItem =
   | { kind: "release"; data: Release; date: string }
@@ -122,6 +90,48 @@ function TimelineRow({
         <div className="mt-0.5 text-xs italic text-ink-faint">{tag}</div>
       </div>
     </button>
+  );
+}
+
+function ActivityRow({
+  item,
+  index,
+  isPast,
+  artist,
+  isRead,
+  onClick,
+}: {
+  item: TimelineItem;
+  index: number;
+  isPast: boolean;
+  artist: Artist;
+  isRead: (key: string) => boolean;
+  onClick: () => void;
+}) {
+  // release は Feed と共通の jacket-style 行で表示する。concert は既存の
+  // テキスト index 行 (TimelineRow) を使い続ける。混在で行高が違うが、
+  // 「ジャケットあり = リリース、無し = 公演」 と直感的に区別できる方を優先。
+  if (item.kind === "release") {
+    return (
+      <ReleaseRow
+        release={item.data}
+        artist={artist}
+        isPast={isPast}
+        isRead={isRead(`release:${item.data.spotify_id}`)}
+        onClick={onClick}
+      />
+    );
+  }
+  return (
+    <TimelineRow
+      index={index}
+      title={item.data.title}
+      sub={timelineSub(item)}
+      date={item.date}
+      tag={timelineTag(item)}
+      isPast={isPast}
+      onClick={onClick}
+    />
   );
 }
 
@@ -210,6 +220,8 @@ export function ArtistDetailModal({
   useEffect(() => {
     setExpandedSection(null);
   }, [artist?.spotify_id]);
+  // Activity に release を出すとき、Feed と同じ既読状態 (localStorage 共有) を尊重する。
+  const { isRead } = useReadState();
   // 個別アーティストクリック時に発火する lazy fetch 群。modal が閉じている間は
   // enabled=false で発火しない。
   // - artistQ: backend が image_url を Spotify から hydrate して返す
@@ -316,14 +328,13 @@ export function ArtistDetailModal({
             {tp.upcoming.length > 0 && (
               <div className="divide-y divide-ink-faint/30">
                 {tp.upcoming.map((item, i) => (
-                  <TimelineRow
+                  <ActivityRow
                     key={timelineKey(item)}
+                    item={item}
                     index={i + 1}
-                    title={item.data.title}
-                    sub={timelineSub(item)}
-                    date={item.date}
-                    tag={timelineTag(item)}
                     isPast={false}
+                    artist={artist}
+                    isRead={isRead}
                     onClick={() => handleClick(item)}
                   />
                 ))}
@@ -335,14 +346,13 @@ export function ArtistDetailModal({
             {tp.past.length > 0 && (
               <div className="divide-y divide-ink-faint/30">
                 {tp.past.map((item, i) => (
-                  <TimelineRow
+                  <ActivityRow
                     key={timelineKey(item)}
+                    item={item}
                     index={tp.upcoming.length + i + 1}
-                    title={item.data.title}
-                    sub={timelineSub(item)}
-                    date={item.date}
-                    tag={timelineTag(item)}
                     isPast={true}
+                    artist={artist}
+                    isRead={isRead}
                     onClick={() => handleClick(item)}
                   />
                 ))}

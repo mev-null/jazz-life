@@ -53,6 +53,18 @@ class RecordService:
         self.follow_repo.upsert(user_id, saved.artist_id)
         return saved
 
+    def delete(self, id: uuid.UUID) -> None:
+        """1 件削除。存在しなければ NotFoundError。
+
+        user_follows は意図的に触らない (record の生死と follow の独立性を
+        保つ。最後の record を消しても follow は残る)。auto-unfollow が必要に
+        なったらここに足す。
+        """
+        record = self.repo.get(id)
+        if record is None:
+            raise NotFoundError(f"vinyl_record id={id}")
+        self.repo.delete(record)
+
     def update_partial(self, id: uuid.UUID, patch: VinylRecordUpdate) -> VinylRecord:
         record = self.repo.get(id)
         if record is None:
