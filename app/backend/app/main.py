@@ -7,7 +7,7 @@ from sqlmodel import Session
 
 from app.core.db import get_engine
 from app.core.repositories.artist_repository import ArtistRepository
-from app.routers import artists, auth, records, releases, spotify
+from app.routers import artists, auth, records, releases, spotify, user_follows
 from app.seed import seed_artists_if_empty
 
 
@@ -40,6 +40,7 @@ app.include_router(artists.router)
 app.include_router(records.router)
 app.include_router(releases.router)
 app.include_router(spotify.router)
+app.include_router(user_follows.router)
 
 
 @app.get("/")

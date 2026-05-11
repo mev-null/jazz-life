@@ -625,6 +625,64 @@
         }
       }
     },
+    "/api/user-follows/artists": {
+      "get": {
+        "tags": [
+          "user-follows"
+        ],
+        "summary": "List Followed Artists",
+        "description": "現ユーザが follow 中 (archived=false) の artists を返す。\n\nArtistsPage 一覧専用。`GET /api/artists` は global registry (HomePage の\nrecord→artist 名前引きなどで利用) なので別エンドポイントに切る。",
+        "operationId": "list_followed_artists_api_user_follows_artists_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResponse_ArtistRead_"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user-follows/{artist_id}": {
+      "delete": {
+        "tags": [
+          "user-follows"
+        ],
+        "summary": "Unfollow Artist",
+        "description": "Spotify ID の artist を follow から外す (soft delete: archived_flag=true)。\n\narchived_flag を立てるだけなので「以前 follow してた」履歴は残る。\nlist_artist_ids は archived_flag=false のみ返すので、次の release sync は\nこのアーティストを対象から外す。\n\n無いものを消そうとしたら 404、既に archived なら 204 (冪等)。",
+        "operationId": "unfollow_artist_api_user_follows__artist_id__delete",
+        "parameters": [
+          {
+            "name": "artist_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artist Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Root",

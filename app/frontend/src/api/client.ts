@@ -38,6 +38,10 @@ import {
   triggerSyncApiReleasesSyncPost,
 } from "./generated/releases/releases";
 import { searchAlbumsApiSpotifyAlbumsSearchGet } from "./generated/spotify/spotify";
+import {
+  listFollowedArtistsApiUserFollowsArtistsGet,
+  unfollowArtistApiUserFollowsArtistIdDelete,
+} from "./generated/user-follows/user-follows";
 import type {
   ArtistCreate,
   SpotifyAlbumSummary,
@@ -110,6 +114,36 @@ export async function getRecordCounts(): Promise<ListResponse<ArtistRecordCount>
   }
   const res = await listRecordCountsApiArtistsRecordCountsGet();
   return res.data as ListResponse<ArtistRecordCount>;
+}
+
+/**
+ * 現ユーザが follow 中 (archived=false) の artists のみ返す。
+ *
+ * ArtistsPage 一覧専用。HomePage / RecordFormModal が使う `getArtists()` は
+ * global registry (全 artists 行) を返す既存挙動のままで、本関数とはキャッシュ
+ * キー (`["followed-artists"]`) を分けてある。auth 必須。
+ *
+ * mock 時は artists.json をそのまま返す (mock store は user_follows を表現
+ * しないため、ArtistsPage では全 mock artists が見える)。
+ */
+export async function getFollowedArtists(): Promise<ListResponse<Artist>> {
+  if (USE_MOCK) return artistsMock as ListResponse<Artist>;
+  const res = await listFollowedArtistsApiUserFollowsArtistsGet();
+  return res.data as ListResponse<Artist>;
+}
+
+/**
+ * Spotify ID で artist を follow から外す (soft delete: archived_flag=true)。
+ *
+ * mock 時はネットワークを叩かない (mock store には user_follows 表現を持たない
+ * ので no-op)。auth 必須エンドポイントなので cookie 同梱 (orval mutator 経由)。
+ */
+export async function unfollowArtist(spotifyId: string): Promise<void> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 30));
+    return;
+  }
+  await unfollowArtistApiUserFollowsArtistIdDelete(spotifyId);
 }
 
 /**

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { getArtists, getRecordCounts } from "../api/client";
+import { getFollowedArtists, getRecordCounts } from "../api/client";
 import { ArtistDetailModal } from "../components/artists/ArtistDetailModal";
 import {
   FeedDetailModal,
@@ -16,7 +16,14 @@ import { useReadState } from "../lib/useReadState";
 import type { Artist, Concert, Release, VinylRecord } from "../types/api";
 
 export function ArtistsPage() {
-  const artistsQ = useQuery({ queryKey: ["artists"], queryFn: getArtists });
+  // ArtistsPage の一覧は「現ユーザが follow 中 (archived=false) の artists」だけ。
+  // record→artist 名前引きで使う global artist registry とはキャッシュキーを
+  // 分けてある (HomePage 等は依然 ["artists"] を共有)。unfollow で archived 化
+  // した artist はここから消える。
+  const artistsQ = useQuery({
+    queryKey: ["followed-artists"],
+    queryFn: getFollowedArtists,
+  });
   // 件数は専用エンドポイント /api/artists/record-counts で受け取る。
   // records 本体は ArtistDetailModal を開いた時にだけ fetch する設計のため、
   // 一覧では集計値だけを軽量に取得する。

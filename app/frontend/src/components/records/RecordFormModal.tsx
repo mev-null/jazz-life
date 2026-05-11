@@ -17,6 +17,7 @@ import type {
   VinylRecordCreateStatus,
   VinylRecordUpdate,
 } from "../../api/generated/model";
+import { InlineConfirm } from "../InlineConfirm";
 import { ModalShell } from "../ModalShell";
 
 export type FormMode =
@@ -80,30 +81,38 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
 
   const create = useMutation({
     mutationFn: createVinylRecord,
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["records"] }),
+    // record 作成は auto-follow 経路で user_follows に行を作る / archived を解除
+    // するので、ArtistsPage の followed-artists 一覧と件数も再取得対象。
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["records"] });
+      queryClient.invalidateQueries({ queryKey: ["followed-artists"] });
+      queryClient.invalidateQueries({ queryKey: ["record-counts"] });
+    },
   });
 
   const update = useMutation({
     mutationFn: ({ id, input }: { id: string; input: VinylRecordUpdate }) =>
       updateVinylRecord(id, input),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["records"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["records"] });
+      queryClient.invalidateQueries({ queryKey: ["record-counts"] });
+    },
   });
 
   const upload = useMutation({
     mutationFn: ({ recordId, file }: { recordId: string; file: File }) =>
       uploadJacket(recordId, file),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["records"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["records"] }),
   });
 
-  // 編集モードの「削除」ボタン。1 クリック目で confirm 状態に切り替え、2
-  // クリック目で実際に DELETE を打つ (誤タップ防止のため独立ステートで管理)。
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  // 編集モードの「削除」ボタン。共通 InlineConfirm に切替えたので、ローカル
+  // state は不要 (内側でハンドリング)。
   const remove = useMutation({
     mutationFn: deleteVinylRecord,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["records"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["records"] });
+      queryClient.invalidateQueries({ queryKey: ["record-counts"] });
+    },
   });
 
   // load fields when modal opens / mode changes.
@@ -158,7 +167,6 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
     setSpotifyOpen(false);
     setSpotifyError(null);
     setArtistDropdownOpen(false);
-    setConfirmDelete(false);
     // pending blob はモーダル切替（mode→null 含む）/ unmount で確実に解放する
     return () => {
       if (previewBlobRef.current) {
@@ -606,33 +614,25 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
 
         <div className="mt-8 flex items-center gap-6 text-sm">
           {isEdit && mode.kind === "edit" && (
-            // 編集モードのみ Delete ボタンを左端に出す。1 クリック目で confirm
-            // ラベルに切り替え、2 クリック目で実際に DELETE する誤タップガード。
-            <button
-              type="button"
-              onClick={() => {
-                if (!confirmDelete) {
-                  setConfirmDelete(true);
-                  return;
-                }
+            <InlineConfirm
+              // edit A → edit B のとき confirm 状態が引き継がれないよう
+              // record.id で remount させる。
+              key={mode.record.id}
+              className="mr-auto flex items-center gap-4"
+              triggerLabel="Remove"
+              prompt="Remove this record?"
+              pendingLabel="Removing…"
+              isPending={remove.isPending}
+              disabled={submitting}
+              onConfirm={() =>
                 remove.mutate(mode.record.id, {
                   onSuccess: () => {
                     previewBlobRef.current = null;
                     onClose();
                   },
-                });
-              }}
-              disabled={submitting || remove.isPending}
-              className={`mr-auto cursor-pointer italic transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                confirmDelete ? "text-ink underline" : "text-ink-mute hover:text-ink"
-              }`}
-            >
-              {remove.isPending
-                ? "Deleting…"
-                : confirmDelete
-                  ? "Really delete?"
-                  : "Delete"}
-            </button>
+                })
+              }
+            />
           )}
           <button
             type="button"

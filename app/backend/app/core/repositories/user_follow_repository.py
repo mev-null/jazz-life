@@ -48,15 +48,45 @@ class UserFollowRepository:
         return len(artist_ids)
 
     def upsert(self, user_id: UUID, artist_id: str) -> None:
-        """1 件の (user_id, artist_id) を follow に追加する (既存なら no-op)。
+        """1 件の (user_id, artist_id) を follow に追加 / 再有効化する。
 
-        record 登録時の auto-follow 経路で使う。`bulk_insert` を 1 件で呼んでも
-        同じ動作だが、意図が明瞭になる名前を別に切る。
+        record 登録時の auto-follow 経路で使う。挙動:
+        - 行が無ければ INSERT (archived_flag のデフォルトは False)
+        - 既に archived な行があれば archived_flag=False に戻して再 follow
+        - 既に active な行があれば no-op (上書きで害なし)
+
+        「以前 unfollow したアーティストの record を再追加 → 自動的に re-follow」
+        という UX を担保するため、`ON CONFLICT DO UPDATE` で archived_flag を
+        必ず False に書き直す。
         """
         stmt = (
             pg_insert(UserFollow)
-            .values(user_id=user_id, artist_id=artist_id)
-            .on_conflict_do_nothing(index_elements=["user_id", "artist_id"])
+            .values(user_id=user_id, artist_id=artist_id, archived_flag=False)
+            .on_conflict_do_update(
+                index_elements=["user_id", "artist_id"],
+                set_={"archived_flag": False},
+            )
         )
         self.session.exec(stmt)  # type: ignore[call-overload]
         self.session.commit()
+
+    def archive(self, user_id: UUID, artist_id: str) -> bool:
+        """(user_id, artist_id) の follow を soft delete (`archived_flag=true`) する。
+
+        該当行が無ければ False、archive 済の行を更新したら True を返す。
+        既に archived の行に対しては True を返す (冪等性)。
+        list_artist_ids が archived_flag=False のみ返すので、archive 後は sync
+        対象から自然に外れる。
+        """
+        stmt = (
+            select(UserFollow)
+            .where(col(UserFollow.user_id) == user_id)
+            .where(col(UserFollow.artist_id) == artist_id)
+        )
+        row = self.session.exec(stmt).first()
+        if row is None:
+            return False
+        row.archived_flag = True
+        self.session.add(row)
+        self.session.commit()
+        return True

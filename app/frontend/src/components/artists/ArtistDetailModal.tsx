@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   getArtist,
   getConcerts,
   getReleases,
   getVinylRecords,
+  unfollowArtist,
 } from "../../api/client";
 import {
   formatShortDate,
@@ -21,6 +22,7 @@ import type {
   VinylRecord,
 } from "../../types/api";
 import { useReadState } from "../../lib/useReadState";
+import { InlineConfirm } from "../InlineConfirm";
 import { ModalShell } from "../ModalShell";
 import { ReleaseRow } from "../feed/ReleaseRow";
 import { TodayDivider } from "../feed/TodayDivider";
@@ -222,6 +224,17 @@ export function ArtistDetailModal({
   }, [artist?.spotify_id]);
   // Activity に release を出すとき、Feed と同じ既読状態 (localStorage 共有) を尊重する。
   const { isRead } = useReadState();
+  const queryClient = useQueryClient();
+  const unfollow = useMutation({
+    mutationFn: unfollowArtist,
+    onSuccess: () => {
+      // ArtistsPage 一覧 (followed-artists) と件数表示を更新。global artists
+      // registry (HomePage 等が使う) は変わらないので invalidate しない。
+      queryClient.invalidateQueries({ queryKey: ["followed-artists"] });
+      queryClient.invalidateQueries({ queryKey: ["record-counts"] });
+      onClose();
+    },
+  });
   // 個別アーティストクリック時に発火する lazy fetch 群。modal が閉じている間は
   // enabled=false で発火しない。
   // - artistQ: backend が image_url を Spotify から hydrate して返す
@@ -286,13 +299,10 @@ export function ArtistDetailModal({
   return (
     <ModalShell onClose={onClose}>
       <div className="max-h-[90vh] w-[min(92vw,720px)] overflow-y-auto bg-paper p-8 text-left text-ink shadow-xl ring-1 ring-ink/10">
-        <header className="flex items-start gap-4 border-b border-ink/15 pb-4">
+        <header className="flex items-center gap-4 border-b border-ink/15 pb-4">
           <div className="min-w-0 flex-1">
             <div className="text-2xl font-medium leading-tight">
               {displayArtist.name}
-            </div>
-            <div className="mt-1 text-sm italic text-ink-mute">
-              {displayArtist.source}
             </div>
           </div>
           <ArtistAvatar artist={displayArtist} />
@@ -362,6 +372,25 @@ export function ArtistDetailModal({
               <p className="text-sm italic text-ink-faint">none</p>
             )}
           </div>
+        </section>
+
+        {/* Remove (unfollow) — modal 最下部。記録がある間は disable。
+            共通の InlineConfirm で「trigger → prompt+Cancel+Confirm」を表現。
+        */}
+        <section className="mt-12 border-t border-ink/15 pt-4 text-sm">
+          <InlineConfirm
+            // 別アーティストに切り替えた時に confirm 状態が引き継がれないよう
+            // spotify_id で remount させる。
+            key={artist.spotify_id}
+            className="flex items-center justify-end gap-3"
+            triggerLabel="Remove from follow"
+            prompt={`Stop following ${displayArtist.name}?`}
+            pendingLabel="Removing…"
+            isPending={unfollow.isPending}
+            disabled={artistRecords.length > 0}
+            disabledHint="good music..."
+            onConfirm={() => unfollow.mutate(artist.spotify_id)}
+          />
         </section>
       </div>
       {expandedSection !== null && (
