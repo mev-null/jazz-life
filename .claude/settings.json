@@ -87,7 +87,15 @@
       "Bash(curl -sf -o /dev/null -w \"GET /openapi.json -> %{http_code}\\\\n\" http://localhost:8000/openapi.json)",
       "Bash(curl -sf -o /dev/null -w \"GET /redoc -> %{http_code}\\\\n\" http://localhost:8000/redoc)",
       "Bash(curl -sf -o /dev/null http://localhost:8000/healthz)",
-      "Bash(xargs -I{} echo \"records in DB: {}\")"
+      "Bash(xargs -I{} echo \"records in DB: {}\")",
+      "Bash(git mv *)",
+      "Bash(make dev *)",
+      "Bash(curl -sS -o /dev/null -w \"favicon: status=%{http_code} size=%{size_download}B type=%{content_type}\\\\n\" http://localhost:5173/favicon.png)",
+      "Bash(curl -sS http://localhost:5173/)",
+      "Bash(identify app/frontend/public/favicon.png)",
+      "Bash(python3 -c \"from PIL import Image; print\\('Pillow', Image.__version__\\)\")",
+      "Bash(unset VIRTUAL_ENV)",
+      "Bash(git config *)"
     ]
   }
 }
