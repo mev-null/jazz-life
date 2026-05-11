@@ -153,7 +153,11 @@
       "Bash(python3 -c \"import json; d=json.load\\(open\\('/tmp/oapi.json'\\)\\); print\\('\\\\n'.join\\(sorted\\(d.get\\('paths',{}\\).keys\\(\\)\\)\\)\\)\")",
       "Bash(curl -sf -o /tmp/oapi.json http://localhost:8000/openapi.json)",
       "Bash(python3 -c ' *)",
-      "Bash(DATABASE_URL=postgresql+psycopg://jazz:jazz@localhost:5432/jazz uv run python -c ' *)"
+      "Bash(DATABASE_URL=postgresql+psycopg://jazz:jazz@localhost:5432/jazz uv run python -c ' *)",
+      "Bash(uv python *)",
+      "Bash(.venv/bin/python --version)",
+      "Bash(xargs ls -la)",
+      "Bash(sed -n '/openapi/,/^  [a-z]/p' /workspaces/jazz-life/.github/workflows/backend.yml)"
     ],
     "additionalDirectories": [
       "/tmp",
