@@ -20,11 +20,22 @@ services:
     build:
       context: ./backend
     image: jazz-life-backend:dev
-    env_file:
-      - .env
+    # `.env` は廃止。値は host shell から forward する。
+    # - Codespaces: .devcontainer/devcontainer.json の containerEnv (公開デフォルト) と
+    #   secrets (Codespaces user secrets から注入) が shell に揃う
+    # - 非 Codespaces: 各自 host shell に export する (例: direnv で .envrc) か、
+    #   app/.env を作っておけば docker-compose が自動で interpolation 用に拾う
     environment:
       DATABASE_URL: postgresql+psycopg://jazz:jazz@db:5432/jazz
       TEST_DATABASE_URL: postgresql+psycopg://jazz:jazz@db:5432/jazz_test
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+      SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI:-http://127.0.0.1:8000/api/auth/callback}
+      ALLOWED_SPOTIFY_USER_ID: ${ALLOWED_SPOTIFY_USER_ID:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+      REFRESH_TOKEN_KEY: ${REFRESH_TOKEN_KEY:-}
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://127.0.0.1:5173}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     ports:
       - "8000:8000"
     volumes:
@@ -37,8 +48,9 @@ services:
     build:
       context: ./frontend
     image: jazz-life-frontend:dev
-    env_file:
-      - .env
+    environment:
+      VITE_API_BASE: ${VITE_API_BASE:-http://127.0.0.1:8000}
+      VITE_USE_MOCK: ${VITE_USE_MOCK:-false}
     ports:
       - "5173:5173"
     depends_on:
