@@ -80,26 +80,36 @@ jazz-life/
 
 ## よく使うコマンド
 
-> Codespace 起動時に `.devcontainer/devcontainer.json` の postStartCommand が `docker compose up -d` を自動で実行するので、通常は `make up` を手動で叩く必要はない。再ビルドや停止のときだけ使う。
+> Codespace 起動時に `.devcontainer/devcontainer.json` の postStartCommand が `docker compose up -d db` を自動で実行するので、db だけは常に上がっている。backend / frontend は開発を始める時に各サブディレクトリで `make dev` を叩いて手動で起動する運用（別ターミナル × 2）。
 
-すべて `cd app` してから:
-
-```bash
-make up          # 全サービス起動（HMR 有効。手動で再起動したいときに使う）
-make down        # 停止
-make logs        # 全ログ follow
-make spec        # 起動中の backend から OpenAPI spec を取得して backend/openapi.json に保存（要 backend 起動）
-make gen         # backend/openapi.json から TS 型 + react-query hooks 生成（backend 不要）
-```
-
-backend 単体（`cd app/backend`）:
+backend（`cd app/backend`）:
 
 ```bash
-make help            # ターゲット一覧
+make dev             # コンテナを foreground で起動（HMR + ログ。Ctrl-C で停止）
+make help            # 全ターゲット
 make sync-dev        # host venv 構築（IDE 補完用にも必須）
 make check           # lint + typecheck + test 一括
-make logs            # backend だけのログ
+make logs            # 稼働中の backend ログを follow
 make shell           # コンテナに bash で入る
+```
+
+frontend（`cd app/frontend`）:
+
+```bash
+make dev             # コンテナを foreground で起動（HMR + ログ。Ctrl-C で停止）
+make typecheck       # npm run typecheck
+make gen             # npm run gen (orval)
+```
+
+スタック全体（`cd app`）:
+
+```bash
+make db          # db だけ起動（postStartCommand と同じ。手動で再起動したい時用）
+make up          # 全サービスを detached でまとめて起動（CI / 一括検証用）
+make down        # 停止
+make logs        # 全ログ follow（detached 起動時用）
+make spec        # 起動中の backend から OpenAPI spec を取得して backend/openapi.json に保存（要 backend 起動）
+make gen         # backend/openapi.json から TS 型 + react-query hooks 生成（backend 不要）
 ```
 
 ## 開発ルール（守る）

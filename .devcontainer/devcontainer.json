@@ -1,21 +1,22 @@
 {
   "name": "jazz-life",
-  // dockerComposeFile パターン: workspace サービスにアタッチ。
-  // db / backend / frontend は ../app/docker-compose.yml 側で別プロジェクトとして
-  // 動かし、postStartCommand から `docker compose up -d` で立ち上げる。
-  // workspace 内で secrets が露出するので compose interpolation も自然に効く。
-  "dockerComposeFile": ["docker-compose.devcontainer.yml"],
+  "dockerComposeFile": [
+    "docker-compose.devcontainer.yml"
+  ],
   "service": "workspace",
   "workspaceFolder": "/workspaces/jazz-life",
-  // workspace を止めるとアプリ側にも触らないので不要な再起動を避ける。
   "shutdownAction": "stopCompose",
-
   "features": {
-    // ホスト daemon と通信する docker CLI を入れる。dind より高速・軽量。
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/sshd:1": {
+      "version": "latest"
+    }
   },
-
-  "forwardPorts": [8000, 5173, 5432],
+  "forwardPorts": [
+    8000,
+    5173,
+    5432
+  ],
   "portsAttributes": {
     "8000": {
       "label": "FastAPI Backend",
@@ -30,7 +31,6 @@
       "onAutoForward": "silent"
     }
   },
-
   "containerEnv": {
     "SPOTIFY_REDIRECT_URI": "http://127.0.0.1:8000/api/auth/callback",
     "FRONTEND_BASE_URL": "http://127.0.0.1:5173",
@@ -55,10 +55,10 @@
       "description": "Fernet key for encrypting Spotify refresh_token"
     }
   },
-
-  // 初回作成時: app stack を build + up。secrets は workspace shell に存在するので
-  // compose interpolation で backend/frontend に流れる。
-  "postCreateCommand": "cd /workspaces/jazz-life/app && docker compose up -d",
-  // 以降の Codespace 再開時: 既存イメージで再起動するだけ (高速)。
-  "postStartCommand": "cd /workspaces/jazz-life/app && docker compose up -d"
+  // 起動時間短縮のため Codespace 起動では db のみ自動で上げる。
+  // backend / frontend は別ターミナルで `cd app/backend && make dev` /
+  // `cd app/frontend && make dev` をそれぞれ手動で叩いてフォアグラウンドで動かす。
+  // secrets は workspace shell に揃っているので、後から起動しても compose interpolation で渡る。
+  "postCreateCommand": "cd /workspaces/jazz-life/app && docker compose up -d db",
+  "postStartCommand": "cd /workspaces/jazz-life/app && docker compose up -d db"
 }
