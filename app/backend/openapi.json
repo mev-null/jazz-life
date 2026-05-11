@@ -462,11 +462,12 @@
           "source": {
             "type": "string",
             "enum": [
-              "spotify",
+              "seeded",
+              "spotify_dynamic",
               "manual"
             ],
             "title": "Source",
-            "default": "spotify"
+            "default": "spotify_dynamic"
           }
         },
         "type": "object",
@@ -498,14 +499,11 @@
             ],
             "title": "Image Url"
           },
-          "followed": {
-            "type": "boolean",
-            "title": "Followed"
-          },
           "source": {
             "type": "string",
             "enum": [
-              "spotify",
+              "seeded",
+              "spotify_dynamic",
               "manual"
             ],
             "title": "Source"
@@ -521,7 +519,6 @@
           "spotify_id",
           "name",
           "image_url",
-          "followed",
           "source",
           "added_at"
         ],
@@ -747,6 +744,15 @@
             "title": "Source",
             "default": "manual"
           },
+          "status": {
+            "type": "string",
+            "enum": [
+              "owned",
+              "wanted"
+            ],
+            "title": "Status",
+            "default": "owned"
+          },
           "title": {
             "type": "string",
             "title": "Title"
@@ -898,6 +904,14 @@
             ],
             "title": "Source"
           },
+          "status": {
+            "type": "string",
+            "enum": [
+              "owned",
+              "wanted"
+            ],
+            "title": "Status"
+          },
           "title": {
             "type": "string",
             "title": "Title"
@@ -1027,6 +1041,7 @@
           "artist_id",
           "spotify_album_id",
           "source",
+          "status",
           "title",
           "image_url",
           "original_release_date",
@@ -1082,6 +1097,21 @@
               }
             ],
             "title": "Source"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "owned",
+                  "wanted"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
           },
           "title": {
             "anyOf": [

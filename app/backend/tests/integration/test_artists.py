@@ -96,7 +96,7 @@ def test_upsert_artist_creates_new(authed_client: TestClient) -> None:
     assert body["spotify_id"] == "new-spotify-id"
     assert body["name"] == "New Artist"
     assert body["image_url"] == "https://i.scdn.co/image/new.jpg"
-    assert body["source"] == "spotify"
+    assert body["source"] == "spotify_dynamic"
     # 同 endpoint で確認できる
     listing = authed_client.get("/api/artists").json()
     assert any(a["spotify_id"] == "new-spotify-id" for a in listing["items"])

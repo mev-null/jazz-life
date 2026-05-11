@@ -16,7 +16,6 @@ def _seed_artist(session: Session, spotify_id: str = "test_artist") -> str:
     artist = Artist(
         spotify_id=spotify_id,
         name=f"Artist {spotify_id}",
-        followed=True,
         added_at=dt.datetime.now(dt.UTC),
     )
     session.add(artist)

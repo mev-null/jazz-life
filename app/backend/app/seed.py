@@ -18,7 +18,7 @@ def seed_artists_if_empty(repo: ArtistRepository) -> int:
             spotify_id=item["spotify_id"],
             name=item["name"],
             image_url=item.get("image_url"),
-            followed=item.get("followed", False),
+            source="seeded",
             added_at=datetime.fromisoformat(item["added_at"].replace("Z", "+00:00")),
         )
         for item in payload["items"]
