@@ -5,11 +5,13 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { VinylRecordCreateSource } from './vinylRecordCreateSource';
+import type { VinylRecordCreateStatus } from './vinylRecordCreateStatus';
 
 export interface VinylRecordCreate {
   artist_id: string;
   spotify_album_id?: string | null;
   source?: VinylRecordCreateSource;
+  status?: VinylRecordCreateStatus;
   title: string;
   image_url?: string | null;
   original_release_date?: string | null;

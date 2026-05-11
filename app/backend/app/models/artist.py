@@ -9,8 +9,10 @@ class Artist(SQLModel, table=True):
     spotify_id: str = Field(primary_key=True, max_length=64)
     name: str = Field(max_length=200, index=True)
     image_url: str | None = Field(default=None, max_length=500)
-    followed: bool = Field(default=False)
-    source: str = Field(default="spotify", max_length=20)
+    # ADR-003: artists マスタは「フォローしているか」を持たず、user_follows に責務を委譲。
+    # source は "seeded" (初期投入) / "spotify_dynamic" (Spotify 検索由来で動的追加)
+    # / "manual" (将来の手入力) の 3 値を取る。
+    source: str = Field(default="seeded", max_length=20)
     added_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),

@@ -3,7 +3,11 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-ArtistSource = Literal["spotify", "manual"]
+# ADR-003 §2.1: source は 3 値を取る
+# - "seeded": 初期投入 (artists.json から)
+# - "spotify_dynamic": Spotify 検索由来で動的追加 (RecordFormModal から upsert)
+# - "manual": 将来の手入力エンドポイント由来
+ArtistSource = Literal["seeded", "spotify_dynamic", "manual"]
 
 
 class ArtistRead(BaseModel):
@@ -12,9 +16,20 @@ class ArtistRead(BaseModel):
     spotify_id: str
     name: str
     image_url: str | None
-    followed: bool
     source: ArtistSource
     added_at: datetime
+
+
+class ArtistRecordCount(BaseModel):
+    """ArtistsPage 一覧の件数列に渡す軽量行。
+
+    records 本体は ArtistDetailModal を開くまで fetch しない方針のため、
+    一覧では「N records」表示だけ別エンドポイント `/api/artists/record-counts`
+    から先に取れるようにする。
+    """
+
+    artist_id: str
+    count: int
 
 
 class ArtistCreate(BaseModel):
@@ -27,4 +42,4 @@ class ArtistCreate(BaseModel):
     spotify_id: Annotated[str, Field(min_length=1, max_length=64)]
     name: Annotated[str, Field(min_length=1, max_length=200)]
     image_url: str | None = None
-    source: ArtistSource = "spotify"
+    source: ArtistSource = "spotify_dynamic"

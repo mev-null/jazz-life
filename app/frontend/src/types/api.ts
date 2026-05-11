@@ -4,6 +4,7 @@
 
 export type {
   ArtistRead as Artist,
+  ArtistRecordCount,
   VinylRecordRead as VinylRecord,
 } from "../api/generated/model";
 

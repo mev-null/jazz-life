@@ -10,7 +10,6 @@ export interface ArtistRead {
   spotify_id: string;
   name: string;
   image_url: string | null;
-  followed: boolean;
   source: ArtistReadSource;
   added_at: string;
 }

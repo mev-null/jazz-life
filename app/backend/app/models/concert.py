@@ -26,6 +26,16 @@ class Concert(SQLModel, table=True):
     url: str | None = Field(default=None, max_length=500)
     stage_times: str | None = Field(default=None, max_length=200)
     status: str = Field(default="scheduled", max_length=20)
+    # ADR-003 §2.1: "scraped" はスクレイピング由来、"manual" はユーザー手動追加
+    # (過去公演 / 海外 / 閉鎖会場など)。
+    source: str = Field(
+        default="scraped",
+        max_length=20,
+        sa_column_kwargs={"server_default": "scraped"},
+    )
+    # 手動追加時に venue マスタに登録するほどでもない会場を自由記述で残す。
+    # venue_id 自体の nullable 化は別 PR (ADR-003 PR-6) で扱う。
+    venue_name_freetext: str | None = Field(default=None, max_length=200)
     first_seen_at: dt.datetime = Field(
         default_factory=lambda: dt.datetime.now(dt.UTC),
         sa_type=DateTime(timezone=True),

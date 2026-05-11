@@ -17,6 +17,13 @@ class VinylRecord(SQLModel, table=True):
     )
     spotify_album_id: str | None = Field(default=None, max_length=64, index=True)
     source: str = Field(default="manual", max_length=20)
+    # ADR-003 §2.1: "owned" は Home マトリクスに表示、"wanted" は want list 専用。
+    # 既存行への ALTER 用に server_default を明示する (autogenerate が拾えるように)。
+    status: str = Field(
+        default="owned",
+        max_length=20,
+        sa_column_kwargs={"server_default": "owned"},
+    )
     title: str = Field(max_length=300)
     image_url: str | None = Field(default=None, max_length=500)
     original_release_date: str | None = Field(default=None, max_length=10)

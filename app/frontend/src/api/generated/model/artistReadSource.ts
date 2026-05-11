@@ -9,6 +9,7 @@ export type ArtistReadSource = typeof ArtistReadSource[keyof typeof ArtistReadSo
 
 
 export const ArtistReadSource = {
-  spotify: 'spotify',
+  seeded: 'seeded',
+  spotify_dynamic: 'spotify_dynamic',
   manual: 'manual',
 } as const;

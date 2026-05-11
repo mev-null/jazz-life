@@ -5,12 +5,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { VinylRecordReadSource } from './vinylRecordReadSource';
+import type { VinylRecordReadStatus } from './vinylRecordReadStatus';
 
 export interface VinylRecordRead {
   id: string;
   artist_id: string;
   spotify_album_id: string | null;
   source: VinylRecordReadSource;
+  status: VinylRecordReadStatus;
   title: string;
   image_url: string | null;
   original_release_date: string | null;

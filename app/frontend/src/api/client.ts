@@ -11,6 +11,7 @@
 import { API_BASE, USE_MOCK } from "../lib/env";
 import type {
   Artist,
+  ArtistRecordCount,
   Concert,
   ListResponse,
   Release,
@@ -18,7 +19,9 @@ import type {
 } from "../types/api";
 
 import {
+  getArtistApiArtistsSpotifyIdGet,
   listArtistsApiArtistsGet,
+  listRecordCountsApiArtistsRecordCountsGet,
   upsertArtistApiArtistsPost,
 } from "./generated/artists/artists";
 import {
@@ -60,6 +63,47 @@ export async function getArtists(): Promise<ListResponse<Artist>> {
 }
 
 /**
+ * 単一 artist の lazy fetch。ArtistDetailModal を開いた時に呼び、
+ * backend 側で image_url が NULL なら Spotify から補完されて返ってくる。
+ *
+ * mock モードでは artists.json から spotify_id 一致を引くだけで Spotify は
+ * 叩かない (実 API 切替時にだけ画像 hydration が走る)。
+ */
+export async function getArtist(spotifyId: string): Promise<Artist | null> {
+  if (USE_MOCK) {
+    const mock = artistsMock as ListResponse<Artist>;
+    return mock.items.find((a) => a.spotify_id === spotifyId) ?? null;
+  }
+  const res = await getArtistApiArtistsSpotifyIdGet(spotifyId);
+  if (res.status === 200) {
+    return res.data as Artist;
+  }
+  return null;
+}
+
+/**
+ * artist_id ごとの所有レコード件数を集計して返す軽量エンドポイント。
+ * ArtistsPage 一覧の件数列に使うため、records 本体は取らずに件数だけ先取りする。
+ */
+export async function getRecordCounts(): Promise<ListResponse<ArtistRecordCount>> {
+  if (USE_MOCK) {
+    const records = (vinylRecordsMock as ListResponse<VinylRecord>).items;
+    const counts = new Map<string, number>();
+    for (const r of records) {
+      counts.set(r.artist_id, (counts.get(r.artist_id) ?? 0) + 1);
+    }
+    return {
+      items: [...counts.entries()].map(([artist_id, count]) => ({
+        artist_id,
+        count,
+      })),
+    };
+  }
+  const res = await listRecordCountsApiArtistsRecordCountsGet();
+  return res.data as ListResponse<ArtistRecordCount>;
+}
+
+/**
  * Spotify ID をキーに artist を upsert する。
  *
  * RecordFormModal で Spotify album を選んだ時、その album.artists[0] が DB に
@@ -78,8 +122,7 @@ export async function upsertArtist(input: ArtistCreate): Promise<Artist> {
       spotify_id: input.spotify_id,
       name: input.name,
       image_url: input.image_url ?? null,
-      followed: false,
-      source: input.source ?? "spotify",
+      source: input.source ?? "spotify_dynamic",
       added_at: now,
     } as Artist;
   }
@@ -118,6 +161,7 @@ export async function createVinylRecord(
       artist_id: input.artist_id,
       spotify_album_id: input.spotify_album_id ?? null,
       source: input.source ?? "manual",
+      status: input.status ?? "owned",
       title: input.title,
       image_url: input.image_url ?? null,
       original_release_date: input.original_release_date ?? null,

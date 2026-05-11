@@ -18,6 +18,9 @@ export function HomePage() {
   });
   const artists = useQuery({ queryKey: ["artists"], queryFn: getArtists });
 
+  // Home は所有レコードのコレクション。wanted は ArtistDetailModal の want list でだけ表示。
+  const ownedRecords = records.data?.items.filter((r) => r.status === "owned") ?? [];
+
   const [openRecord, setOpenRecord] = useState<VinylRecord | null>(null);
   const [formMode, setFormMode] = useState<FormMode | null>(null);
 
@@ -35,7 +38,7 @@ export function HomePage() {
       <h1 className="flex items-baseline gap-3 text-base">
         <span className="font-medium">Records</span>
         <span className="text-ink-faint tabular-nums">
-          {records.data ? records.data.items.length : ""}
+          {records.data ? ownedRecords.length : ""}
         </span>
       </h1>
 
@@ -49,7 +52,7 @@ export function HomePage() {
         {records.data && (
           <>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {records.data.items.map((r) => (
+              {ownedRecords.map((r) => (
                 <JacketCard
                   key={r.id}
                   record={r}
@@ -58,10 +61,10 @@ export function HomePage() {
               ))}
               <AddRecordTile
                 onClick={() => setFormMode({ kind: "add" })}
-                prominent={records.data.items.length === 0}
+                prominent={ownedRecords.length === 0}
               />
             </div>
-            {records.data.items.length === 0 && (
+            {ownedRecords.length === 0 && (
               <p className="mt-6 text-center text-sm italic text-ink-mute">
                 まだレコードがありません。タイルから最初の 1 枚を追加してください。
               </p>
