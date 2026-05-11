@@ -45,3 +45,19 @@ class ForbiddenError(DomainError):
 
     def __str__(self) -> str:
         return self.safe_message
+
+
+class SpotifyApiError(DomainError):
+    """Spotify Web API (user 認証不要の参照系) 呼び出しで発生したエラー。
+
+    `status_code` には Spotify 側ステータスを格納し、router で 429 / 502 へ分岐させる。
+    `__str__` は `safe_message` のみ (auth 系と同方針)。
+    """
+
+    def __init__(self, safe_message: str, *, status_code: int | None = None) -> None:
+        super().__init__(safe_message)
+        self.safe_message = safe_message
+        self.status_code = status_code
+
+    def __str__(self) -> str:
+        return self.safe_message

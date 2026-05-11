@@ -272,6 +272,81 @@
         }
       }
     },
+    "/api/spotify/albums/search": {
+      "get": {
+        "tags": [
+          "spotify"
+        ],
+        "summary": "Search Albums",
+        "operationId": "search_albums_api_spotify_albums_search_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "album title query",
+              "title": "Q"
+            },
+            "description": "album title query"
+          },
+          {
+            "name": "artist",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "artist name to refine the query",
+              "title": "Artist"
+            },
+            "description": "artist name to refine the query"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResponse_SpotifyAlbumSummary_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Root",
@@ -428,6 +503,22 @@
         ],
         "title": "ListResponse[ArtistRead]"
       },
+      "ListResponse_SpotifyAlbumSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SpotifyAlbumSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ListResponse[SpotifyAlbumSummary]"
+      },
       "ListResponse_VinylRecordRead_": {
         "properties": {
           "items": {
@@ -443,6 +534,57 @@
           "items"
         ],
         "title": "ListResponse[VinylRecordRead]"
+      },
+      "SpotifyAlbumSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "release_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Date"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "artist_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Artist Names"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "release_date",
+          "image_url",
+          "artist_names"
+        ],
+        "title": "SpotifyAlbumSummary",
+        "description": "Spotify album search 結果の 1 件を表す DTO。\n\n`vinyl_records` への投入で必要なフィールドだけを露出する:\n`spotify_album_id` (= id) / `title` (= name) / `original_release_date` (= release_date)\n/ `image_url` / 表示用の `artist_names`。"
       },
       "ValidationError": {
         "properties": {
@@ -592,8 +734,8 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 5.0,
-                "minimum": 1.0
+                "maximum": 5,
+                "minimum": 1
               },
               {
                 "type": "null"
@@ -941,8 +1083,8 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 5.0,
-                "minimum": 1.0
+                "maximum": 5,
+                "minimum": 1
               },
               {
                 "type": "null"
