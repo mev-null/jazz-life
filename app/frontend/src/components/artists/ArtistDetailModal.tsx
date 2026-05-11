@@ -133,9 +133,10 @@ export function ArtistDetailModal({
 }: Props) {
   if (!artist) return null;
 
-  const ownedRecords = records.filter(
-    (r) => r.artist_id === artist.spotify_id,
-  );
+  // ADR-003: status='owned' は Records (所有) セクション、'wanted' は Want list セクションに分ける。
+  const artistRecords = records.filter((r) => r.artist_id === artist.spotify_id);
+  const ownedRecords = artistRecords.filter((r) => r.status === "owned");
+  const wantedRecords = artistRecords.filter((r) => r.status === "wanted");
 
   const timeline: TimelineItem[] = [
     ...releases
@@ -172,7 +173,7 @@ export function ArtistDetailModal({
           <ArtistAvatar artist={artist} />
         </header>
 
-        {/* Records */}
+        {/* Records (owned) */}
         <section className="mt-8">
           <h3 className="flex items-baseline gap-3 text-base">
             <span className="font-medium">Records</span>
@@ -196,6 +197,33 @@ export function ArtistDetailModal({
             </div>
           ) : (
             <p className="mt-2 text-sm italic text-ink-faint">none owned</p>
+          )}
+        </section>
+
+        {/* Want list (wanted) — Home からは見えず、ここでだけ参照する */}
+        <section className="mt-10">
+          <h3 className="flex items-baseline gap-3 text-base">
+            <span className="font-medium">Want list</span>
+            <span className="text-ink-faint tabular-nums">
+              {wantedRecords.length}
+            </span>
+          </h3>
+          {wantedRecords.length > 0 ? (
+            <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
+              {wantedRecords.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => onRecordClick(r)}
+                  aria-label={r.title}
+                  className="block aspect-square w-full cursor-pointer appearance-none bg-transparent p-0 transition-opacity hover:opacity-90"
+                >
+                  <JacketArt record={r} />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm italic text-ink-faint">none wanted</p>
           )}
         </section>
 
