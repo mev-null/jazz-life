@@ -114,9 +114,6 @@ make gen         # backend/openapi.json から TS 型 + react-query hooks 生成
 
 ## 開発ルール（守る）
 
-### 1 PR = 1 機能 × 1 レイヤ
-**backend と frontend を跨いだ PR は作らない**。型契約のすり合わせは `make gen` の生成型を別 PR でコミットして橋渡しする。詳細は memory の `feedback_pr_workflow.md`。
-
 ### モック切替の維持（Phase B-2 以降も）
 - フロントの全 API 呼び出しは [app/frontend/src/api/client.ts](app/frontend/src/api/client.ts) 経由
 - `VITE_USE_MOCK=true` の間は `src/api/mocks/*.json` を返す

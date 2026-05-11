@@ -21,10 +21,9 @@ import type { AuthUser } from "../types/api";
 
 const MOCK_STORAGE_KEY = STORAGE_KEYS.AUTH_MOCK;
 
-// backend が `/api/auth/*` を実装するまで mock 経路を強制する。Phase B-3 で
-// 認証エンドポイントが入ったら true にして USE_MOCK 経由の分岐に戻す。
-// `USE_MOCK || !AUTH_BACKEND_READY` のうち後者が真の間は常に mock 側。
-const AUTH_BACKEND_READY = false;
+// Phase B-3 PR-1 で backend が `/api/auth/*` を実装したので true に切替済み。
+// 以降は USE_MOCK だけが分岐の鍵になる。`VITE_USE_MOCK=true` のときだけ mock。
+const AUTH_BACKEND_READY = true;
 const useAuthMock = USE_MOCK || !AUTH_BACKEND_READY;
 
 const MOCK_USER: AuthUser = {

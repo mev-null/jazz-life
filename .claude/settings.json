@@ -147,7 +147,17 @@
       "Bash(sudo tee /etc/apt/sources.list.d/github-cli.list)",
       "Bash(sudo apt-get update -qq)",
       "Bash(sudo apt-get install -y gh)",
-      "Bash(gh --version)"
+      "Bash(gh --version)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); paths=sorted\\(d.get\\('paths',{}\\).keys\\(\\)\\); print\\('\\\\n'.join\\(paths\\)\\)\")",
+      "Bash(curl -sf http://localhost:8000/openapi.json -o /tmp/oapi.json)",
+      "Bash(python3 -c \"import json; d=json.load\\(open\\('/tmp/oapi.json'\\)\\); print\\('\\\\n'.join\\(sorted\\(d.get\\('paths',{}\\).keys\\(\\)\\)\\)\\)\")",
+      "Bash(curl -sf -o /tmp/oapi.json http://localhost:8000/openapi.json)",
+      "Bash(python3 -c ' *)",
+      "Bash(DATABASE_URL=postgresql+psycopg://jazz:jazz@localhost:5432/jazz uv run python -c ' *)",
+      "Bash(uv python *)",
+      "Bash(.venv/bin/python --version)",
+      "Bash(xargs ls -la)",
+      "Bash(sed -n '/openapi/,/^  [a-z]/p' /workspaces/jazz-life/.github/workflows/backend.yml)"
     ],
     "additionalDirectories": [
       "/tmp",

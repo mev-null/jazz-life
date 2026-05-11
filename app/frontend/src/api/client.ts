@@ -17,13 +17,19 @@ import type {
   VinylRecord,
 } from "../types/api";
 
-import { listArtistsApiArtistsGet } from "./generated/artists/artists";
+import {
+  listArtistsApiArtistsGet,
+  upsertArtistApiArtistsPost,
+} from "./generated/artists/artists";
 import {
   createRecordApiRecordsPost,
   listRecordsApiRecordsGet,
   updateRecordApiRecordsIdPut,
 } from "./generated/records/records";
+import { searchAlbumsApiSpotifyAlbumsSearchGet } from "./generated/spotify/spotify";
 import type {
+  ArtistCreate,
+  SpotifyAlbumSummary,
   VinylRecordCreate,
   VinylRecordUpdate,
 } from "./generated/model";
@@ -51,6 +57,34 @@ export async function getArtists(): Promise<ListResponse<Artist>> {
   if (USE_MOCK) return artistsMock as ListResponse<Artist>;
   const res = await listArtistsApiArtistsGet();
   return res.data as ListResponse<Artist>;
+}
+
+/**
+ * Spotify ID をキーに artist を upsert する。
+ *
+ * RecordFormModal で Spotify album を選んだ時、その album.artists[0] が DB に
+ * 無ければこの関数で追加してから records POST に進む。重複呼び出しは backend が
+ * 冪等処理するので呼び出し側でガードしなくて良い。USE_MOCK 時はネットワークを
+ * 叩かず入力を mock store にだけ追加して既存挙動を維持する。
+ */
+export async function upsertArtist(input: ArtistCreate): Promise<Artist> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 30));
+    // mock では artists.json をディープに更新する設計まではしない。
+    // 呼び出し側の record 作成と form 上の整合だけ保てれば十分なので、
+    // 入力をそのまま Artist 互換で返して上位の cache に任せる。
+    const now = new Date().toISOString();
+    return {
+      spotify_id: input.spotify_id,
+      name: input.name,
+      image_url: input.image_url ?? null,
+      followed: false,
+      source: input.source ?? "spotify",
+      added_at: now,
+    } as Artist;
+  }
+  const res = await upsertArtistApiArtistsPost(input);
+  return res.data as Artist;
 }
 
 export async function getVinylRecords(): Promise<ListResponse<VinylRecord>> {
@@ -132,6 +166,30 @@ export async function updateVinylRecord(
   }
   const res = await updateRecordApiRecordsIdPut(id, input);
   return res.data as VinylRecord;
+}
+
+/**
+ * Spotify album search (Phase B-3 PR-2 / ADR-002 §2.7 連携)
+ *
+ * backend が認証必須の `/api/spotify/albums/search` を立てて Spotify Search API を
+ * プロキシする。Record 追加時に呼び、選択した album の `image_url` /
+ * `spotify_album_id` / `original_release_date` をフォームに自動入力する用途。
+ *
+ * USE_MOCK 時はネットワークを叩かず空配列を返す。検索 UI は実 API 接続時にのみ
+ * 機能する（モック表示を充実させるよりも、実際に画像が並ぶことを優先）。
+ */
+export async function searchSpotifyAlbums(
+  q: string,
+  artist?: string,
+): Promise<SpotifyAlbumSummary[]> {
+  if (USE_MOCK) return [];
+  if (!q.trim()) return [];
+  const params = artist ? { q, artist } : { q };
+  const res = await searchAlbumsApiSpotifyAlbumsSearchGet(params);
+  if (res.status === 200) {
+    return res.data.items;
+  }
+  return [];
 }
 
 /**

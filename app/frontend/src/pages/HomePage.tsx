@@ -47,16 +47,26 @@ export function HomePage() {
           <p className="text-sm text-ink-mute">読み込みに失敗しました</p>
         )}
         {records.data && (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {records.data.items.map((r) => (
-              <JacketCard
-                key={r.id}
-                record={r}
-                onClick={() => setOpenRecord(r)}
+          <>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+              {records.data.items.map((r) => (
+                <JacketCard
+                  key={r.id}
+                  record={r}
+                  onClick={() => setOpenRecord(r)}
+                />
+              ))}
+              <AddRecordTile
+                onClick={() => setFormMode({ kind: "add" })}
+                prominent={records.data.items.length === 0}
               />
-            ))}
-            <AddRecordTile onClick={() => setFormMode({ kind: "add" })} />
-          </div>
+            </div>
+            {records.data.items.length === 0 && (
+              <p className="mt-6 text-center text-sm italic text-ink-mute">
+                まだレコードがありません。タイルから最初の 1 枚を追加してください。
+              </p>
+            )}
+          </>
         )}
       </div>
 

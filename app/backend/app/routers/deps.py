@@ -11,6 +11,7 @@ from app.models.user import User
 from app.services.artist_service import ArtistService
 from app.services.auth_service import AuthService
 from app.services.record_service import RecordService
+from app.services.spotify_app_client import SpotifyAppClient
 from app.services.spotify_oauth_client import SpotifyOAuthClient
 
 
@@ -41,6 +42,19 @@ def get_user_repository(session: Session = Depends(get_session)) -> UserReposito
 
 def get_spotify_oauth_client(settings: Settings = Depends(get_settings)) -> SpotifyOAuthClient:
     return SpotifyOAuthClient(settings)
+
+
+# Client Credentials Flow 用クライアントは process-wide で 1 つに揃え、
+# in-memory token cache を共有する。FastAPI の Depends は呼び出し毎に新しい
+# インスタンスを返すので、ここでモジュール変数に保持する。
+_spotify_app_client: SpotifyAppClient | None = None
+
+
+def get_spotify_app_client(settings: Settings = Depends(get_settings)) -> SpotifyAppClient:
+    global _spotify_app_client
+    if _spotify_app_client is None:
+        _spotify_app_client = SpotifyAppClient(settings)
+    return _spotify_app_client
 
 
 def get_auth_service(

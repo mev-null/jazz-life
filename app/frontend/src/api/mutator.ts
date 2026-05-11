@@ -13,7 +13,13 @@ export const customFetch = async <T>(
   url: string,
   options: RequestInit,
 ): Promise<T> => {
-  const res = await fetch(`${API_BASE}${url}`, options);
+  // 認証経路は HttpOnly cookie で持つので、orval 経由の API 呼び出しでも
+  // 常に credentials を送る。Spotify Search など `get_current_user` 必須の
+  // endpoint が cookie 無しで叩かれて 401 になるのを防ぐ。
+  const res = await fetch(`${API_BASE}${url}`, {
+    credentials: "include",
+    ...options,
+  });
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
