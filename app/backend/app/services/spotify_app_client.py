@@ -52,7 +52,10 @@ class SpotifyAppClient:
         if not query.strip():
             return []
         token = self._get_app_token()
-        q = f'album:"{query}"'
+        # type=album で既に album 種別に絞っているので、追加で `album:` field-filter を
+        # 重ねると Spotify が 400 を返すことがある。クエリ本体はそのまま渡し、artist
+        # のみ field filter で絞り込む。
+        q = query.strip()
         if artist:
             q += f' artist:"{artist}"'
         try:
@@ -67,7 +70,17 @@ class SpotifyAppClient:
         if res.status_code == 429:
             raise SpotifyApiError("spotify rate limit exceeded", status_code=429)
         if res.status_code != 200:
-            logger.warning("spotify search returned %s", res.status_code)
+            try:
+                err_body = res.json()
+                err_detail = err_body.get("error")
+            except ValueError:
+                err_detail = None
+            logger.warning(
+                "spotify search returned %s q=%r error=%s",
+                res.status_code,
+                q,
+                err_detail,
+            )
             raise SpotifyApiError(
                 f"spotify search returned {res.status_code}",
                 status_code=res.status_code,
@@ -123,10 +136,12 @@ def _to_summary(item: dict) -> SpotifyAlbumSummary:
     images = item.get("images") or []
     image_url = images[0].get("url") if images else None
     artists = item.get("artists") or []
+    primary_artist_id = artists[0].get("id") if artists else None
     return SpotifyAlbumSummary(
         id=item.get("id") or "",
         name=item.get("name") or "",
         release_date=item.get("release_date"),
         image_url=image_url,
         artist_names=[a.get("name") for a in artists if a.get("name")],
+        primary_artist_id=primary_artist_id,
     )

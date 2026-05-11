@@ -101,6 +101,7 @@ def test_search_returns_items(spotify_client: TestClient, httpx_mock: HTTPXMock)
                 "release_date": "1959-08-17",
                 "image_url": "https://i.scdn.co/image/koh.jpg",
                 "artist_names": ["Miles Davis"],
+                "primary_artist_id": "art-1",
             }
         ]
     }

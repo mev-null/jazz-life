@@ -22,7 +22,9 @@ router = APIRouter(prefix="/api/spotify", tags=["spotify"])
 def search_albums(
     q: str = Query(min_length=1, description="album title query"),
     artist: str | None = Query(default=None, description="artist name to refine the query"),
-    limit: int = Query(default=20, ge=1, le=50),
+    # 2026-05 時点で Spotify Search は max=10 を超えると 400 を返す
+    # (公式 doc は max=50 だが実挙動が乖離)。10 に絞って 400 を防ぐ。
+    limit: int = Query(default=10, ge=1, le=10),
     _: User = Depends(get_current_user),
     client: SpotifyAppClient = Depends(get_spotify_app_client),
 ) -> ListResponse[SpotifyAlbumSummary]:

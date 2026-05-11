@@ -58,6 +58,7 @@ def test_search_returns_mapped_albums(httpx_mock: HTTPXMock) -> None:
     assert a.release_date == "1959-08-17"
     assert a.image_url == "https://i.scdn.co/image/kind-of-blue.jpg"
     assert a.artist_names == ["Miles Davis"]
+    assert a.primary_artist_id == "art-0"
 
 
 def test_empty_query_skips_network(httpx_mock: HTTPXMock) -> None:
@@ -87,7 +88,7 @@ def test_artist_parameter_is_added_to_query(httpx_mock: HTTPXMock) -> None:
     assert len(requests) == 1
     q_param = requests[0].url.params.get("q")
     assert q_param is not None
-    assert 'album:"Kind of Blue"' in q_param
+    assert "Kind of Blue" in q_param
     assert 'artist:"Miles Davis"' in q_param
 
 
