@@ -191,20 +191,20 @@ def test_sync_for_user_does_not_reseed_when_already_followed(session: Session) -
     assert follows == ["art-1"]
 
 
-def test_sync_for_user_continues_on_per_artist_error(session: Session) -> None:
-    """1 アーティストが Spotify 429/5xx でも他のアーティストは ingest 継続。"""
+def test_sync_for_user_continues_on_per_artist_5xx(session: Session) -> None:
+    """1 アーティストが Spotify 5xx を返しても他のアーティストは ingest 継続。"""
     user = _seed_user(session)
     _seed_artist(session, "art-ok-1")
-    _seed_artist(session, "art-rate-limit")
+    _seed_artist(session, "art-server-error")
     _seed_artist(session, "art-ok-2")
     _seed_follow(session, user.id, "art-ok-1")
-    _seed_follow(session, user.id, "art-rate-limit")
+    _seed_follow(session, user.id, "art-server-error")
     _seed_follow(session, user.id, "art-ok-2")
 
     spotify = FakeSpotifyClient(
         responses={
             "art-ok-1": [_ingest("alb-1", "art-ok-1")],
-            "art-rate-limit": SpotifyApiError("rate limit", status_code=429),
+            "art-server-error": SpotifyApiError("server error", status_code=500),
             "art-ok-2": [_ingest("alb-2", "art-ok-2")],
         }
     )
@@ -216,7 +216,41 @@ def test_sync_for_user_continues_on_per_artist_error(session: Session) -> None:
     assert result.artists_succeeded == 2
     assert result.albums_ingested == 2
     # 部分失敗は success 扱い (last_success_at が更新される、last_error はクリア)
+    assert result.first_error is not None and "server error" in result.first_error
+    status = SyncStatusRepository(session).get(RELEASE_SYNC_SOURCE)
+    assert status is not None
+    assert status.last_success_at is not None
+    assert status.last_error is None
+
+
+def test_sync_for_user_stops_early_on_rate_limit(session: Session) -> None:
+    """Spotify 429 を踏んだら残りの artist は叩かず即中断する (limit window を延ばさないため)。"""
+    user = _seed_user(session)
+    _seed_artist(session, "art-ok-1")
+    _seed_artist(session, "art-rate-limit")
+    _seed_artist(session, "art-never-called")
+    _seed_follow(session, user.id, "art-ok-1")
+    _seed_follow(session, user.id, "art-rate-limit")
+    _seed_follow(session, user.id, "art-never-called")
+
+    spotify = FakeSpotifyClient(
+        responses={
+            "art-ok-1": [_ingest("alb-1", "art-ok-1")],
+            "art-rate-limit": SpotifyApiError("rate limit", status_code=429),
+            "art-never-called": [_ingest("alb-2", "art-never-called")],
+        }
+    )
+    result = _make_service(session).sync_for_user(
+        user.id, spotify, since_date=date(2025, 1, 1), until_date=date(2027, 1, 1)
+    )
+
+    assert result.artists_total == 3
+    assert result.artists_succeeded == 1
+    assert result.albums_ingested == 1
     assert result.first_error is not None and "rate limit" in result.first_error
+    # 429 を踏んだ後の artist は叩かれていないこと (Spotify への無駄打ち防止)。
+    assert "art-never-called" not in spotify.calls
+    # 1 件でも成功しているので mark_success 側に倒す (last_error は据え置きクリア)
     status = SyncStatusRepository(session).get(RELEASE_SYNC_SOURCE)
     assert status is not None
     assert status.last_success_at is not None
