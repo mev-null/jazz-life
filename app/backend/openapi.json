@@ -935,8 +935,8 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 5,
-                "minimum": 1
+                "maximum": 5.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -1308,8 +1308,8 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 5,
-                "minimum": 1
+                "maximum": 5.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"

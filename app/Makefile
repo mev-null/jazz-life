@@ -21,11 +21,14 @@ logs:
 ps:
 	docker compose ps
 
-# 起動中の backend から OpenAPI 仕様を取得して backend/openapi.json に保存する。
-# spec を更新したい時に明示的に呼ぶ（API 変更があった時など）。
-# 事前条件: backend が起動していること（make up 後）
+# FastAPI app を直接 import して openapi 仕様を出力し backend/openapi.json に保存する。
+# 整形は jq ではなく Python の json.dumps を使う: jq 1.6 (ローカル devcontainer) は
+# 5.0 → 5 と float を integer 化してしまい、CI の jq 1.7+ と byte 不一致になる
+# (Pydantic の Field(ge=1, le=5) は openapi で 5.0/1.0 を出力する仕様)。
+# CI 側 (.github/workflows/backend.yml の openapi-spec-check) も Python 直叩きなので、
+# こちらに揃える。backend サーバ起動は不要 (DB 接続もしないので lifespan が走らない)。
 spec:
-	curl -sf http://localhost:8000/openapi.json | jq --indent 2 . > backend/openapi.json
+	cd backend && uv run python -c "import json; from app.main import app; print(json.dumps(app.openapi(), indent=2, ensure_ascii=False))" > openapi.json
 
 # OpenAPI 仕様から TypeScript 型 + react-query hooks を自動生成（ホスト側で実行）。
 # spec は backend/openapi.json をローカルから読むため、backend 未起動でも実行できる。
