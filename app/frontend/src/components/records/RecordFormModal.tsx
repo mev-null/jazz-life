@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import {
   createVinylRecord,
+  deleteVinylRecord,
   searchSpotifyAlbums,
   updateVinylRecord,
   uploadJacket,
@@ -16,15 +17,25 @@ import type {
   VinylRecordCreateStatus,
   VinylRecordUpdate,
 } from "../../api/generated/model";
+import { InlineConfirm } from "../InlineConfirm";
 import { ModalShell } from "../ModalShell";
 
 export type FormMode =
   | {
     kind: "add";
-    // ArtistDetailModal から呼ぶ際に artist と status を事前確定するための
-    // 任意デフォルト。UI には status コントロールを出さず、ここで指定された
-    // ものを create payload に流し込む。
-    defaults?: { artistId?: string; status?: VinylRecordCreateStatus };
+    // ArtistDetailModal / FeedDetailModal から呼ぶ際の事前デフォルト。
+    // - artistId / status: 必須に近い (どこから呼ぶかで決まる)
+    // - title / imageUrl / spotifyAlbumId / originalReleaseDate: FeedDetailModal の
+    //   「買った/ほしい」経路で Release のメタデータを流し込む用 (ユーザが
+    //   そのまま保存してもよし、編集してもよし)
+    defaults?: {
+      artistId?: string;
+      status?: VinylRecordCreateStatus;
+      title?: string;
+      imageUrl?: string | null;
+      spotifyAlbumId?: string | null;
+      originalReleaseDate?: string | null;
+    };
   }
   | { kind: "edit"; record: VinylRecord };
 
@@ -70,22 +81,38 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
 
   const create = useMutation({
     mutationFn: createVinylRecord,
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["records"] }),
+    // record 作成は auto-follow 経路で user_follows に行を作る / archived を解除
+    // するので、ArtistsPage の followed-artists 一覧と件数も再取得対象。
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["records"] });
+      queryClient.invalidateQueries({ queryKey: ["followed-artists"] });
+      queryClient.invalidateQueries({ queryKey: ["record-counts"] });
+    },
   });
 
   const update = useMutation({
     mutationFn: ({ id, input }: { id: string; input: VinylRecordUpdate }) =>
       updateVinylRecord(id, input),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["records"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["records"] });
+      queryClient.invalidateQueries({ queryKey: ["record-counts"] });
+    },
   });
 
   const upload = useMutation({
     mutationFn: ({ recordId, file }: { recordId: string; file: File }) =>
       uploadJacket(recordId, file),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["records"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["records"] }),
+  });
+
+  // 編集モードの「削除」ボタン。共通 InlineConfirm に切替えたので、ローカル
+  // state は不要 (内側でハンドリング)。
+  const remove = useMutation({
+    mutationFn: deleteVinylRecord,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["records"] });
+      queryClient.invalidateQueries({ queryKey: ["record-counts"] });
+    },
   });
 
   // load fields when modal opens / mode changes.
@@ -111,25 +138,29 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
       setPreviewUrl(r.image_url);
       setSpotifyAlbumId(r.spotify_album_id);
     } else {
-      setTitle("");
+      const d = mode.defaults;
+      setTitle(d?.title ?? "");
       // add mode: defaults.artistId が渡されていればその場で artists を引いて
       // name も埋める。artists 未到着のケースは下の追い焚き effect が補完する。
-      const defaultArtistId = mode.defaults?.artistId ?? "";
+      const defaultArtistId = d?.artistId ?? "";
       setArtistId(defaultArtistId);
       setArtistQuery(
         defaultArtistId
           ? artists.find((a) => a.spotify_id === defaultArtistId)?.name ?? ""
           : "",
       );
-      setReleaseDate("");
+      setReleaseDate(d?.originalReleaseDate ?? "");
       setPressingInfo("");
       setPurchaseStore("");
       setPurchaseDate("");
       setMemo("");
       setFavoriteTracks("");
-      setExistingImageUrl(null);
-      setPreviewUrl(null);
-      setSpotifyAlbumId(null);
+      // Release 由来の image URL は Spotify CDN なので blob revoke 不要。
+      // existingImageUrl / previewUrl の両方にセットして form 上にプレビュー表示する。
+      const defaultImage = d?.imageUrl ?? null;
+      setExistingImageUrl(defaultImage);
+      setPreviewUrl(defaultImage);
+      setSpotifyAlbumId(d?.spotifyAlbumId ?? null);
     }
     setPendingFile(null);
     setSpotifyResults([]);
@@ -581,7 +612,28 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
           </label>
         </div>
 
-        <div className="mt-8 flex justify-end gap-6 text-sm">
+        <div className="mt-8 flex items-center gap-6 text-sm">
+          {isEdit && mode.kind === "edit" && (
+            <InlineConfirm
+              // edit A → edit B のとき confirm 状態が引き継がれないよう
+              // record.id で remount させる。
+              key={mode.record.id}
+              className="mr-auto flex items-center gap-4"
+              triggerLabel="Remove"
+              prompt="Remove this record?"
+              pendingLabel="Removing…"
+              isPending={remove.isPending}
+              disabled={submitting}
+              onConfirm={() =>
+                remove.mutate(mode.record.id, {
+                  onSuccess: () => {
+                    previewBlobRef.current = null;
+                    onClose();
+                  },
+                })
+              }
+            />
+          )}
           <button
             type="button"
             onClick={onClose}

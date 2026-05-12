@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   getArtist,
   getConcerts,
   getReleases,
   getVinylRecords,
+  unfollowArtist,
 } from "../../api/client";
 import {
   formatShortDate,
@@ -14,57 +15,25 @@ import {
 } from "../../lib/dates";
 import { formatVenue } from "../../lib/formatVenue";
 import { concertMatchesArtist } from "../../lib/matchArtist";
-import { avatarTintByString } from "../../lib/palette";
 import type {
   Artist,
   Concert,
   Release,
   VinylRecord,
 } from "../../types/api";
+import { InlineConfirm } from "../InlineConfirm";
 import { ModalShell } from "../ModalShell";
+import { ReleaseRow } from "../feed/ReleaseRow";
 import { TodayDivider } from "../feed/TodayDivider";
 import { AddRecordTile } from "../records/AddRecordTile";
 import { JacketArt } from "../records/JacketCard";
-import { ArtistRecordsAllModal } from "./ArtistRecordsAllModal";
+import { RecordsAllModal } from "../records/RecordsAllModal";
+import { ArtistAvatar } from "./ArtistAvatar";
 
 // detail modal のセクションが「拡大表示」(別 modal で全件) に切り替わる件数閾値。
-// 4 = sm+ の grid 1 行に収まる枚数。これ以上は detail 内グリッドに「+」を出さず、
-// 4 件だけプレビューして "view all" 経由で拡大表示へ誘導する。
-const SECTION_PREVIEW_LIMIT = 4;
-
-function initials(name: string): string {
-  const words = name.trim().split(/\s+/);
-  if (words.length === 0) return "—";
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
-}
-
-function ArtistAvatar({ artist }: { artist: Artist }) {
-  if (artist.image_url) {
-    return (
-      <img
-        src={artist.image_url}
-        alt=""
-        className="aspect-square w-20 shrink-0 object-cover"
-      />
-    );
-  }
-  const bg = avatarTintByString(artist.spotify_id);
-  const isWarm = bg === "#b08a3a";
-  return (
-    <div
-      className="flex aspect-square w-20 shrink-0 items-center justify-center"
-      style={{
-        backgroundColor: bg,
-        color: isWarm ? "#1a1714" : "#f4efe3",
-      }}
-    >
-      <span className="text-base font-medium tracking-wide">
-        {initials(artist.name)}
-      </span>
-    </div>
-  );
-}
+// 8 = sm+ の 4 列 grid で 2 行分。これ以上溜まったらグリッド内の「+」タイルは
+// 隠して "view all" 経由で拡大表示モーダルに誘導する。
+const SECTION_PREVIEW_LIMIT = 8;
 
 type TimelineItem =
   | { kind: "release"; data: Release; date: string }
@@ -122,6 +91,46 @@ function TimelineRow({
         <div className="mt-0.5 text-xs italic text-ink-faint">{tag}</div>
       </div>
     </button>
+  );
+}
+
+function ActivityRow({
+  item,
+  index,
+  isPast,
+  artist,
+  onClick,
+}: {
+  item: TimelineItem;
+  index: number;
+  isPast: boolean;
+  artist: Artist;
+  onClick: () => void;
+}) {
+  // release は backend (is_read) を真として表示。concert は読了状態を
+  // この行レベルで表現していない (TimelineRow に isRead プロパティ無し)。
+  // 必要になったら useReadState 由来の bool をここに足す。
+  if (item.kind === "release") {
+    return (
+      <ReleaseRow
+        release={item.data}
+        artist={artist}
+        isPast={isPast}
+        isRead={item.data.is_read}
+        onClick={onClick}
+      />
+    );
+  }
+  return (
+    <TimelineRow
+      index={index}
+      title={item.data.title}
+      sub={timelineSub(item)}
+      date={item.date}
+      tag={timelineTag(item)}
+      isPast={isPast}
+      onClick={onClick}
+    />
   );
 }
 
@@ -210,6 +219,17 @@ export function ArtistDetailModal({
   useEffect(() => {
     setExpandedSection(null);
   }, [artist?.spotify_id]);
+  const queryClient = useQueryClient();
+  const unfollow = useMutation({
+    mutationFn: unfollowArtist,
+    onSuccess: () => {
+      // ArtistsPage 一覧 (followed-artists) と件数表示を更新。global artists
+      // registry (HomePage 等が使う) は変わらないので invalidate しない。
+      queryClient.invalidateQueries({ queryKey: ["followed-artists"] });
+      queryClient.invalidateQueries({ queryKey: ["record-counts"] });
+      onClose();
+    },
+  });
   // 個別アーティストクリック時に発火する lazy fetch 群。modal が閉じている間は
   // enabled=false で発火しない。
   // - artistQ: backend が image_url を Spotify から hydrate して返す
@@ -228,7 +248,7 @@ export function ArtistDetailModal({
   });
   const releasesQ = useQuery({
     queryKey: ["releases"],
-    queryFn: getReleases,
+    queryFn: () => getReleases(),
     enabled: artistId !== null,
   });
   const concertsQ = useQuery({
@@ -274,30 +294,27 @@ export function ArtistDetailModal({
   return (
     <ModalShell onClose={onClose}>
       <div className="max-h-[90vh] w-[min(92vw,720px)] overflow-y-auto bg-paper p-8 text-left text-ink shadow-xl ring-1 ring-ink/10">
-        <header className="flex items-start gap-4 border-b border-ink/15 pb-4">
+        <header className="flex items-center gap-4 border-b border-ink/15 pb-4">
           <div className="min-w-0 flex-1">
             <div className="text-2xl font-medium leading-tight">
               {displayArtist.name}
-            </div>
-            <div className="mt-1 text-sm italic text-ink-mute">
-              {displayArtist.source}
             </div>
           </div>
           <ArtistAvatar artist={displayArtist} />
         </header>
 
-        {/* Records (owned) */}
+        {/* Owned records */}
         <RecordsSection
-          label="Records"
+          label="On the shelf"
           records={ownedRecords}
           onRecordClick={onRecordClick}
           onAddRecord={() => onAddRecord(artist, "owned")}
           onViewAll={() => setExpandedSection("owned")}
         />
 
-        {/* Want list (wanted) — Home からは見えず、ここでだけ参照する */}
+        {/* Wanted records — Home からは見えず、ここでだけ参照する */}
         <RecordsSection
-          label="Want list"
+          label="On the hunt"
           records={wantedRecords}
           onRecordClick={onRecordClick}
           onAddRecord={() => onAddRecord(artist, "wanted")}
@@ -316,14 +333,12 @@ export function ArtistDetailModal({
             {tp.upcoming.length > 0 && (
               <div className="divide-y divide-ink-faint/30">
                 {tp.upcoming.map((item, i) => (
-                  <TimelineRow
+                  <ActivityRow
                     key={timelineKey(item)}
+                    item={item}
                     index={i + 1}
-                    title={item.data.title}
-                    sub={timelineSub(item)}
-                    date={item.date}
-                    tag={timelineTag(item)}
                     isPast={false}
+                    artist={artist}
                     onClick={() => handleClick(item)}
                   />
                 ))}
@@ -335,14 +350,12 @@ export function ArtistDetailModal({
             {tp.past.length > 0 && (
               <div className="divide-y divide-ink-faint/30">
                 {tp.past.map((item, i) => (
-                  <TimelineRow
+                  <ActivityRow
                     key={timelineKey(item)}
+                    item={item}
                     index={tp.upcoming.length + i + 1}
-                    title={item.data.title}
-                    sub={timelineSub(item)}
-                    date={item.date}
-                    tag={timelineTag(item)}
                     isPast={true}
+                    artist={artist}
                     onClick={() => handleClick(item)}
                   />
                 ))}
@@ -353,15 +366,34 @@ export function ArtistDetailModal({
             )}
           </div>
         </section>
+
+        {/* Remove (unfollow) — modal 最下部。記録がある間は disable。
+            共通の InlineConfirm で「trigger → prompt+Cancel+Confirm」を表現。
+        */}
+        <section className="mt-12 border-t border-ink/15 pt-4 text-sm">
+          <InlineConfirm
+            // 別アーティストに切り替えた時に confirm 状態が引き継がれないよう
+            // spotify_id で remount させる。
+            key={artist.spotify_id}
+            className="flex items-center justify-end gap-3"
+            triggerLabel="Remove from follow"
+            prompt={`Stop following ${displayArtist.name}?`}
+            pendingLabel="Removing…"
+            isPending={unfollow.isPending}
+            disabled={artistRecords.length > 0}
+            disabledHint="good music..."
+            onConfirm={() => unfollow.mutate(artist.spotify_id)}
+          />
+        </section>
       </div>
       {expandedSection !== null && (
-        <ArtistRecordsAllModal
-          artist={displayArtist}
+        <RecordsAllModal
+          prefix={displayArtist.name}
+          label={expandedSection === "owned" ? "On the shelf" : "On the hunt"}
           records={expandedSection === "owned" ? ownedRecords : wantedRecords}
-          status={expandedSection}
           onClose={() => setExpandedSection(null)}
           onRecordClick={onRecordClick}
-          onAddRecord={onAddRecord}
+          onAddRecord={() => onAddRecord(artist, expandedSection)}
         />
       )}
     </ModalShell>

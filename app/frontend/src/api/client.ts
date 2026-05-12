@@ -3,9 +3,9 @@
 //   ADR-002 §2.7-§2.8 に従い、VITE_USE_MOCK で mock / 実 API を切り替える。
 //
 //   実 API パス:
-//     - artists / records は orval 生成 fetcher (src/api/generated/) を経由
-//     - releases / concerts / jacket upload は backend 未実装のため fetch のまま
-//       (jacket upload の実 API は Phase B-3 で実装予定)
+//     - artists / records / releases は orval 生成 fetcher (src/api/generated/) を経由
+//     - concerts / jacket upload は backend 未実装のため fetch のまま
+//       (jacket upload の実 API は Phase B-3 以降)
 // ====================================================================
 
 import { API_BASE, USE_MOCK } from "../lib/env";
@@ -15,6 +15,8 @@ import type {
   Concert,
   ListResponse,
   Release,
+  SyncRunResult,
+  SyncStatus,
   VinylRecord,
 } from "../types/api";
 
@@ -26,13 +28,25 @@ import {
 } from "./generated/artists/artists";
 import {
   createRecordApiRecordsPost,
+  deleteRecordApiRecordsIdDelete,
   listRecordsApiRecordsGet,
   updateRecordApiRecordsIdPut,
 } from "./generated/records/records";
+import {
+  getSyncStatusApiReleasesSyncStatusGet,
+  listReleasesApiReleasesGet,
+  setReleaseReadStatusApiReleasesSpotifyIdReadPatch,
+  triggerSyncApiReleasesSyncPost,
+} from "./generated/releases/releases";
 import { searchAlbumsApiSpotifyAlbumsSearchGet } from "./generated/spotify/spotify";
+import {
+  listFollowedArtistsApiUserFollowsArtistsGet,
+  unfollowArtistApiUserFollowsArtistIdDelete,
+} from "./generated/user-follows/user-follows";
 import type {
   ArtistCreate,
   SpotifyAlbumSummary,
+  SyncRunRequest,
   VinylRecordCreate,
   VinylRecordUpdate,
 } from "./generated/model";
@@ -104,6 +118,36 @@ export async function getRecordCounts(): Promise<ListResponse<ArtistRecordCount>
 }
 
 /**
+ * 現ユーザが follow 中 (archived=false) の artists のみ返す。
+ *
+ * ArtistsPage 一覧専用。HomePage / RecordFormModal が使う `getArtists()` は
+ * global registry (全 artists 行) を返す既存挙動のままで、本関数とはキャッシュ
+ * キー (`["followed-artists"]`) を分けてある。auth 必須。
+ *
+ * mock 時は artists.json をそのまま返す (mock store は user_follows を表現
+ * しないため、ArtistsPage では全 mock artists が見える)。
+ */
+export async function getFollowedArtists(): Promise<ListResponse<Artist>> {
+  if (USE_MOCK) return artistsMock as ListResponse<Artist>;
+  const res = await listFollowedArtistsApiUserFollowsArtistsGet();
+  return res.data as ListResponse<Artist>;
+}
+
+/**
+ * Spotify ID で artist を follow から外す (soft delete: archived_flag=true)。
+ *
+ * mock 時はネットワークを叩かない (mock store には user_follows 表現を持たない
+ * ので no-op)。auth 必須エンドポイントなので cookie 同梱 (orval mutator 経由)。
+ */
+export async function unfollowArtist(spotifyId: string): Promise<void> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 30));
+    return;
+  }
+  await unfollowArtistApiUserFollowsArtistIdDelete(spotifyId);
+}
+
+/**
  * Spotify ID をキーに artist を upsert する。
  *
  * RecordFormModal で Spotify album を選んだ時、その album.artists[0] が DB に
@@ -136,10 +180,95 @@ export async function getVinylRecords(): Promise<ListResponse<VinylRecord>> {
   return res.data as ListResponse<VinylRecord>;
 }
 
-// backend 未実装。実 API 接続は Phase B-3 以降。
-export async function getReleases(): Promise<ListResponse<Release>> {
+/**
+ * 期間窓内 (デフォルト today-30d .. today+30d) の release 一覧を取る。
+ *
+ * mock モードでは releases.json の items をそのまま返し (frontend 側で期間
+ * フィルタは行わない、検証用)、実 API モードでは backend のデフォルト窓に
+ * 任せる (from/to 省略時 today-30d/today+30d)。
+ */
+export async function getReleases(
+  from?: string,
+  to?: string,
+): Promise<ListResponse<Release>> {
   if (USE_MOCK) return releasesMock as ListResponse<Release>;
-  return fetchJson<ListResponse<Release>>("/api/releases");
+  const params: { from?: string; to?: string } = {};
+  if (from) params.from = from;
+  if (to) params.to = to;
+  const res = await listReleasesApiReleasesGet(params);
+  return res.data as ListResponse<Release>;
+}
+
+/**
+ * release の既読フラグを切り替える (PATCH 経由)。auth 必須。
+ *
+ * frontend では「Feed の release 行をクリック」 / 「FeedDetailModal で
+ * mark as read / unread」のタイミングで呼ぶ。release.is_read が backend
+ * 永続化されるので、ブラウザを跨いでも既読状態が保持される (localStorage
+ * 時代との違い)。
+ *
+ * mock 時はネットワークを叩かず、入力された is_read 状態をそのまま返す。
+ */
+export async function setReleaseRead(
+  spotifyId: string,
+  isRead: boolean,
+): Promise<Release> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 20));
+    const mock = (releasesMock as ListResponse<Release>).items.find(
+      (r) => r.spotify_id === spotifyId,
+    );
+    return {
+      ...(mock ?? ({} as Release)),
+      is_read: isRead,
+      read_at: isRead ? new Date().toISOString() : null,
+    };
+  }
+  const res = await setReleaseReadStatusApiReleasesSpotifyIdReadPatch(spotifyId, {
+    is_read: isRead,
+  });
+  return res.data as Release;
+}
+
+/**
+ * Spotify Get Artist's Albums をフォロー中アーティスト全件に対し走らせて
+ * releases テーブルを upsert する。認証必須 (current_user 経由で
+ * user_follows を絞る)。
+ *
+ * USE_MOCK 時はネットワークを叩かず、ダミー結果を返す (mock は再同期不要)。
+ */
+export async function triggerReleaseSync(
+  payload?: SyncRunRequest,
+): Promise<SyncRunResult> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 30));
+    return {
+      artists_total: 0,
+      artists_succeeded: 0,
+      albums_ingested: 0,
+      first_error: null,
+    };
+  }
+  const res = await triggerSyncApiReleasesSyncPost(payload ?? null);
+  return res.data as SyncRunResult;
+}
+
+/**
+ * release sync の最終実行ステータス。空状態 (一度も sync していない) を
+ * 区別するため、source 以外は null になり得る。Feed 画面の「最終同期日時 /
+ * エラー状態」表示 (ADR-000 §314) に使う想定。
+ */
+export async function getReleaseSyncStatus(): Promise<SyncStatus> {
+  if (USE_MOCK) {
+    return {
+      source: "spotify_releases",
+      last_success_at: null,
+      last_attempt_at: null,
+      last_error: null,
+    };
+  }
+  const res = await getSyncStatusApiReleasesSyncStatusGet();
+  return res.data as SyncStatus;
 }
 
 // backend 未実装。実 API 接続は Phase B-3 以降。
@@ -182,6 +311,23 @@ export async function createVinylRecord(
   }
   const res = await createRecordApiRecordsPost(input);
   return res.data as VinylRecord;
+}
+
+/**
+ * 1 件削除。auth 必須 (backend で get_current_user ガード済み)。
+ *
+ * user_follows は触らないので、最後の 1 件を消しても follow と sync 対象は
+ * 残ったまま。「興味なくなった」を反映したい場合は将来 unfollow UI を別途。
+ */
+export async function deleteVinylRecord(id: string): Promise<void> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 30));
+    const idx = mockRecordsStore.findIndex((r) => r.id === id);
+    if (idx < 0) throw new Error(`record not found: ${id}`);
+    mockRecordsStore.splice(idx, 1);
+    return;
+  }
+  await deleteRecordApiRecordsIdDelete(id);
 }
 
 export async function updateVinylRecord(

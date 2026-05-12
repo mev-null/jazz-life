@@ -32,21 +32,34 @@ def test_artists_empty(client: TestClient) -> None:
     assert res.json() == {"items": []}
 
 
-def test_artists_seeded_returns_six(seeded_client: TestClient) -> None:
+def test_seed_is_now_empty(seeded_client: TestClient) -> None:
+    """Phase B-3: seeds/artists.json は items=[] に倒し、artist は records 登録
+    経由でのみ生まれる運用にしたので、`seed_artists_if_empty` を回しても
+    artists は 0 件のまま。"""
     res = seeded_client.get("/api/artists")
     assert res.status_code == 200
-    body = res.json()
-    assert len(body["items"]) == 6
-    names = {item["name"] for item in body["items"]}
-    assert "Bill Evans" in names
-    assert "Avishai Cohen" in names
+    assert res.json() == {"items": []}
 
 
-def test_artists_sorted_by_added_at_desc(seeded_client: TestClient) -> None:
-    res = seeded_client.get("/api/artists")
+def test_artists_sorted_by_added_at_desc(client: TestClient, session: Session) -> None:
+    """artists が複数件あれば added_at desc で返る。
+
+    seed が空になったので、ソート検証用に fixture artist を直接 2 件投入する。
+    """
+    from datetime import UTC, datetime, timedelta
+
+    now = datetime.now(UTC)
+    session.add_all(
+        [
+            Artist(spotify_id="a-old", name="Old", added_at=now - timedelta(days=10)),
+            Artist(spotify_id="a-new", name="New", added_at=now),
+        ]
+    )
+    session.commit()
+
+    res = client.get("/api/artists")
     items = res.json()["items"]
-    added_dates = [item["added_at"] for item in items]
-    assert added_dates == sorted(added_dates, reverse=True)
+    assert [a["spotify_id"] for a in items] == ["a-new", "a-old"]
 
 
 # ---- POST /api/artists (upsert) ----
@@ -167,18 +180,16 @@ def test_get_artist_hydrates_image_from_spotify(
     session.add(Artist(spotify_id="art-99", name="To Be Hydrated", image_url=None))
     session.commit()
     httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    # get_artists_images は単発 GET /v1/artists/{id} をループする実装
+    # (batch endpoint は Spotify Development Mode app で 403 になるため)
     httpx_mock.add_response(
-        url=_ARTISTS_URL_PATTERN,
+        url="https://api.spotify.com/v1/artists/art-99",
         method="GET",
-        json=_artists_response(
-            [
-                {
-                    "id": "art-99",
-                    "name": "To Be Hydrated",
-                    "images": [{"url": "https://i.scdn.co/image/art99.jpg"}],
-                }
-            ]
-        ),
+        json={
+            "id": "art-99",
+            "name": "To Be Hydrated",
+            "images": [{"url": "https://i.scdn.co/image/art99.jpg"}],
+        },
     )
 
     res = spotify_client.get("/api/artists/art-99")
@@ -222,7 +233,9 @@ def test_get_artist_swallows_spotify_error(
     session.add(Artist(spotify_id="art-fail", name="Spotify Down", image_url=None))
     session.commit()
     httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
-    httpx_mock.add_response(url=_ARTISTS_URL_PATTERN, method="GET", status_code=500)
+    httpx_mock.add_response(
+        url="https://api.spotify.com/v1/artists/art-fail", method="GET", status_code=500
+    )
 
     res = spotify_client.get("/api/artists/art-fail")
 
@@ -239,10 +252,11 @@ def test_record_counts_empty(client: TestClient) -> None:
     assert res.json() == {"items": []}
 
 
-def test_record_counts_aggregates_by_artist(seeded_client: TestClient, session: Session) -> None:
-    # 直接 INSERT すると display_order 等の必須カラムが面倒なので
-    # POST 経由で 2 件 ぶら下げる…のは authed_client が必要で面倒。代わりに
-    # ORM 直で書く。display_order は count_by_artist のロジックに影響しない。
+def test_record_counts_aggregates_by_artist(client: TestClient, session: Session) -> None:
+    """記録 GROUP BY artist_id の集計が正しく返ることを検証する。
+
+    seed が空になったので、fixture artist と vinyl_record を直接投入する。
+    """
     from datetime import UTC, datetime
 
     from app.models.record import VinylRecord
@@ -250,8 +264,15 @@ def test_record_counts_aggregates_by_artist(seeded_client: TestClient, session: 
     now = datetime.now(UTC)
     session.add_all(
         [
+            Artist(spotify_id="art-bill", name="Bill", added_at=now),
+            Artist(spotify_id="art-avishai", name="Avishai", added_at=now),
+        ]
+    )
+    session.commit()
+    session.add_all(
+        [
             VinylRecord(
-                artist_id="4xRYI6VqpkE3UwrDrAZL8L",  # Bill Evans (seeded)
+                artist_id="art-bill",
                 title="Track 1",
                 source="manual",
                 status="owned",
@@ -260,7 +281,7 @@ def test_record_counts_aggregates_by_artist(seeded_client: TestClient, session: 
                 updated_at=now,
             ),
             VinylRecord(
-                artist_id="4xRYI6VqpkE3UwrDrAZL8L",
+                artist_id="art-bill",
                 title="Track 2",
                 source="manual",
                 status="owned",
@@ -269,7 +290,7 @@ def test_record_counts_aggregates_by_artist(seeded_client: TestClient, session: 
                 updated_at=now,
             ),
             VinylRecord(
-                artist_id="7HRgLn5KUXfLeKjsoXl5XS",  # Avishai Cohen (seeded)
+                artist_id="art-avishai",
                 title="Track 3",
                 source="manual",
                 status="wanted",
@@ -281,11 +302,8 @@ def test_record_counts_aggregates_by_artist(seeded_client: TestClient, session: 
     )
     session.commit()
 
-    res = seeded_client.get("/api/artists/record-counts")
+    res = client.get("/api/artists/record-counts")
 
     assert res.status_code == 200
     items = {item["artist_id"]: item["count"] for item in res.json()["items"]}
-    assert items == {
-        "4xRYI6VqpkE3UwrDrAZL8L": 2,
-        "7HRgLn5KUXfLeKjsoXl5XS": 1,
-    }
+    assert items == {"art-bill": 2, "art-avishai": 1}

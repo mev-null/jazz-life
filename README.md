@@ -1,7 +1,7 @@
 # jazz-life
 
 ジャズ・アーティスト ダッシュボード（個人用 MVP）。
-要件定義は [docs/000-pre-adr.md](docs/000-pre-adr.md)。Phase B 開始時の方針再評価（PostgreSQL / クリーンアーキ / orval / UUID v7 / 寛容 PUT 等）は [docs/002-phase-b-decisions.md](docs/002-phase-b-decisions.md) を正とする。
+要件定義は [docs/000-pre-adr.md](docs/000-pre-adr.md)。Phase B 開始時の方針再評価（PostgreSQL / クリーンアーキ / orval / UUID v7 / 寛容 PUT 等）は [docs/002-phase-b-decisions.md](docs/002-phase-b-decisions.md) を正とする。アーティスト管理の 3 層構造は [docs/003-artist-management.md](docs/003-artist-management.md)、場所マスタは [docs/010-place.md](docs/010-place.md)。
 
 ## クイックスタート
 
@@ -26,11 +26,12 @@ make up                # db (5432) / backend (8000) / frontend (5173) が起動
 | URL | 内容 |
 |---|---|
 | <http://localhost:8000/healthz> | `{"status":"ok"}` |
-| <http://localhost:8000/api/artists> | seed 投入済みの 6 件が返る |
+| <http://localhost:8000/api/artists> | seed 投入済みのアーティストが返る |
 | <http://localhost:8000/api/records> | 空または手動投入分 |
+| <http://localhost:8000/api/releases> | フォロー中アーティストの新譜（`POST /api/releases/sync` で Spotify から取り込み） |
 | <http://localhost:8000/openapi.json> | OpenAPI 仕様（`make spec` で `backend/openapi.json` に保存 → `make gen` で型生成） |
 | <http://localhost:8000/docs> | Swagger UI |
-| <http://localhost:5173> | フロントエンド（`VITE_USE_MOCK=true` の間はモック） |
+| <http://localhost:5173> | フロントエンド（デフォルトは実 API。モック切替は `VITE_USE_MOCK=true`） |
 
 停止:
 
@@ -73,9 +74,9 @@ jazz-life/
 | Step 0 | ✅ | Docker 環境セットアップ |
 | Phase A | ✅ | frontend モック完成（手書き型 / モック JSON / レコードマトリクス / dnd-kit） |
 | Phase B-1 | ✅ | backend home 機能（vinyl_records CRUD + artists 参照、PostgreSQL 16、3 層クリーンアーキ、Alembic） |
-| Phase B-2 | 🟡 | frontend の orval 移行 → home 実 API 接続（POST/PUT 分解、`VITE_USE_MOCK=false` 切替） |
-| Phase B-3+ | ⬜ | jacket upload / reorder / releases / concerts / 既読 API / Spotify OAuth / 新譜バッチ |
-| Phase C | ⬜ | スクレイピング統合（5 会場 + sync_status） |
+| Phase B-2 | ✅ | frontend を orval 化して home / artists / records を実 API 接続（`VITE_USE_MOCK=false` がデフォルト） |
+| Phase B-3 | 🟡 | Spotify OAuth ログイン、album search + records 登録、artist 管理 (ADR-003、follow / unfollow / 詳細 lazy fetch)、releases 同期 (Spotify Get Artist's Albums)、records 削除、release 既読 backend 化、view all 拡大表示の共通化 が完了。jacket upload / reorder / concerts / 日次自動 sync は未着手 |
+| Phase C | ⬜ | concerts スクレイピング統合（ADR-010 の場所マスタを基盤に、5 会場 + sync_status） |
 
 詳細は [docs/000-pre-adr.md](docs/000-pre-adr.md) §16 と [docs/002-phase-b-decisions.md](docs/002-phase-b-decisions.md) §6。
 
@@ -105,5 +106,7 @@ CI（[.github/workflows/backend.yml](.github/workflows/backend.yml)）: backend 
 | [docs/000-pre-adr.md](docs/000-pre-adr.md) | 要件定義書（v1.7）。機能要件・データモデル・画面仕様 |
 | [docs/001-phase-a-revisions.md](docs/001-phase-a-revisions.md) | Phase A 終了時の確定事項（VinylRecord スキーマ改訂、既読、jacket 仕様等） |
 | [docs/002-phase-b-decisions.md](docs/002-phase-b-decisions.md) | Phase B 開始時の方針再評価（PostgreSQL / クリーンアーキ / orval / UUID v7 / 寛容 PUT 等）。**000 と矛盾時は 002 を正とする** |
+| [docs/003-artist-management.md](docs/003-artist-management.md) | アーティスト管理の 3 層構造 (registry / user_follows / records) と体験ライフサイクル。ADR-001 §1 の "followed" を supersede |
+| [docs/010-place.md](docs/010-place.md) | 場所マスタと訪問体験の設計 (Phase C 以降の concerts スクレイピングの土台) |
 | [docs/999-vision.md](docs/999-vision.md) | プロダクトビジョン |
 | [CLAUDE.md](CLAUDE.md) | Claude Code セッション向け作業規約 |
