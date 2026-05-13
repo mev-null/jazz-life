@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { getArtists, getVinylRecords } from "../api/client";
+import { getArtists, getFollowedArtists, getVinylRecords } from "../api/client";
 import { AddRecordTile } from "../components/records/AddRecordTile";
 import { JacketCard } from "../components/records/JacketCard";
 import { RecordDetailModal } from "../components/records/RecordDetailModal";
@@ -24,7 +24,14 @@ export function HomePage() {
     queryKey: ["records"],
     queryFn: getVinylRecords,
   });
+  // `artists` は global registry (archived 含む)。既存 record の artist_id →
+  // name 引きに使うので、unfollow 済みアーティストの過去 record でも名前が
+  // 出るよう維持する。typeahead サジェスト用は followed-only で別キャッシュ。
   const artists = useQuery({ queryKey: ["artists"], queryFn: getArtists });
+  const followedArtists = useQuery({
+    queryKey: ["followed-artists"],
+    queryFn: getFollowedArtists,
+  });
 
   const { isMobile } = useBreakpoint();
   const mobile = MOBILE_UI_ENABLED && isMobile;
@@ -135,6 +142,7 @@ export function HomePage() {
       <RecordFormModal
         mode={formMode}
         artists={artists.data?.items ?? []}
+        followedArtists={followedArtists.data?.items ?? []}
         onClose={() => setFormMode(null)}
       />
     </section>

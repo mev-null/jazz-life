@@ -231,6 +231,7 @@ export function ArtistsPage() {
       <RecordFormModal
         mode={formMode}
         artists={artistsQ.data?.items ?? []}
+        followedArtists={artistsQ.data?.items ?? []}
         onClose={() => setFormMode(null)}
       />
 
