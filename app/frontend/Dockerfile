@@ -32,6 +32,11 @@ RUN npm run build
 # --- prod: nginx で静的配信 ---
 FROM nginx:alpine AS prod
 COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# nginx:alpine の既定 entrypoint が /etc/nginx/templates/*.template を envsubst で
+# 展開してから /etc/nginx/conf.d/ に書き出す。${PORT} を実 listen port に差し替える。
+# NGINX_ENVSUBST_FILTER='^PORT$' で nginx 内部変数 ($uri など) を保護する。
+COPY nginx.conf /etc/nginx/templates/default.conf.template
+ENV PORT=80
+ENV NGINX_ENVSUBST_FILTER=^PORT$
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# CMD は nginx:alpine 既定 (envsubst → nginx) に任せる

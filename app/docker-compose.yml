@@ -38,6 +38,8 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      # ローカル / CI は /docs を見られたいので default true、本番では false にする
+      EXPOSE_OPENAPI_DOCS: ${EXPOSE_OPENAPI_DOCS:-true}
     ports:
       - "8000:8000"
     volumes:

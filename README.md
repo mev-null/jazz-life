@@ -115,6 +115,7 @@ CI（[.github/workflows/backend.yml](.github/workflows/backend.yml)）: backend 
    CORS_ALLOW_ORIGINS       = https://<frontend>.up.railway.app
    COOKIE_SECURE            = true
    COOKIE_SAMESITE          = none
+   EXPOSE_OPENAPI_DOCS      = false
    ```
    invite 制御は **Spotify Developer Dashboard の Users and Access** に集約する（ADR-005）。アプリ側 allowlist は持たないので、Dashboard で許可した Spotify アカウントだけが OAuth を完了できる。
 3. **frontend** service を追加。Build context: `app/frontend`、Dockerfile target: `prod`。Build-time args:
@@ -123,8 +124,10 @@ CI（[.github/workflows/backend.yml](.github/workflows/backend.yml)）: backend 
    VITE_USE_MOCK   = false
    ```
 4. Spotify Developer Dashboard で `SPOTIFY_REDIRECT_URI` を **完全一致** で事前登録（trailing slash も含めて）。
+5. **backend service の Replicas を 1 に保つ**: OAuth state を process 内に in-memory で持つため、複数 replica にすると state 検証が必ず失敗する（callback がランダムに振られて別 process の state を引きにいく）。マルチ replica 化する時は state を Redis 等に外出しする必要がある。
+6. **Dashboard には自分の Spotify アカウントだけ登録する**: 現状 `vinyl_records` は user_id でスコープされておらず、Dashboard で複数 user を許可すると同じ records を共有・改竄可能になる。schema 刷新は [ADR-006](docs/006-records-user-scope-schema.md) で別 PR 対応予定。
 
-Migration は backend container 起動時に `alembic upgrade head` が走る（[entrypoint.sh](app/backend/entrypoint.sh)）。
+Migration は backend container 起動時に `alembic upgrade head` が走る（[entrypoint.sh](app/backend/entrypoint.sh)）。listen port は backend / frontend ともに `$PORT` env を尊重するので Railway 側で port 設定を上書きする必要はない。
 
 ## ドキュメント
 
@@ -136,6 +139,7 @@ Migration は backend container 起動時に `alembic upgrade head` が走る（
 | [docs/003-artist-management.md](docs/003-artist-management.md) | アーティスト管理の 3 層構造 (registry / user_follows / records) と体験ライフサイクル。ADR-001 §1 の "followed" を supersede |
 | [docs/004-record-reorder.md](docs/004-record-reorder.md) | レコードの DnD 並び替え機能の設計（実装は別 PR） |
 | [docs/005-railway-deploy-prep.md](docs/005-railway-deploy-prep.md) | Railway デプロイ準備（env 駆動化 + frontend 本番ビルド） |
+| [docs/006-records-user-scope-schema.md](docs/006-records-user-scope-schema.md) | records を `vinyl_records` (catalog) + `user_collections` (ownership) に 2 層分離する計画（Status: Proposed、実装は別 PR） |
 | [docs/010-place.md](docs/010-place.md) | 場所マスタと訪問体験の設計 (Phase C 以降の concerts スクレイピングの土台) |
 | [docs/999-vision.md](docs/999-vision.md) | プロダクトビジョン |
 | [CLAUDE.md](CLAUDE.md) | Claude Code セッション向け作業規約 |

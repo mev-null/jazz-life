@@ -70,12 +70,11 @@ def _test_settings() -> Settings:
 
 @pytest.fixture
 def authed_records_client(session: Session, _test_settings: Settings) -> Iterator[TestClient]:
-    """records POST 経路用の auth 済 TestClient。
+    """records 全エンドポイント用の auth 済 TestClient。
 
     - get_current_user override で固定 user を返す
     - 必要な artist を直接 INSERT する (records が FK 参照するため)
-    - records POST は auth ガードがあるが、GET / PUT は現状 auth 不要なので
-      auth fixture を使わない get/put の検証は別 client を切る必要は今のところ無い
+    - GET / POST / PUT / DELETE すべて auth ガードあり (本 PR で GET も塞いだ)
     """
     _seed_artists_for_records(session)
     user = _seed_user(session)
@@ -95,7 +94,7 @@ def authed_records_client(session: Session, _test_settings: Settings) -> Iterato
 
 @pytest.fixture
 def unauthed_client(session: Session, _test_settings: Settings) -> Iterator[TestClient]:
-    """records POST に cookie 無しでアクセスして 401 を確認するための client。"""
+    """records に cookie 無しでアクセスして 401 を確認するための client。"""
 
     def _override_session() -> Iterator[Session]:
         yield session
@@ -110,6 +109,12 @@ def test_list_empty(authed_records_client: TestClient) -> None:
     res = authed_records_client.get("/api/records")
     assert res.status_code == 200
     assert res.json() == {"items": []}
+
+
+def test_get_requires_auth(unauthed_client: TestClient) -> None:
+    """GET /api/records は auth 必須 (records が user-scope されるまでの入口ガード)。"""
+    res = unauthed_client.get("/api/records")
+    assert res.status_code == 401
 
 
 def test_post_requires_auth(unauthed_client: TestClient) -> None:
