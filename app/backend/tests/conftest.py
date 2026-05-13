@@ -32,7 +32,6 @@ def make_settings_kwargs(**overrides: Any) -> dict[str, Any]:
         "spotify_client_id": "test-client-id",
         "spotify_client_secret": "test-client-secret",
         "spotify_redirect_uri": "http://localhost:8000/api/auth/callback",
-        "allowed_spotify_user_id": "test-owner",
         "jwt_secret": "x" * 32,
         "refresh_token_key": Fernet.generate_key().decode(),
     }
