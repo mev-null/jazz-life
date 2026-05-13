@@ -399,6 +399,7 @@
           "releases"
         ],
         "summary": "List Releases",
+        "description": "current user が follow 中 (archived=false) の artist の release を返す\n(ADR-007 §2.4)。既読状態は user 単位で計算される (ADR-007 §2.3)。",
         "operationId": "list_releases_api_releases_get",
         "parameters": [
           {
@@ -487,7 +488,7 @@
           "releases"
         ],
         "summary": "Set Release Read Status",
-        "description": "release の既読フラグをトグル (Feed の未読 dot 用)。\n\nPhase B-3 で localStorage ベースの既読を backend (release.is_read / read_at)\nに移行する経路。`is_read=true` で `read_at=now()`、`false` で `read_at=null`\nに連動して書き換える。auth 必須 (単一ユーザだが将来 multi-user 化で current\nuser が要るため最初から固定)。",
+        "description": "release の既読フラグを user 単位でトグル (Feed の未読 dot 用、ADR-007)。\n\n`is_read=true` で `release_read_states` に upsert (read_at = now())、`false`\nで行を DELETE。release catalog が無ければ 404。",
         "operationId": "set_release_read_status_api_releases__spotify_id__read_patch",
         "parameters": [
           {

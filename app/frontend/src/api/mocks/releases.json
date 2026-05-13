@@ -6,7 +6,9 @@
       "title": "Returnings (Live)",
       "album_type": "single",
       "release_date": "2026-05-30",
-      "image_url": null
+      "image_url": null,
+      "is_read": false,
+      "read_at": null
     },
     {
       "spotify_id": "release_002",
@@ -14,7 +16,9 @@
       "title": "Bill Evans: The Lost Sessions",
       "album_type": "compilation",
       "release_date": "2026-06-15",
-      "image_url": null
+      "image_url": null,
+      "is_read": false,
+      "read_at": null
     },
     {
       "spotify_id": "release_003",
@@ -22,7 +26,9 @@
       "title": "Solo Piano: Spring",
       "album_type": "album",
       "release_date": "2026-07-10",
-      "image_url": null
+      "image_url": null,
+      "is_read": false,
+      "read_at": null
     },
     {
       "spotify_id": "release_004",
@@ -30,7 +36,9 @@
       "title": "Diavola (Deluxe Edition)",
       "album_type": "album",
       "release_date": "2026-05-02",
-      "image_url": null
+      "image_url": null,
+      "is_read": false,
+      "read_at": null
     },
     {
       "spotify_id": "release_005",
@@ -38,7 +46,9 @@
       "title": "Brightlight",
       "album_type": "album",
       "release_date": "2026-04-18",
-      "image_url": null
+      "image_url": null,
+      "is_read": false,
+      "read_at": null
     },
     {
       "spotify_id": "release_006",
@@ -46,7 +56,9 @@
       "title": "Live in Stuttgart",
       "album_type": "album",
       "release_date": "2026-04-05",
-      "image_url": null
+      "image_url": null,
+      "is_read": false,
+      "read_at": null
     },
     {
       "spotify_id": "release_007",
@@ -54,7 +66,9 @@
       "title": "Live at Tokyo Jazz Festival",
       "album_type": "album",
       "release_date": "2026-03-22",
-      "image_url": null
+      "image_url": null,
+      "is_read": false,
+      "read_at": null
     }
   ]
 }
