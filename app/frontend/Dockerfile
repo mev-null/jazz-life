@@ -33,15 +33,18 @@ RUN npm run build
 FROM nginx:alpine AS prod
 COPY --from=builder /app/dist /usr/share/nginx/html
 # nginx:alpine の既定 entrypoint が /etc/nginx/templates/*.template を envsubst で
-# 展開してから /etc/nginx/conf.d/ に書き出す。${PORT} と backend 内部接続先を
-# 実値に差し替える。NGINX_ENVSUBST_FILTER で展開対象を限定し、nginx 内部変数
-# ($uri など) を保護する。
+# 展開してから /etc/nginx/conf.d/ に書き出す。${PORT} と backend 内部接続先と
+# ${NAMESERVER} を実値に差し替える。NGINX_ENVSUBST_FILTER で展開対象を限定し、
+# nginx 内部変数 ($uri など) を保護する。
 COPY nginx.conf /etc/nginx/templates/default.conf.template
+# 動的 DNS resolver の nameserver IP を resolv.conf から読み出す entrypoint
+# script (詳細は 15-resolve-dns.envsh の冒頭コメント)。
+COPY docker-entrypoint.d/15-resolve-dns.envsh /docker-entrypoint.d/15-resolve-dns.envsh
 ENV PORT=80
 # Railway 環境では BACKEND_INTERNAL_HOST=backend.railway.internal, _PORT=8080 を
 # service 変数で上書きする。デフォルトはローカル docker-compose 用 (backend:8000)。
 ENV BACKEND_INTERNAL_HOST=backend
 ENV BACKEND_INTERNAL_PORT=8000
-ENV NGINX_ENVSUBST_FILTER=^(PORT|BACKEND_INTERNAL_HOST|BACKEND_INTERNAL_PORT)$
+ENV NGINX_ENVSUBST_FILTER=^(PORT|BACKEND_INTERNAL_HOST|BACKEND_INTERNAL_PORT|NAMESERVER)$
 EXPOSE 80
 # CMD は nginx:alpine 既定 (envsubst → nginx) に任せる

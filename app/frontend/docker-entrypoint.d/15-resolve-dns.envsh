@@ -1,0 +1,21 @@
+#!/bin/sh
+# nginx:alpine の docker-entrypoint.d/ で `*.envsh` は **source** される (env が
+# 後続スクリプトに引き継がれる)。20-envsubst-on-templates.sh が nginx.conf
+# テンプレ展開時に NAMESERVER を参照するので、その手前 (15-) で立てる。
+#
+# 目的:
+#   nginx.conf の `resolver ${NAMESERVER} ...` を動的に埋めるため、コンテナの
+#   /etc/resolv.conf に書かれた nameserver IP を取り出す。Railway コンテナでは
+#   Railway 内部 DNS の IP が入る (これが無いと *.railway.internal が引けない)。
+#
+# フォールバック:
+#   /etc/resolv.conf が空 / 読めない場合は public DNS (1.1.1.1) を入れて nginx
+#   起動だけは通す。その時 *.railway.internal は引けないので backend には届かない
+#   が、起動失敗で frontend ごと落ちる事故よりはマシ。
+
+NS=$(awk '/^nameserver/ { print $2; exit }' /etc/resolv.conf 2>/dev/null)
+if [ -z "$NS" ]; then
+    NS="1.1.1.1"
+fi
+export NAMESERVER="$NS"
+echo "[entrypoint] using NAMESERVER=$NAMESERVER for nginx resolver" >&2
