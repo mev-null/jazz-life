@@ -46,7 +46,8 @@
     "CORS_ALLOW_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173",
     "VITE_API_BASE": "http://127.0.0.1:8000",
     "VITE_USE_MOCK": "false",
-    "VITE_ALLOWED_HOSTS": ""
+    "VITE_ALLOWED_HOSTS": "",
+    "VITE_ENABLE_MOBILE_UI": "true"
   },
   "secrets": {
     "SPOTIFY_CLIENT_ID": {

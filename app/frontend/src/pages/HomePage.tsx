@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { getArtists, getVinylRecords } from "../api/client";
@@ -10,11 +10,14 @@ import {
   type FormMode,
 } from "../components/records/RecordFormModal";
 import { RecordsAllModal } from "../components/records/RecordsAllModal";
+import { useBreakpoint } from "../hooks/useBreakpoint";
+import { MOBILE_UI_ENABLED } from "../lib/featureFlags";
 import type { VinylRecord } from "../types/api";
 
-// ArtistDetailModal の RecordsSection と同じ閾値ロジック:
-// 8 件以上は「view all 拡大表示モーダル」(RecordsAllModal) に切り替える。
+// PC 側は ArtistDetailModal の RecordsSection と同じ 8 件 (4 列 × 2 行)。
+// Mobile は 2 列 × 3 行で 6 件に減らし、view all 経由で全件閲覧へ。
 const HOME_PREVIEW_LIMIT = 8;
+const HOME_MOBILE_PREVIEW_LIMIT = 6;
 
 export function HomePage() {
   const records = useQuery({
@@ -23,11 +26,27 @@ export function HomePage() {
   });
   const artists = useQuery({ queryKey: ["artists"], queryFn: getArtists });
 
+  const { isMobile } = useBreakpoint();
+  const mobile = MOBILE_UI_ENABLED && isMobile;
+  const previewLimit = mobile ? HOME_MOBILE_PREVIEW_LIMIT : HOME_PREVIEW_LIMIT;
+
+  // Mobile の Home は「棚をひと目で見せる」コンセプトに合わせて body スクロールを抑止。
+  // 6 件 + ヘッダ + 余白で iPhone 14 (390x844) 程度の縦に収まる前提。
+  // 他ページや PC では効かないよう unmount / breakpoint 変化で必ず元に戻す。
+  useEffect(() => {
+    if (!mobile) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobile]);
+
   // Home は所有レコードのコレクション。wanted は ArtistDetailModal の want list でだけ表示。
   const ownedRecords = records.data?.items.filter((r) => r.status === "owned") ?? [];
-  const exceedsPreview = ownedRecords.length >= HOME_PREVIEW_LIMIT;
+  const exceedsPreview = ownedRecords.length >= previewLimit;
   const visibleRecords = exceedsPreview
-    ? ownedRecords.slice(0, HOME_PREVIEW_LIMIT)
+    ? ownedRecords.slice(0, previewLimit)
     : ownedRecords;
 
   const [openRecord, setOpenRecord] = useState<VinylRecord | null>(null);
@@ -61,7 +80,7 @@ export function HomePage() {
         )}
       </h1>
 
-      <div className="mt-10">
+      <div className="my-6">
         {records.isLoading && (
           <p className="text-sm text-ink-faint">loading…</p>
         )}

@@ -17,11 +17,16 @@ import {
   RecordFormModal,
   type FormMode,
 } from "../components/records/RecordFormModal";
+import { useBreakpoint } from "../hooks/useBreakpoint";
 import { concertMatchesArtist } from "../lib/matchArtist";
+import { MOBILE_UI_ENABLED } from "../lib/featureFlags";
+import { useAuth } from "../lib/useAuth";
 import { useReadState } from "../lib/useReadState";
 import type { Artist, Concert, Release, VinylRecord } from "../types/api";
 
 export function ArtistsPage() {
+  const { isMobile } = useBreakpoint();
+  const { logout } = useAuth();
   // ArtistsPage の一覧は「現ユーザが follow 中 (archived=false) の artists」だけ。
   // record→artist 名前引きで使う global artist registry とはキャッシュキーを
   // 分けてある (HomePage 等は依然 ["artists"] を共有)。unfollow で archived 化
@@ -181,6 +186,18 @@ export function ArtistsPage() {
           </ul>
         )}
       </div>
+
+      {MOBILE_UI_ENABLED && isMobile && (
+        <div className="mt-10 border-t border-rule pt-6 text-center">
+          <button
+            type="button"
+            onClick={() => logout()}
+            className="text-xs italic tracking-wider text-ink-faint transition-colors hover:text-ink"
+          >
+            logout
+          </button>
+        </div>
+      )}
 
       <ArtistDetailModal
         artist={openArtist}
