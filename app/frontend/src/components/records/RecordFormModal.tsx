@@ -44,7 +44,12 @@ export type FormMode =
 
 type Props = {
   mode: FormMode | null;
+  // 既存 record の artist_id → name 引きに使う global registry (archived 含む)。
+  // edit モードの初期値補完と Spotify album 選択時の「既存行があるか」判定で使う。
   artists: Artist[];
+  // typeahead サジェスト候補は現ユーザがフォロー中の artists のみに限定する。
+  // クエリ部分一致 × フォロー中 の交差で dropdown / 完全一致 lookup を行う。
+  followedArtists: Artist[];
   onClose: () => void;
 };
 
@@ -65,7 +70,7 @@ const stringToFavorites = (s: string): FavoriteTrack[] =>
     .filter((line) => line.length > 0)
     .map((line) => ({ spotify_track_id: null, track_name: line, note: null }));
 
-export function RecordFormModal({ mode, artists, onClose }: Props) {
+export function RecordFormModal({ mode, artists, followedArtists, onClose }: Props) {
   const queryClient = useQueryClient();
   const isEdit = mode?.kind === "edit";
   // ArtistsPage / ArtistDetailModal / FeedDetailModal 起点で artist が事前に
@@ -314,13 +319,17 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
   }
 
   // Artist input の現値で部分一致 filter した候補。typeahead dropdown 表示用。
+  // 候補母集合は followed-only (現ユーザがフォロー中のアーティスト)。
+  // フォロー解除済みアーティストを誤って既存 record に紐付けないため、ここでは
+  // global registry (`artists`) は参照しない。新規アーティストへの追加は
+  // Spotify album 検索 → 選択フロー経由 (auto-follow 経路) で行う。
   const artistMatches = artistQuery.trim()
-    ? artists
+    ? followedArtists
       .filter((a) =>
         a.name.toLowerCase().includes(artistQuery.trim().toLowerCase()),
       )
       .slice(0, 8)
-    : artists.slice(0, 8);
+    : followedArtists.slice(0, 8);
 
   function handleSelectArtistFromDropdown(artist: Artist) {
     setArtistId(artist.spotify_id);
@@ -333,7 +342,9 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
     // 既存 artist を入力中の name と完全一致した場合は artistId を保持。
     // それ以外は artistId を一旦クリアし、Spotify album 選択 / dropdown 選択で
     // 改めてセットする方針 (中途半端な不一致 ID で保存しないため)。
-    const match = artists.find(
+    // 完全一致 lookup も followed-only に対して行う (フォロー解除済みアーティスト
+    // の名前を直打ちしても artistId に採用させない)。
+    const match = followedArtists.find(
       (a) => a.name.toLowerCase() === value.trim().toLowerCase(),
     );
     setArtistId(match?.spotify_id ?? "");

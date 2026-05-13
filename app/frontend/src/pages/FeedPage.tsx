@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getArtists,
   getConcerts,
+  getFollowedArtists,
   getReleaseSyncStatus,
   getReleases,
   setReleaseRead,
@@ -95,7 +96,15 @@ export function FeedPage() {
     queryFn: () => getReleases(),
   });
   const concerts = useQuery({ queryKey: ["concerts"], queryFn: getConcerts });
+  // `artists` は global registry (archived 含む)。release / concert 行や
+  // FeedDetailModal の artist 名表示で「現在は unfollow しているアーティスト」
+  // でも名前が消えないよう、これは従来通り全件を持つ。typeahead サジェスト用は
+  // followed-only で別キャッシュ。
   const artists = useQuery({ queryKey: ["artists"], queryFn: getArtists });
+  const followedArtists = useQuery({
+    queryKey: ["followed-artists"],
+    queryFn: getFollowedArtists,
+  });
   const syncStatusQ = useQuery({
     queryKey: ["release-sync-status"],
     queryFn: getReleaseSyncStatus,
@@ -431,6 +440,7 @@ export function FeedPage() {
       <RecordFormModal
         mode={formMode}
         artists={artists.data?.items ?? []}
+        followedArtists={followedArtists.data?.items ?? []}
         onClose={() => setFormMode(null)}
       />
     </section>
