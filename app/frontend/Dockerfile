@@ -30,21 +30,22 @@ COPY . .
 RUN npm run build
 
 # --- prod: nginx で静的配信 + /api を backend に reverse proxy ---
-FROM nginx:alpine AS prod
+# nginx:1.27-alpine で固定。組み込み /docker-entrypoint.d/15-local-resolvers.envsh
+# (/etc/resolv.conf から NGINX_LOCAL_RESOLVERS を組み立てて export) を確実に含む
+# バージョンを保証する。alpine タグだと minor 更新で挙動が変わるリスクがある。
+FROM nginx:1.27-alpine AS prod
 COPY --from=builder /app/dist /usr/share/nginx/html
 # nginx:alpine の既定 entrypoint が /etc/nginx/templates/*.template を envsubst で
-# 展開してから /etc/nginx/conf.d/ に書き出す。${PORT} と backend 内部接続先と
-# ${NAMESERVER} を実値に差し替える。NGINX_ENVSUBST_FILTER で展開対象を限定し、
-# nginx 内部変数 ($uri など) を保護する。
+# 展開してから /etc/nginx/conf.d/ に書き出す。${PORT} / backend 内部接続先 /
+# ${NGINX_LOCAL_RESOLVERS} を実値に差し替える。NGINX_ENVSUBST_FILTER で展開対象を
+# 限定し、nginx 内部変数 ($uri など) を保護する。NGINX_LOCAL_RESOLVERS が filter に
+# 含まれていないと文字列のまま残り、nginx が起動時に host-not-found で落ちる。
 COPY nginx.conf /etc/nginx/templates/default.conf.template
-# 動的 DNS resolver の nameserver IP を resolv.conf から読み出す entrypoint
-# script (詳細は 15-resolve-dns.envsh の冒頭コメント)。
-COPY docker-entrypoint.d/15-resolve-dns.envsh /docker-entrypoint.d/15-resolve-dns.envsh
 ENV PORT=80
 # Railway 環境では BACKEND_INTERNAL_HOST=backend.railway.internal, _PORT=8080 を
 # service 変数で上書きする。デフォルトはローカル docker-compose 用 (backend:8000)。
 ENV BACKEND_INTERNAL_HOST=backend
 ENV BACKEND_INTERNAL_PORT=8000
-ENV NGINX_ENVSUBST_FILTER=^(PORT|BACKEND_INTERNAL_HOST|BACKEND_INTERNAL_PORT|NAMESERVER)$
+ENV NGINX_ENVSUBST_FILTER=^(PORT|BACKEND_INTERNAL_HOST|BACKEND_INTERNAL_PORT|NGINX_LOCAL_RESOLVERS)$
 EXPOSE 80
 # CMD は nginx:alpine 既定 (envsubst → nginx) に任せる
