@@ -23,7 +23,6 @@ import type {
 import {
   getArtistApiArtistsSpotifyIdGet,
   listArtistsApiArtistsGet,
-  listRecordCountsApiArtistsRecordCountsGet,
   upsertArtistApiArtistsPost,
 } from "./generated/artists/artists";
 import {
@@ -41,6 +40,7 @@ import {
 import { searchAlbumsApiSpotifyAlbumsSearchGet } from "./generated/spotify/spotify";
 import {
   listFollowedArtistsApiUserFollowsArtistsGet,
+  listRecordCountsApiUserFollowsRecordCountsGet,
   unfollowArtistApiUserFollowsArtistIdDelete,
 } from "./generated/user-follows/user-follows";
 import type {
@@ -96,8 +96,14 @@ export async function getArtist(spotifyId: string): Promise<Artist | null> {
 }
 
 /**
- * artist_id ごとの所有レコード件数を集計して返す軽量エンドポイント。
- * ArtistsPage 一覧の件数列に使うため、records 本体は取らずに件数だけ先取りする。
+ * current user の「所有 (status='owned')」レコード件数を artist_id ごとに集計
+ * して返す軽量エンドポイント。ArtistsPage 一覧の件数列に使うため、records 本体は
+ * 取らずに件数だけ先取りする。実 API は `/api/user-follows/record-counts` (auth
+ * 必須、wanted は数えない)。
+ *
+ * mock 時は user 概念を持たないので records.json 全体を artist_id でグループ化
+ * して返す (frontend 単独でも件数が見えるよう、実 API の filter 厳密性より UX
+ * を優先する)。
  */
 export async function getRecordCounts(): Promise<ListResponse<ArtistRecordCount>> {
   if (USE_MOCK) {
@@ -113,7 +119,7 @@ export async function getRecordCounts(): Promise<ListResponse<ArtistRecordCount>
       })),
     };
   }
-  const res = await listRecordCountsApiArtistsRecordCountsGet();
+  const res = await listRecordCountsApiUserFollowsRecordCountsGet();
   return res.data as ListResponse<ArtistRecordCount>;
 }
 

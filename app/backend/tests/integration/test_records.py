@@ -186,6 +186,33 @@ def test_put_unknown_id_returns_404(authed_records_client: TestClient) -> None:
     assert res.status_code == 404
 
 
+def test_put_requires_auth(unauthed_client: TestClient, session: Session) -> None:
+    """update_record も create / delete と同様に auth ガード必須。
+
+    record 行は authed client を使わず直接 INSERT する (両 fixture を同テストで
+    使うと dependency_overrides が積み重なって auth ガードが効かなくなる)。
+    """
+    from app.models.record import VinylRecord
+
+    _seed_artists_for_records(session)
+    now = dt.datetime.now(dt.UTC)
+    record = VinylRecord(
+        artist_id=BILL_EVANS_ID,
+        title="x",
+        source="manual",
+        status="owned",
+        display_order=1,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+
+    res = unauthed_client.put(f"/api/records/{record.id}", json={"memo": "no auth"})
+    assert res.status_code == 401
+
+
 def test_invalid_release_date_returns_422(authed_records_client: TestClient) -> None:
     res = authed_records_client.post(
         "/api/records",

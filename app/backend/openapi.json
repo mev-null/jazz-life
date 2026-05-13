@@ -199,28 +199,6 @@
         }
       }
     },
-    "/api/artists/record-counts": {
-      "get": {
-        "tags": [
-          "artists"
-        ],
-        "summary": "List Record Counts",
-        "description": "artist_id ごとの所有レコード数を集計して返す。\n\nArtistsPage 一覧の件数列専用。records 全件取得を避けて軽量化する。",
-        "operationId": "list_record_counts_api_artists_record_counts_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListResponse_ArtistRecordCount_"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/artists/{spotify_id}": {
       "get": {
         "tags": [
@@ -700,6 +678,28 @@
         }
       }
     },
+    "/api/user-follows/record-counts": {
+      "get": {
+        "tags": [
+          "user-follows"
+        ],
+        "summary": "List Record Counts",
+        "description": "current user の所有レコード数を artist_id ごとに集計して返す。\n\nArtistsPage 一覧の件数列専用。records 全件取得を避けて軽量化する。\n旧 `/api/artists/record-counts` を user-follows 配下に移設し (集計の単位が\nfollow と一致するため意味論として整合する)、同時に user_id でスコープを\n切るようにした。status='owned' のみ数える (want list は除外)。",
+        "operationId": "list_record_counts_api_user_follows_record_counts_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResponse_ArtistRecordCount_"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/user-follows/{artist_id}": {
       "delete": {
         "tags": [
@@ -890,7 +890,7 @@
           "count"
         ],
         "title": "ArtistRecordCount",
-        "description": "ArtistsPage 一覧の件数列に渡す軽量行。\n\nrecords 本体は ArtistDetailModal を開くまで fetch しない方針のため、\n一覧では「N records」表示だけ別エンドポイント `/api/artists/record-counts`\nから先に取れるようにする。"
+        "description": "ArtistsPage 一覧の件数列に渡す軽量行。\n\nrecords 本体は ArtistDetailModal を開くまで fetch しない方針のため、\n一覧では「N records」表示だけ別エンドポイント `/api/user-follows/record-counts`\nから先に取れるようにする (auth 必須、current user 所有 owned のみ集計)。"
       },
       "AuthUserRead": {
         "properties": {
