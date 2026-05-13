@@ -1,6 +1,6 @@
 # ADR-006: records を catalog + user_collections に 2 層分離する
 
-**Status**: Proposed | **Date**: 2026-05-13
+**Status**: Accepted | **Date**: 2026-05-13
 **Related**: [ADR-000](./000-pre-adr.md) §F-H2 / §7（裏面メタファー）, [ADR-001](./001-phase-a-revisions.md) §2.1（favorite_tracks の元意図）, [ADR-002](./002-phase-b-decisions.md) §2.1（PostgreSQL 採用）, [ADR-003](./003-artist-management.md) §1.2 原則 7（物質性の度合いがメモの粒度を決める）, [ADR-005](./005-railway-deploy-prep.md) §2.10（運用ガード）
 
 ---
