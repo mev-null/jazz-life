@@ -76,6 +76,8 @@ export const getListReleasesApiReleasesGetUrl = (params?: ListReleasesApiRelease
 }
 
 /**
+ * current user が follow 中 (archived=false) の artist の release を返す
+(ADR-007 §2.4)。既読状態は user 単位で計算される (ADR-007 §2.3)。
  * @summary List Releases
  */
 export const listReleasesApiReleasesGet = async (params?: ListReleasesApiReleasesGetParams, options?: RequestInit): Promise<listReleasesApiReleasesGetResponse> => {
@@ -307,12 +309,10 @@ export const getSetReleaseReadStatusApiReleasesSpotifyIdReadPatchUrl = (spotifyI
 }
 
 /**
- * release の既読フラグをトグル (Feed の未読 dot 用)。
+ * release の既読フラグを user 単位でトグル (Feed の未読 dot 用、ADR-007)。
 
-Phase B-3 で localStorage ベースの既読を backend (release.is_read / read_at)
-に移行する経路。`is_read=true` で `read_at=now()`、`false` で `read_at=null`
-に連動して書き換える。auth 必須 (単一ユーザだが将来 multi-user 化で current
-user が要るため最初から固定)。
+`is_read=true` で `release_read_states` に upsert (read_at = now())、`false`
+で行を DELETE。release catalog が無ければ 404。
  * @summary Set Release Read Status
  */
 export const setReleaseReadStatusApiReleasesSpotifyIdReadPatch = async (spotifyId: string,

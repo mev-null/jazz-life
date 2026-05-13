@@ -1,7 +1,8 @@
-"""`/api/releases` 系エンドポイントの統合テスト。
+"""`/api/releases` 系エンドポイントの統合テスト (ADR-007)。
 
-- GET /api/releases: 期間窓 / ソート / 空状態
+- GET /api/releases: follow フィルタ + 期間窓 / ソート / 空状態 / cross-user 隔離
 - POST /api/releases/sync: 未認証 401、認証済で Spotify を httpx_mock 偽装して 200
+- PATCH /api/releases/{spotify_id}/read: 既読/未読 toggle、cross-user 隔離
 - GET /api/releases/sync-status: row なし / 後に成功状態
 """
 
@@ -13,13 +14,14 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from pytest_httpx import HTTPXMock
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.core.db import get_session
 from app.core.settings import Settings, get_settings
 from app.main import app
 from app.models.artist import Artist
 from app.models.release import Release
+from app.models.release_read_state import ReleaseReadState
 from app.models.user import User
 from app.models.user_follow import UserFollow
 from app.routers.deps import get_current_user, get_spotify_app_client
@@ -52,6 +54,23 @@ def _album(
         "release_date_precision": release_date_precision,
         "images": [],
     }
+
+
+def _seed_artist(session: Session, spotify_id: str, name: str = "X") -> Artist:
+    artist = Artist(
+        spotify_id=spotify_id,
+        name=name,
+        source="seeded",
+        added_at=datetime.now(UTC),
+    )
+    session.add(artist)
+    session.commit()
+    return artist
+
+
+def _seed_follow(session: Session, user_id, artist_id: str, archived: bool = False) -> None:
+    session.add(UserFollow(user_id=user_id, artist_id=artist_id, archived_flag=archived))
+    session.commit()
 
 
 @pytest.fixture
@@ -120,8 +139,9 @@ def test_get_releases_returns_within_window_and_sorts_desc(
     authed_client: TestClient, session: Session
 ) -> None:
     today = date.today()
-    session.add(Artist(spotify_id="art-1", name="A", source="seeded", added_at=datetime.now(UTC)))
-    session.commit()
+    _seed_artist(session, "art-1")
+    user = session.exec(select(User).where(User.spotify_id == "test-owner")).one()
+    _seed_follow(session, user.id, "art-1")
     session.add_all(
         [
             Release(
@@ -157,8 +177,9 @@ def test_get_releases_returns_within_window_and_sorts_desc(
 
 
 def test_get_releases_accepts_custom_window(authed_client: TestClient, session: Session) -> None:
-    session.add(Artist(spotify_id="art-1", name="A", source="seeded", added_at=datetime.now(UTC)))
-    session.commit()
+    _seed_artist(session, "art-1")
+    user = session.exec(select(User).where(User.spotify_id == "test-owner")).one()
+    _seed_follow(session, user.id, "art-1")
     session.add(
         Release(
             spotify_id="r-1",
@@ -170,10 +191,110 @@ def test_get_releases_accepts_custom_window(authed_client: TestClient, session: 
     )
     session.commit()
 
-    # デフォルト窓では取れない 2024 年のリリースを from/to 指定で取れる
     res = authed_client.get("/api/releases", params={"from": "2024-01-01", "to": "2024-12-31"})
     assert res.status_code == 200
     assert [r["spotify_id"] for r in res.json()["items"]] == ["r-1"]
+
+
+def test_get_releases_only_followed_artists(authed_client: TestClient, session: Session) -> None:
+    """current user が follow している artist の release だけ返る (ADR-007 §2.4)。"""
+    today = date.today()
+    _seed_artist(session, "art-followed")
+    _seed_artist(session, "art-not-followed")
+    user = session.exec(select(User).where(User.spotify_id == "test-owner")).one()
+    _seed_follow(session, user.id, "art-followed")
+    # art-not-followed は follow しない
+
+    session.add_all(
+        [
+            Release(
+                spotify_id="r-followed",
+                artist_id="art-followed",
+                title="Followed Album",
+                album_type="album",
+                release_date=today,
+            ),
+            Release(
+                spotify_id="r-not-followed",
+                artist_id="art-not-followed",
+                title="Not Followed Album",
+                album_type="album",
+                release_date=today,
+            ),
+        ]
+    )
+    session.commit()
+
+    res = authed_client.get("/api/releases")
+    ids = [r["spotify_id"] for r in res.json()["items"]]
+    assert ids == ["r-followed"]
+
+
+def test_get_releases_excludes_archived_follows(
+    authed_client: TestClient, session: Session
+) -> None:
+    """archived な follow の artist の release は返らない。"""
+    today = date.today()
+    _seed_artist(session, "art-archived")
+    user = session.exec(select(User).where(User.spotify_id == "test-owner")).one()
+    _seed_follow(session, user.id, "art-archived", archived=True)
+
+    session.add(
+        Release(
+            spotify_id="r-archived",
+            artist_id="art-archived",
+            title="X",
+            album_type="album",
+            release_date=today,
+        )
+    )
+    session.commit()
+
+    res = authed_client.get("/api/releases")
+    assert res.json() == {"items": []}
+
+
+def test_get_releases_isolated_between_users(session: Session, _test_settings: Settings) -> None:
+    """user A が follow している artist の release は user B には見えない。"""
+    today = date.today()
+    user_a = User(spotify_id="user-a", display_name="A", refresh_token="")
+    user_b = User(spotify_id="user-b", display_name="B", refresh_token="")
+    session.add_all([user_a, user_b])
+    session.commit()
+    session.refresh(user_a)
+    session.refresh(user_b)
+    _seed_artist(session, "art-a")
+    _seed_follow(session, user_a.id, "art-a")
+    session.add(
+        Release(
+            spotify_id="r-a",
+            artist_id="art-a",
+            title="A only",
+            album_type="album",
+            release_date=today,
+        )
+    )
+    session.commit()
+
+    def _override_session() -> Iterator[Session]:
+        yield session
+
+    app.dependency_overrides[get_session] = _override_session
+    app.dependency_overrides[get_settings] = lambda: _test_settings
+    try:
+        # user A 視点
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        c = TestClient(app)
+        a_ids = [r["spotify_id"] for r in c.get("/api/releases").json()["items"]]
+        # user B 視点 (follow していない)
+        app.dependency_overrides[get_current_user] = lambda: user_b
+        c = TestClient(app)
+        b_ids = [r["spotify_id"] for r in c.get("/api/releases").json()["items"]]
+    finally:
+        app.dependency_overrides.clear()
+
+    assert a_ids == ["r-a"]
+    assert b_ids == []
 
 
 # ---- GET /api/releases/sync-status ----
@@ -211,9 +332,6 @@ def test_post_sync_ingests_albums_for_followed_artists(
 ) -> None:
     """user_follows に登録された artist を対象に Spotify から albums を取り込み、
     sync_status を last_success_at 付きで更新する。
-
-    ADR-006 後 auto-follow が user_collections 作成と同 TX で走るので、
-    本テストでは user_follows を直接 INSERT して既に follow 済の状態を作る。
     """
     now = datetime.now(UTC)
     session.add_all(
@@ -223,7 +341,6 @@ def test_post_sync_ingests_albums_for_followed_artists(
         ]
     )
     session.commit()
-    from sqlmodel import select
 
     user = session.exec(select(User).where(User.spotify_id == "test-owner")).one()
     session.add_all(
@@ -273,7 +390,6 @@ def test_post_sync_marks_error_when_all_artists_fail(
     now = datetime.now(UTC)
     session.add(Artist(spotify_id="art-A", name="A", source="manual", added_at=now))
     session.commit()
-    from sqlmodel import select
 
     user = session.exec(select(User).where(User.spotify_id == "test-owner")).one()
     session.add(UserFollow(user_id=user.id, artist_id="art-A"))
@@ -307,7 +423,7 @@ def test_set_read_unknown_id_returns_404(authed_client: TestClient) -> None:
 
 
 def test_set_read_true_then_false(authed_client: TestClient, session: Session) -> None:
-    """is_read=true で read_at が now、false に戻すと read_at=null。"""
+    """is_read=true で release_read_states に行が入り read_at=now、false で行が消える。"""
     now = datetime.now(UTC)
     session.add(Artist(spotify_id="art-r", name="A", added_at=now))
     session.commit()
@@ -322,16 +438,68 @@ def test_set_read_true_then_false(authed_client: TestClient, session: Session) -
     )
     session.commit()
 
-    # 既読化
     res = authed_client.patch("/api/releases/rel-1/read", json={"is_read": True})
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["is_read"] is True
     assert body["read_at"] is not None
 
-    # 未読に戻す
     res2 = authed_client.patch("/api/releases/rel-1/read", json={"is_read": False})
     assert res2.status_code == 200
     body2 = res2.json()
     assert body2["is_read"] is False
     assert body2["read_at"] is None
+
+
+def test_set_read_isolated_between_users(session: Session, _test_settings: Settings) -> None:
+    """user A が既読化した release を user B では未読のまま見える (ADR-007 §2.3)。"""
+    now = datetime.now(UTC)
+    user_a = User(spotify_id="user-a", display_name="A", refresh_token="")
+    user_b = User(spotify_id="user-b", display_name="B", refresh_token="")
+    session.add_all([user_a, user_b])
+    session.commit()
+    session.refresh(user_a)
+    session.refresh(user_b)
+
+    _seed_artist(session, "art-shared")
+    _seed_follow(session, user_a.id, "art-shared")
+    _seed_follow(session, user_b.id, "art-shared")
+    session.add(
+        Release(
+            spotify_id="rel-shared",
+            artist_id="art-shared",
+            title="Shared",
+            album_type="album",
+            release_date=now.date(),
+        )
+    )
+    session.commit()
+
+    def _override_session() -> Iterator[Session]:
+        yield session
+
+    app.dependency_overrides[get_session] = _override_session
+    app.dependency_overrides[get_settings] = lambda: _test_settings
+    try:
+        # user A が既読化
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        c = TestClient(app)
+        res_a = c.patch("/api/releases/rel-shared/read", json={"is_read": True})
+        assert res_a.status_code == 200
+        assert res_a.json()["is_read"] is True
+
+        # user B が同じ release を GET → 未読のまま
+        app.dependency_overrides[get_current_user] = lambda: user_b
+        c = TestClient(app)
+        res_b = c.get("/api/releases", params={"from": "2025-01-01", "to": "2030-12-31"})
+        items = res_b.json()["items"]
+        b_item = next(r for r in items if r["spotify_id"] == "rel-shared")
+        assert b_item["is_read"] is False
+        assert b_item["read_at"] is None
+    finally:
+        app.dependency_overrides.clear()
+
+    # release_read_states 行は user A の 1 行だけ
+    states = list(session.exec(select(ReleaseReadState)).all())
+    assert len(states) == 1
+    assert states[0].user_id == user_a.id

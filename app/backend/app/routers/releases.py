@@ -9,14 +9,13 @@
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
-from app.core.repositories.release_repository import ReleaseRepository
 from app.core.repositories.sync_status_repository import SyncStatusRepository
 from app.models.user import User
+from app.routers._handlers import http_errors
 from app.routers.deps import (
     get_current_user,
-    get_release_repository,
     get_release_service,
     get_spotify_app_client,
     get_sync_status_repository,
@@ -55,11 +54,13 @@ def list_releases(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     service: ReleaseService = Depends(get_release_service),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> ListResponse[ReleaseRead]:
+    """current user が follow 中 (archived=false) の artist の release を返す
+    (ADR-007 §2.4)。既読状態は user 単位で計算される (ADR-007 §2.3)。"""
     default_from, default_to = _default_window()
-    rows = service.list_window(from_date or default_from, to_date or default_to)
-    return ListResponse(items=[ReleaseRead.model_validate(r) for r in rows])
+    items = service.list_window(current_user.id, from_date or default_from, to_date or default_to)
+    return ListResponse(items=items)
 
 
 # 注意: `/sync-status` を `/{spotify_id}` 風の path より先に宣言したいが
@@ -85,23 +86,16 @@ def get_sync_status(
 def set_release_read_status(
     spotify_id: str,
     payload: ReleaseReadStatusUpdate,
-    repo: ReleaseRepository = Depends(get_release_repository),
-    _: User = Depends(get_current_user),
+    service: ReleaseService = Depends(get_release_service),
+    current_user: User = Depends(get_current_user),
 ) -> ReleaseRead:
-    """release の既読フラグをトグル (Feed の未読 dot 用)。
+    """release の既読フラグを user 単位でトグル (Feed の未読 dot 用、ADR-007)。
 
-    Phase B-3 で localStorage ベースの既読を backend (release.is_read / read_at)
-    に移行する経路。`is_read=true` で `read_at=now()`、`false` で `read_at=null`
-    に連動して書き換える。auth 必須 (単一ユーザだが将来 multi-user 化で current
-    user が要るため最初から固定)。
+    `is_read=true` で `release_read_states` に upsert (read_at = now())、`false`
+    で行を DELETE。release catalog が無ければ 404。
     """
-    row = repo.set_read_status(spotify_id, payload.is_read)
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"release spotify_id={spotify_id} not found",
-        )
-    return ReleaseRead.model_validate(row)
+    with http_errors():
+        return service.set_read_status(spotify_id, payload.is_read, current_user.id)
 
 
 @router.post("/sync", response_model=SyncRunResult, status_code=status.HTTP_200_OK)

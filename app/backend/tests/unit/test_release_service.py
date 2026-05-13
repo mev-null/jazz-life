@@ -17,12 +17,16 @@ from uuid import UUID
 
 from sqlmodel import Session
 
-from app.core.exceptions import SpotifyApiError
+from app.core.exceptions import NotFoundError, SpotifyApiError
+from app.core.repositories.release_read_state_repository import (
+    ReleaseReadStateRepository,
+)
 from app.core.repositories.release_repository import ReleaseRepository
 from app.core.repositories.sync_status_repository import SyncStatusRepository
 from app.core.repositories.user_follow_repository import UserFollowRepository
 from app.models.artist import Artist
 from app.models.release import Release
+from app.models.release_read_state import ReleaseReadState
 from app.models.user import User
 from app.models.user_follow import UserFollow
 from app.services.release_service import (
@@ -84,6 +88,7 @@ def _seed_follow(session: Session, user_id: UUID, artist_id: str) -> None:
 def _make_service(session: Session) -> ReleaseService:
     return ReleaseService(
         release_repo=ReleaseRepository(session),
+        read_state_repo=ReleaseReadStateRepository(session),
         follow_repo=UserFollowRepository(session),
         sync_repo=SyncStatusRepository(session),
     )
@@ -211,31 +216,203 @@ def test_sync_for_user_marks_error_when_all_artists_fail(session: Session) -> No
     assert status.last_error is not None and "server error" in status.last_error
 
 
-def test_sync_for_user_upsert_preserves_is_read(session: Session) -> None:
-    """既存の Release.is_read=True は sync 再実行で上書きされない。"""
+def test_sync_does_not_touch_read_states(session: Session) -> None:
+    """ADR-007 後、release_read_states は catalog の sync と独立。
+
+    user が既読化した release を Spotify から再 ingest しても、release_read_states
+    の行は触られない (独立テーブルなので preserve は自動)。
+    """
+    import pytest
+
     user = _seed_user(session)
     _seed_artist(session, "art-1")
     _seed_follow(session, user.id, "art-1")
-    existing = Release(
-        spotify_id="alb-1",
-        artist_id="art-1",
-        title="OLD TITLE",
-        album_type="album",
-        release_date=date(2026, 1, 1),
-        is_read=True,
-        read_at=datetime(2026, 1, 2, tzinfo=UTC),
+    session.add(
+        Release(
+            spotify_id="alb-1",
+            artist_id="art-1",
+            title="OLD TITLE",
+            album_type="album",
+            release_date=date(2026, 1, 1),
+        )
     )
-    session.add(existing)
     session.commit()
 
+    # user が既読化
+    service = _make_service(session)
+    service.set_read_status("alb-1", True, user.id)
+    read_at_before = (
+        ReleaseReadStateRepository(session)
+        .list_read_at_map_for_user(user.id, ["alb-1"])
+        .get("alb-1")
+    )
+    assert read_at_before is not None
+
+    # sync で metadata 上書き
     spotify = FakeSpotifyClient(responses={"art-1": [_ingest("alb-1", "art-1", name="NEW TITLE")]})
-    _make_service(session).sync_for_user(
+    service.sync_for_user(
         user.id, spotify, since_date=date(2025, 1, 1), until_date=date(2027, 1, 1)
     )
 
     session.expire_all()
     refreshed = session.get(Release, "alb-1")
     assert refreshed is not None
-    assert refreshed.title == "NEW TITLE"
-    assert refreshed.is_read is True
-    assert refreshed.read_at is not None
+    assert refreshed.title == "NEW TITLE"  # catalog metadata は更新
+
+    # release_read_states は変わらない (独立テーブル)
+    read_at_after = (
+        ReleaseReadStateRepository(session)
+        .list_read_at_map_for_user(user.id, ["alb-1"])
+        .get("alb-1")
+    )
+    assert read_at_after == read_at_before
+    # pytest を関数ローカルで触っているので import warning を抑える
+    _ = pytest
+
+
+# ---- list_window / set_read_status ----
+
+
+def test_list_window_returns_only_followed_artists(session: Session) -> None:
+    """current user が follow している artist の release だけ返る (ADR-007 §2.4)。"""
+    user = _seed_user(session)
+    _seed_artist(session, "art-followed")
+    _seed_artist(session, "art-not-followed")
+    _seed_follow(session, user.id, "art-followed")
+    session.add_all(
+        [
+            Release(
+                spotify_id="r-followed",
+                artist_id="art-followed",
+                title="Followed",
+                album_type="album",
+                release_date=date(2026, 5, 1),
+            ),
+            Release(
+                spotify_id="r-not-followed",
+                artist_id="art-not-followed",
+                title="Not",
+                album_type="album",
+                release_date=date(2026, 5, 1),
+            ),
+        ]
+    )
+    session.commit()
+
+    items = _make_service(session).list_window(
+        user.id, from_date=date(2026, 1, 1), to_date=date(2026, 12, 31)
+    )
+    assert [r.spotify_id for r in items] == ["r-followed"]
+
+
+def test_list_window_excludes_archived_follows(session: Session) -> None:
+    user = _seed_user(session)
+    _seed_artist(session, "art-arc")
+    session.add(UserFollow(user_id=user.id, artist_id="art-arc", archived_flag=True))
+    session.commit()
+    session.add(
+        Release(
+            spotify_id="r-arc",
+            artist_id="art-arc",
+            title="X",
+            album_type="album",
+            release_date=date(2026, 5, 1),
+        )
+    )
+    session.commit()
+
+    items = _make_service(session).list_window(
+        user.id, from_date=date(2026, 1, 1), to_date=date(2026, 12, 31)
+    )
+    assert items == []
+
+
+def test_list_window_returns_is_read_per_user(session: Session) -> None:
+    """同じ release を 2 user で見ると is_read が user 別 (ADR-007 §2.3)。"""
+    user_a = _seed_user(session, "user-a")
+    user_b = _seed_user(session, "user-b")
+    _seed_artist(session, "art-x")
+    _seed_follow(session, user_a.id, "art-x")
+    _seed_follow(session, user_b.id, "art-x")
+    session.add(
+        Release(
+            spotify_id="r-x",
+            artist_id="art-x",
+            title="X",
+            album_type="album",
+            release_date=date(2026, 5, 1),
+        )
+    )
+    session.commit()
+
+    service = _make_service(session)
+    service.set_read_status("r-x", True, user_a.id)
+
+    items_a = service.list_window(user_a.id, from_date=date(2026, 1, 1), to_date=date(2026, 12, 31))
+    items_b = service.list_window(user_b.id, from_date=date(2026, 1, 1), to_date=date(2026, 12, 31))
+    assert items_a[0].is_read is True
+    assert items_a[0].read_at is not None
+    assert items_b[0].is_read is False
+    assert items_b[0].read_at is None
+
+
+def test_set_read_status_unknown_release_raises_not_found(session: Session) -> None:
+    import pytest
+
+    user = _seed_user(session)
+    service = _make_service(session)
+    with pytest.raises(NotFoundError, match="release"):
+        service.set_read_status("ghost", True, user.id)
+
+
+def test_set_read_status_false_deletes_row(session: Session) -> None:
+    """is_read=False を送ると release_read_states 行が削除される。"""
+    user = _seed_user(session)
+    _seed_artist(session, "art-1")
+    _seed_follow(session, user.id, "art-1")
+    session.add(
+        Release(
+            spotify_id="r-1",
+            artist_id="art-1",
+            title="X",
+            album_type="album",
+            release_date=date(2026, 1, 1),
+        )
+    )
+    session.commit()
+
+    service = _make_service(session)
+    service.set_read_status("r-1", True, user.id)
+    assert (
+        ReleaseReadStateRepository(session).list_read_at_map_for_user(user.id, ["r-1"]).get("r-1")
+        is not None
+    )
+
+    service.set_read_status("r-1", False, user.id)
+    assert ReleaseReadStateRepository(session).list_read_at_map_for_user(user.id, ["r-1"]) == {}
+
+
+def test_set_read_status_isolated_between_users(session: Session) -> None:
+    user_a = _seed_user(session, "user-a")
+    user_b = _seed_user(session, "user-b")
+    _seed_artist(session, "art-1")
+    session.add(
+        Release(
+            spotify_id="r-1",
+            artist_id="art-1",
+            title="X",
+            album_type="album",
+            release_date=date(2026, 1, 1),
+        )
+    )
+    session.commit()
+
+    service = _make_service(session)
+    service.set_read_status("r-1", True, user_a.id)
+
+    from sqlmodel import select
+
+    states = list(session.exec(select(ReleaseReadState)).all())
+    assert len(states) == 1
+    assert states[0].user_id == user_a.id
+    _ = user_b  # user_b 視点では何も起きない (行が 1 つしか無いことで担保)
