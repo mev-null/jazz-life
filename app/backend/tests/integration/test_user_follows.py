@@ -143,3 +143,103 @@ def test_list_followed_artists_returns_only_active_follows(
     assert res.status_code == 200
     ids = {item["spotify_id"] for item in res.json()["items"]}
     assert ids == {"art-active"}
+
+
+# ---- GET /api/user-follows/record-counts ----
+
+
+def test_record_counts_requires_auth(unauthed_client: TestClient) -> None:
+    res = unauthed_client.get("/api/user-follows/record-counts")
+    assert res.status_code == 401
+
+
+def test_record_counts_empty_when_no_records(authed_client: TestClient) -> None:
+    res = authed_client.get("/api/user-follows/record-counts")
+    assert res.status_code == 200
+    assert res.json() == {"items": []}
+
+
+def test_record_counts_counts_only_owned_for_active_follows(
+    authed_client: TestClient, session: Session
+) -> None:
+    """current user の所有 (status='owned') レコードを follow 中 artist ごとに集計する。
+
+    検証する観点:
+    - status='wanted' な record は数えない (want list 除外)
+    - archived な follow の artist の record も数えない (followed_artists と整合)
+    - そもそも follow していない artist の record は数えない (理屈上は auto-follow
+      で発生しないはずだが、念のため JOIN 条件として担保)
+    """
+    from datetime import UTC, datetime
+
+    from sqlmodel import select
+
+    from app.models.record import VinylRecord
+
+    now = datetime.now(UTC)
+    user = session.exec(select(User).where(User.spotify_id == "test-owner")).one()
+
+    _seed_artist(session, "art-bill")
+    _seed_artist(session, "art-avishai")
+    _seed_artist(session, "art-archived")
+    _seed_artist(session, "art-unfollowed")
+    _seed_follow(session, user.id, "art-bill", archived=False)
+    _seed_follow(session, user.id, "art-avishai", archived=False)
+    _seed_follow(session, user.id, "art-archived", archived=True)
+
+    session.add_all(
+        [
+            VinylRecord(
+                artist_id="art-bill",
+                title="owned-1",
+                source="manual",
+                status="owned",
+                display_order=1,
+                created_at=now,
+                updated_at=now,
+            ),
+            VinylRecord(
+                artist_id="art-bill",
+                title="owned-2",
+                source="manual",
+                status="owned",
+                display_order=2,
+                created_at=now,
+                updated_at=now,
+            ),
+            VinylRecord(
+                artist_id="art-avishai",
+                title="wanted-1",
+                source="manual",
+                status="wanted",  # 数えない
+                display_order=3,
+                created_at=now,
+                updated_at=now,
+            ),
+            VinylRecord(
+                artist_id="art-archived",
+                title="archived-owned",
+                source="manual",
+                status="owned",  # follow が archived なので数えない
+                display_order=4,
+                created_at=now,
+                updated_at=now,
+            ),
+            VinylRecord(
+                artist_id="art-unfollowed",
+                title="unfollowed-owned",
+                source="manual",
+                status="owned",  # そもそも follow 行が無いので数えない
+                display_order=5,
+                created_at=now,
+                updated_at=now,
+            ),
+        ]
+    )
+    session.commit()
+
+    res = authed_client.get("/api/user-follows/record-counts")
+
+    assert res.status_code == 200
+    items = {item["artist_id"]: item["count"] for item in res.json()["items"]}
+    assert items == {"art-bill": 2}

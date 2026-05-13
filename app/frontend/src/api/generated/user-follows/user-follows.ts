@@ -25,7 +25,8 @@ import type {
 
 import type {
   HTTPValidationError,
-  ListResponseArtistRead
+  ListResponseArtistRead,
+  ListResponseArtistRecordCount
 } from '../model';
 
 import { customFetch } from '../../mutator';
@@ -140,6 +141,124 @@ export function useListFollowedArtistsApiUserFollowsArtistsGet<TData = Awaited<R
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListFollowedArtistsApiUserFollowsArtistsGetQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+export type listRecordCountsApiUserFollowsRecordCountsGetResponse200 = {
+  data: ListResponseArtistRecordCount
+  status: 200
+}
+
+export type listRecordCountsApiUserFollowsRecordCountsGetResponseSuccess = (listRecordCountsApiUserFollowsRecordCountsGetResponse200) & {
+  headers: Headers;
+};
+;
+
+export type listRecordCountsApiUserFollowsRecordCountsGetResponse = (listRecordCountsApiUserFollowsRecordCountsGetResponseSuccess)
+
+export const getListRecordCountsApiUserFollowsRecordCountsGetUrl = () => {
+
+
+
+
+  return `/api/user-follows/record-counts`
+}
+
+/**
+ * current user の所有レコード数を artist_id ごとに集計して返す。
+
+ArtistsPage 一覧の件数列専用。records 全件取得を避けて軽量化する。
+旧 `/api/artists/record-counts` を user-follows 配下に移設し (集計の単位が
+follow と一致するため意味論として整合する)、同時に user_id でスコープを
+切るようにした。status='owned' のみ数える (want list は除外)。
+ * @summary List Record Counts
+ */
+export const listRecordCountsApiUserFollowsRecordCountsGet = async ( options?: RequestInit): Promise<listRecordCountsApiUserFollowsRecordCountsGetResponse> => {
+
+  return customFetch<listRecordCountsApiUserFollowsRecordCountsGetResponse>(getListRecordCountsApiUserFollowsRecordCountsGetUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListRecordCountsApiUserFollowsRecordCountsGetQueryKey = () => {
+    return [
+    `/api/user-follows/record-counts`
+    ] as const;
+    }
+
+
+export const getListRecordCountsApiUserFollowsRecordCountsGetQueryOptions = <TData = Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListRecordCountsApiUserFollowsRecordCountsGetQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>> = ({ signal }) => listRecordCountsApiUserFollowsRecordCountsGet({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListRecordCountsApiUserFollowsRecordCountsGetQueryResult = NonNullable<Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>>
+export type ListRecordCountsApiUserFollowsRecordCountsGetQueryError = unknown
+
+
+export function useListRecordCountsApiUserFollowsRecordCountsGet<TData = Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>, TError = unknown>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>,
+          TError,
+          Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListRecordCountsApiUserFollowsRecordCountsGet<TData = Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>,
+          TError,
+          Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListRecordCountsApiUserFollowsRecordCountsGet<TData = Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List Record Counts
+ */
+
+export function useListRecordCountsApiUserFollowsRecordCountsGet<TData = Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>, TError = unknown>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiUserFollowsRecordCountsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListRecordCountsApiUserFollowsRecordCountsGetQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

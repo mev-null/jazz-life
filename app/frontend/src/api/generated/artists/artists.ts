@@ -27,8 +27,7 @@ import type {
   ArtistCreate,
   ArtistRead,
   HTTPValidationError,
-  ListResponseArtistRead,
-  ListResponseArtistRecordCount
+  ListResponseArtistRead
 } from '../model';
 
 import { customFetch } from '../../mutator';
@@ -243,122 +242,7 @@ export const useUpsertArtistApiArtistsPost = <TError = HTTPValidationError,
       > => {
       return useMutation(getUpsertArtistApiArtistsPostMutationOptions(options), queryClient);
     }
-    export type listRecordCountsApiArtistsRecordCountsGetResponse200 = {
-  data: ListResponseArtistRecordCount
-  status: 200
-}
-
-export type listRecordCountsApiArtistsRecordCountsGetResponseSuccess = (listRecordCountsApiArtistsRecordCountsGetResponse200) & {
-  headers: Headers;
-};
-;
-
-export type listRecordCountsApiArtistsRecordCountsGetResponse = (listRecordCountsApiArtistsRecordCountsGetResponseSuccess)
-
-export const getListRecordCountsApiArtistsRecordCountsGetUrl = () => {
-
-
-
-
-  return `/api/artists/record-counts`
-}
-
-/**
- * artist_id ごとの所有レコード数を集計して返す。
-
-ArtistsPage 一覧の件数列専用。records 全件取得を避けて軽量化する。
- * @summary List Record Counts
- */
-export const listRecordCountsApiArtistsRecordCountsGet = async ( options?: RequestInit): Promise<listRecordCountsApiArtistsRecordCountsGetResponse> => {
-
-  return customFetch<listRecordCountsApiArtistsRecordCountsGetResponse>(getListRecordCountsApiArtistsRecordCountsGetUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getListRecordCountsApiArtistsRecordCountsGetQueryKey = () => {
-    return [
-    `/api/artists/record-counts`
-    ] as const;
-    }
-
-
-export const getListRecordCountsApiArtistsRecordCountsGetQueryOptions = <TData = Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getListRecordCountsApiArtistsRecordCountsGetQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>> = ({ signal }) => listRecordCountsApiArtistsRecordCountsGet({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type ListRecordCountsApiArtistsRecordCountsGetQueryResult = NonNullable<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>>
-export type ListRecordCountsApiArtistsRecordCountsGetQueryError = unknown
-
-
-export function useListRecordCountsApiArtistsRecordCountsGet<TData = Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError = unknown>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>,
-          TError,
-          Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListRecordCountsApiArtistsRecordCountsGet<TData = Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>,
-          TError,
-          Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListRecordCountsApiArtistsRecordCountsGet<TData = Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List Record Counts
- */
-
-export function useListRecordCountsApiArtistsRecordCountsGet<TData = Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordCountsApiArtistsRecordCountsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getListRecordCountsApiArtistsRecordCountsGetQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-export type getArtistApiArtistsSpotifyIdGetResponse200 = {
+    export type getArtistApiArtistsSpotifyIdGetResponse200 = {
   data: ArtistRead
   status: 200
 }

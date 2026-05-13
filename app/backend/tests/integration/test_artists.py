@@ -26,22 +26,18 @@ def _artists_response(entries: list[dict[str, Any] | None]) -> dict[str, Any]:
     return {"artists": entries}
 
 
-def test_artists_empty(client: TestClient) -> None:
-    res = client.get("/api/artists")
+def test_list_artists_requires_auth(unauthed_client: TestClient) -> None:
+    res = unauthed_client.get("/api/artists")
+    assert res.status_code == 401
+
+
+def test_artists_empty(authed_client: TestClient) -> None:
+    res = authed_client.get("/api/artists")
     assert res.status_code == 200
     assert res.json() == {"items": []}
 
 
-def test_seed_is_now_empty(seeded_client: TestClient) -> None:
-    """Phase B-3: seeds/artists.json は items=[] に倒し、artist は records 登録
-    経由でのみ生まれる運用にしたので、`seed_artists_if_empty` を回しても
-    artists は 0 件のまま。"""
-    res = seeded_client.get("/api/artists")
-    assert res.status_code == 200
-    assert res.json() == {"items": []}
-
-
-def test_artists_sorted_by_added_at_desc(client: TestClient, session: Session) -> None:
+def test_artists_sorted_by_added_at_desc(authed_client: TestClient, session: Session) -> None:
     """artists が複数件あれば added_at desc で返る。
 
     seed が空になったので、ソート検証用に fixture artist を直接 2 件投入する。
@@ -57,7 +53,7 @@ def test_artists_sorted_by_added_at_desc(client: TestClient, session: Session) -
     )
     session.commit()
 
-    res = client.get("/api/artists")
+    res = authed_client.get("/api/artists")
     items = res.json()["items"]
     assert [a["spotify_id"] for a in items] == ["a-new", "a-old"]
 
@@ -151,6 +147,7 @@ def spotify_client(session: Session, _test_settings: Settings) -> Iterator[TestC
 
     httpx_mock との連携のため、process-wide cache を避けて毎回新しい
     SpotifyAppClient を返す override を仕込む (test_spotify.py と同じ作法)。
+    auth ガードのため get_current_user も override する。
     """
     from app.core.db import get_session
 
@@ -160,11 +157,20 @@ def spotify_client(session: Session, _test_settings: Settings) -> Iterator[TestC
     def _override_app_client() -> SpotifyAppClient:
         return SpotifyAppClient(_test_settings)
 
+    def _override_user() -> User:
+        return User(spotify_id="test-owner", display_name="Test Owner", refresh_token="")
+
     app.dependency_overrides[get_session] = _override_session
     app.dependency_overrides[get_settings] = lambda: _test_settings
     app.dependency_overrides[get_spotify_app_client] = _override_app_client
+    app.dependency_overrides[get_current_user] = _override_user
     yield TestClient(app)
     app.dependency_overrides.clear()
+
+
+def test_get_artist_requires_auth(unauthed_client: TestClient) -> None:
+    res = unauthed_client.get("/api/artists/anything")
+    assert res.status_code == 401
 
 
 def test_get_artist_404_when_missing(spotify_client: TestClient) -> None:
@@ -243,67 +249,5 @@ def test_get_artist_swallows_spotify_error(
     assert res.json()["image_url"] is None
 
 
-# ---- GET /api/artists/record-counts ----
-
-
-def test_record_counts_empty(client: TestClient) -> None:
-    res = client.get("/api/artists/record-counts")
-    assert res.status_code == 200
-    assert res.json() == {"items": []}
-
-
-def test_record_counts_aggregates_by_artist(client: TestClient, session: Session) -> None:
-    """記録 GROUP BY artist_id の集計が正しく返ることを検証する。
-
-    seed が空になったので、fixture artist と vinyl_record を直接投入する。
-    """
-    from datetime import UTC, datetime
-
-    from app.models.record import VinylRecord
-
-    now = datetime.now(UTC)
-    session.add_all(
-        [
-            Artist(spotify_id="art-bill", name="Bill", added_at=now),
-            Artist(spotify_id="art-avishai", name="Avishai", added_at=now),
-        ]
-    )
-    session.commit()
-    session.add_all(
-        [
-            VinylRecord(
-                artist_id="art-bill",
-                title="Track 1",
-                source="manual",
-                status="owned",
-                display_order=1,
-                created_at=now,
-                updated_at=now,
-            ),
-            VinylRecord(
-                artist_id="art-bill",
-                title="Track 2",
-                source="manual",
-                status="owned",
-                display_order=2,
-                created_at=now,
-                updated_at=now,
-            ),
-            VinylRecord(
-                artist_id="art-avishai",
-                title="Track 3",
-                source="manual",
-                status="wanted",
-                display_order=3,
-                created_at=now,
-                updated_at=now,
-            ),
-        ]
-    )
-    session.commit()
-
-    res = client.get("/api/artists/record-counts")
-
-    assert res.status_code == 200
-    items = {item["artist_id"]: item["count"] for item in res.json()["items"]}
-    assert items == {"art-bill": 2, "art-avishai": 1}
+# record-counts は /api/user-follows/record-counts に移設したので
+# テストも tests/integration/test_user_follows.py に集約している。

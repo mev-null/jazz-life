@@ -6,6 +6,7 @@ from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
 from app import models  # noqa: F401  register all SQLModel tables
+from app.core.settings import normalize_database_url
 
 config = context.config
 
@@ -13,7 +14,9 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 if (env_url := os.environ.get("DATABASE_URL")) is not None:
-    config.set_main_option("sqlalchemy.url", env_url)
+    # Railway などの managed PG が渡す `postgres://` 形式を SQLAlchemy 2.x が
+    # 解釈できる `postgresql+psycopg://` に揃える。Settings と同じロジック。
+    config.set_main_option("sqlalchemy.url", normalize_database_url(env_url))
 
 target_metadata = SQLModel.metadata
 

@@ -42,8 +42,11 @@
     "SPOTIFY_REDIRECT_URI": "http://127.0.0.1:8000/api/auth/callback",
     "FRONTEND_BASE_URL": "http://127.0.0.1:5173",
     "COOKIE_SECURE": "false",
+    "COOKIE_SAMESITE": "lax",
+    "CORS_ALLOW_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173",
     "VITE_API_BASE": "http://127.0.0.1:8000",
-    "VITE_USE_MOCK": "false"
+    "VITE_USE_MOCK": "false",
+    "VITE_ALLOWED_HOSTS": ""
   },
   "secrets": {
     "SPOTIFY_CLIENT_ID": {
@@ -51,9 +54,6 @@
     },
     "SPOTIFY_CLIENT_SECRET": {
       "description": "Spotify app Client Secret"
-    },
-    "ALLOWED_SPOTIFY_USER_ID": {
-      "description": "Owner's Spotify user ID"
     },
     "JWT_SECRET": {
       "description": "JWT signing key"

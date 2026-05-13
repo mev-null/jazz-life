@@ -24,8 +24,12 @@ class RecordService:
     def list_all(self) -> list[VinylRecord]:
         return self.repo.list_all()
 
-    def count_by_artist(self) -> dict[str, int]:
-        return self.repo.count_by_artist()
+    def count_owned_by_artist_for_user(self, user_id: UUID) -> dict[str, int]:
+        """current user の所有レコード数を artist_id ごとに返す。
+
+        repo 層の同名メソッドへの薄いラッパ。詳細はそちらの docstring を参照。
+        """
+        return self.repo.count_owned_by_artist_for_user(user_id)
 
     def create(self, data: VinylRecordCreate, user_id: UUID) -> VinylRecord:
         """Record を 1 件作成し、同じトランザクション扱いで該当 artist を

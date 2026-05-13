@@ -105,14 +105,19 @@ def authed_client(session: Session, _test_settings: Settings) -> Iterator[TestCl
 # ---- GET /api/releases ----
 
 
-def test_get_releases_empty(unauthed_client: TestClient) -> None:
+def test_get_releases_requires_auth(unauthed_client: TestClient) -> None:
     res = unauthed_client.get("/api/releases")
+    assert res.status_code == 401
+
+
+def test_get_releases_empty(authed_client: TestClient) -> None:
+    res = authed_client.get("/api/releases")
     assert res.status_code == 200
     assert res.json() == {"items": []}
 
 
 def test_get_releases_returns_within_window_and_sorts_desc(
-    unauthed_client: TestClient, session: Session
+    authed_client: TestClient, session: Session
 ) -> None:
     today = date.today()
     session.add(Artist(spotify_id="art-1", name="A", source="seeded", added_at=datetime.now(UTC)))
@@ -144,14 +149,14 @@ def test_get_releases_returns_within_window_and_sorts_desc(
     )
     session.commit()
 
-    res = unauthed_client.get("/api/releases")
+    res = authed_client.get("/api/releases")
     body = res.json()
     ids = [r["spotify_id"] for r in body["items"]]
     # r-old は窓外なので除外、新しい順 (release_date desc)
     assert ids == ["r-upcoming", "r-recent"]
 
 
-def test_get_releases_accepts_custom_window(unauthed_client: TestClient, session: Session) -> None:
+def test_get_releases_accepts_custom_window(authed_client: TestClient, session: Session) -> None:
     session.add(Artist(spotify_id="art-1", name="A", source="seeded", added_at=datetime.now(UTC)))
     session.commit()
     session.add(
@@ -166,7 +171,7 @@ def test_get_releases_accepts_custom_window(unauthed_client: TestClient, session
     session.commit()
 
     # デフォルト窓では取れない 2024 年のリリースを from/to 指定で取れる
-    res = unauthed_client.get("/api/releases", params={"from": "2024-01-01", "to": "2024-12-31"})
+    res = authed_client.get("/api/releases", params={"from": "2024-01-01", "to": "2024-12-31"})
     assert res.status_code == 200
     assert [r["spotify_id"] for r in res.json()["items"]] == ["r-1"]
 
@@ -174,10 +179,15 @@ def test_get_releases_accepts_custom_window(unauthed_client: TestClient, session
 # ---- GET /api/releases/sync-status ----
 
 
-def test_sync_status_returns_null_fields_when_never_synced(
-    unauthed_client: TestClient,
-) -> None:
+def test_sync_status_requires_auth(unauthed_client: TestClient) -> None:
     res = unauthed_client.get("/api/releases/sync-status")
+    assert res.status_code == 401
+
+
+def test_sync_status_returns_null_fields_when_never_synced(
+    authed_client: TestClient,
+) -> None:
+    res = authed_client.get("/api/releases/sync-status")
     assert res.status_code == 200
     body = res.json()
     assert body["source"] == "spotify_releases"

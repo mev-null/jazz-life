@@ -15,7 +15,10 @@ router = APIRouter(prefix="/api/records", tags=["records"])
 @router.get("", response_model=ListResponse[VinylRecordRead])
 def list_records(
     service: RecordService = Depends(get_record_service),
+    _: User = Depends(get_current_user),
 ) -> ListResponse[VinylRecordRead]:
+    """auth 必須。records が user-scope されるのは別 PR (ADR-006) で対応。
+    本 PR は「未認証で全レコードが list できる」状態を閉塞するための入口ガード。"""
     rows = service.list_all()
     return ListResponse(items=[VinylRecordRead.model_validate(row) for row in rows])
 
@@ -38,6 +41,7 @@ def update_record(
     id: uuid.UUID,
     body: VinylRecordUpdate,
     service: RecordService = Depends(get_record_service),
+    _: User = Depends(get_current_user),
 ) -> VinylRecordRead:
     with http_errors():
         record = service.update_partial(id, body)

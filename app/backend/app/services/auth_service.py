@@ -3,9 +3,12 @@
 責務:
 - OAuth state の発行 / 検証 (`oauth_state` cookie とサーバ dict の二重防御)
 - Spotify との code 交換 / プロフィール取得
-- ALLOWED_SPOTIFY_USER_ID allowlist による 403 判定 (timing-safe 比較)
 - refresh_token の Fernet 暗号化 → users upsert
 - JWT (HS256, iss/aud 検証あり) の発行 / 復号
+
+invite 制御は Spotify Developer Dashboard の "Users and Access" に一本化する
+(ADR-005)。development mode の app に登録された Spotify アカウントだけが OAuth
+を完了できる仕様を信頼し、アプリ側で重ねて allowlist を持たない。
 
 設計上の注意:
 - 復号した平文 refresh_token / access_token / OAuth code はローカル変数に閉じ、
@@ -24,7 +27,7 @@ from datetime import UTC, datetime, timedelta
 import jwt
 
 from app.core.crypto import TokenCipher
-from app.core.exceptions import AuthError, ForbiddenError, SpotifyAuthError
+from app.core.exceptions import AuthError, SpotifyAuthError
 from app.core.repositories.user_repository import UserRepository
 from app.core.settings import (
     JWT_AUDIENCE,
@@ -97,7 +100,6 @@ class AuthService:
             # Spotify は code 交換時に必ず refresh_token を返す仕様。返らないのは異常。
             raise SpotifyAuthError("spotify did not return refresh_token")
         profile = self._spotify.get_me(token.access_token)
-        self._enforce_allowlist(profile.id)
         encrypted = self._cipher.encrypt(token.refresh_token)
         user = self._user_repo.upsert_from_spotify(
             spotify_id=profile.id,
@@ -107,10 +109,6 @@ class AuthService:
         )
         session_token = self._issue_session_token(user.id)
         return CallbackResult(user=user, session_token=session_token)
-
-    def _enforce_allowlist(self, spotify_id: str) -> None:
-        if not secrets.compare_digest(spotify_id, self._settings.allowed_spotify_user_id):
-            raise ForbiddenError("user not in allowlist")
 
     # ---- JWT セッション ----
 

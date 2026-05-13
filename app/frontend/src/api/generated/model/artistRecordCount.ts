@@ -9,8 +9,8 @@
  * ArtistsPage 一覧の件数列に渡す軽量行。
 
 records 本体は ArtistDetailModal を開くまで fetch しない方針のため、
-一覧では「N records」表示だけ別エンドポイント `/api/artists/record-counts`
-から先に取れるようにする。
+一覧では「N records」表示だけ別エンドポイント `/api/user-follows/record-counts`
+から先に取れるようにする (auth 必須、current user 所有 owned のみ集計)。
  */
 export interface ArtistRecordCount {
   artist_id: string;

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import jwt
 import pytest
 
-from app.core.exceptions import AuthError, ForbiddenError, SpotifyAuthError
+from app.core.exceptions import AuthError, SpotifyAuthError
 from app.core.settings import JWT_AUDIENCE, JWT_ISSUER, Settings
 from app.services import auth_service as auth_service_module
 from app.services.auth_service import AuthService
@@ -16,7 +16,7 @@ def _make_service(settings: Settings | None = None) -> AuthService:
     return AuthService(
         user_repo=MagicMock(),
         spotify=MagicMock(),
-        settings=settings or make_settings(allowed_spotify_user_id="owner"),
+        settings=settings or make_settings(),
     )
 
 
@@ -63,7 +63,7 @@ def test_state_url_missing_is_rejected() -> None:
 
 
 def test_state_ttl_expiry_is_rejected() -> None:
-    svc = _make_service(make_settings(allowed_spotify_user_id="owner", state_ttl_seconds=0))
+    svc = _make_service(make_settings(state_ttl_seconds=0))
     state = svc.issue_state()
     time.sleep(0.05)
     with pytest.raises(AuthError):
@@ -176,26 +176,12 @@ def test_jwt_with_wrong_token_type_is_rejected() -> None:
 
 
 def test_jwt_expired_is_rejected() -> None:
-    svc = _make_service(make_settings(allowed_spotify_user_id="owner", session_ttl_seconds=0))
+    svc = _make_service(make_settings(session_ttl_seconds=0))
     user_id = uuid.uuid4()
     token = svc._issue_session_token(user_id)
     time.sleep(0.05)
     with pytest.raises(AuthError):
         svc.decode_session_token(token)
-
-
-# ---- allowlist ----
-
-
-def test_allowlist_hit_succeeds() -> None:
-    svc = _make_service()
-    svc._enforce_allowlist("owner")  # does not raise
-
-
-def test_allowlist_miss_raises_forbidden() -> None:
-    svc = _make_service()
-    with pytest.raises(ForbiddenError):
-        svc._enforce_allowlist("intruder")
 
 
 # ---- secret non-leakage ----
