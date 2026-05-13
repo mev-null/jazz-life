@@ -8,6 +8,9 @@ from app.core.repositories.record_favorite_track_repository import (
     RecordFavoriteTrackRepository,
 )
 from app.core.repositories.record_repository import RecordRepository
+from app.core.repositories.release_read_state_repository import (
+    ReleaseReadStateRepository,
+)
 from app.core.repositories.release_repository import ReleaseRepository
 from app.core.repositories.sync_status_repository import SyncStatusRepository
 from app.core.repositories.user_collection_repository import UserCollectionRepository
@@ -77,6 +80,12 @@ def get_release_repository(session: Session = Depends(get_session)) -> ReleaseRe
     return ReleaseRepository(session)
 
 
+def get_release_read_state_repository(
+    session: Session = Depends(get_session),
+) -> ReleaseReadStateRepository:
+    return ReleaseReadStateRepository(session)
+
+
 def get_sync_status_repository(
     session: Session = Depends(get_session),
 ) -> SyncStatusRepository:
@@ -85,10 +94,11 @@ def get_sync_status_repository(
 
 def get_release_service(
     release_repo: ReleaseRepository = Depends(get_release_repository),
+    read_state_repo: ReleaseReadStateRepository = Depends(get_release_read_state_repository),
     follow_repo: UserFollowRepository = Depends(get_user_follow_repository),
     sync_repo: SyncStatusRepository = Depends(get_sync_status_repository),
 ) -> ReleaseService:
-    return ReleaseService(release_repo, follow_repo, sync_repo)
+    return ReleaseService(release_repo, read_state_repo, follow_repo, sync_repo)
 
 
 def get_user_repository(session: Session = Depends(get_session)) -> UserRepository:

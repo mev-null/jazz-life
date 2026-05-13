@@ -1,44 +1,37 @@
-from datetime import UTC, date, datetime
+from datetime import date
+from uuid import UUID
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import Session, and_, col, select
 
 from app.models.release import Release
+from app.models.user_follow import UserFollow
 
 
 class ReleaseRepository:
+    """releases (catalog) 専用 (ADR-007)。
+
+    既読状態は ReleaseReadStateRepository に分離済み。配信スコープ (current user
+    が follow 中の artist だけ) は `list_window_for_user` の JOIN で適用する。
+    """
+
     def __init__(self, session: Session) -> None:
         self.session = session
 
     def get(self, spotify_id: str) -> Release | None:
         return self.session.get(Release, spotify_id)
 
-    def set_read_status(self, spotify_id: str, is_read: bool) -> Release | None:
-        """`is_read` フラグを書き換えて `read_at` も連動させる。
+    def list_window_for_user(self, user_id: UUID, from_date: date, to_date: date) -> list[Release]:
+        """current user が follow 中 (archived=false) の artist の release を
+        期間窓 `[from_date, to_date]` で取得して新しい順に返す (ADR-007 §2.4)。
 
-        - True にしたら `read_at` を now() に
-        - False に戻したら `read_at` を None に
-        該当 release が無ければ None を返す。
-        """
-        row = self.session.get(Release, spotify_id)
-        if row is None:
-            return None
-        row.is_read = is_read
-        row.read_at = datetime.now(UTC) if is_read else None
-        self.session.add(row)
-        self.session.commit()
-        self.session.refresh(row)
-        return row
-
-    def list_window(self, from_date: date, to_date: date) -> list[Release]:
-        """`release_date` が `[from_date, to_date]` の Release を新しい順で返す。
-
-        Feed の「直近30日 / 今後の予定」表示用 (ADR-000 §220)。Phase B-3 では
-        ingest 時点で `album` / `single` 以外を弾いているので、ここでは
-        album_type フィルタは行わない。
+        unfollow した artist の release は自然に Feed から消える。
         """
         stmt = (
             select(Release)
+            .join(UserFollow, col(UserFollow.artist_id) == col(Release.artist_id))
+            .where(col(UserFollow.user_id) == user_id)
+            .where(col(UserFollow.archived_flag).is_(False))
             .where(
                 and_(
                     col(Release.release_date) >= from_date,
@@ -52,11 +45,10 @@ class ReleaseRepository:
     def upsert_many(self, rows: list[Release]) -> int:
         """`spotify_id` を key にして bulk upsert する。
 
-        Phase B-3 sync で Get Artist's Albums の結果を流し込む経路。`is_read /
-        read_at` は touch しない (将来 backend 既読化したときに sync 再実行で
-        既読状態が消えるのを防ぐ)。戻り値は upsert を試みた行数 (Postgres は
-        ON CONFLICT DO UPDATE の場合に「実際に変更があった」行数を返さないため、
-        新規 + 既存を区別しないラフな件数として扱う)。
+        ADR-007 後は `is_read` / `read_at` 列は catalog から無くなり、既読は
+        独立テーブル `release_read_states` に持つ。catalog の upsert は metadata
+        のみ更新すれば自然に既読状態が preserve される (独立テーブルを触らない
+        ため)。戻り値は新規 + 既存を区別しないラフな件数。
         """
         if not rows:
             return 0
@@ -68,8 +60,6 @@ class ReleaseRepository:
                 "album_type": r.album_type,
                 "release_date": r.release_date,
                 "image_url": r.image_url,
-                "is_read": r.is_read,
-                "read_at": r.read_at,
             }
             for r in rows
         ]
