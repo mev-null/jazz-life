@@ -14,10 +14,17 @@
 #
 # 実行権限は Dockerfile の COPY --chmod=755 で付与する (git の +x bit に依らず
 # 確実に付ける)。
+#
+# IPv6 アドレスは nginx 仕様で `[...]` で囲む必要がある (ポート番号と区別するため)。
+# Railway は内部 DNS を IPv6 (例: fd12::10) で持たせているので、IPv4/IPv6 を
+# awk 内で分岐して適切に整形する。
 
 set -e
 
-NS=$(awk 'BEGIN{ORS=" "} $1=="nameserver" {print $2}' /etc/resolv.conf 2>/dev/null | sed 's/ *$//')
+NS=$(awk '$1=="nameserver" {
+    if ($2 ~ /:/) { printf "[%s] ", $2 }
+    else          { printf "%s ", $2 }
+}' /etc/resolv.conf 2>/dev/null | sed 's/ *$//')
 if [ -z "$NS" ]; then
     # /etc/resolv.conf が空 / 読めない場合のフォールバック。Cloudflare public DNS は
     # Railway 内部ホスト名 (*.railway.internal) を引けないが、nginx の起動ループは
