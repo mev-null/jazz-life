@@ -11,7 +11,6 @@ def _valid_kwargs(**overrides: object) -> dict[str, object]:
         "spotify_client_id": "cid",
         "spotify_client_secret": "secret",
         "spotify_redirect_uri": "http://localhost:8000/api/auth/callback",
-        "allowed_spotify_user_id": "owner",
         "jwt_secret": "x" * 32,
         "refresh_token_key": Fernet.generate_key().decode(),
     }
@@ -32,8 +31,3 @@ def test_short_jwt_secret_is_rejected() -> None:
 def test_invalid_fernet_key_is_rejected() -> None:
     with pytest.raises(ValidationError):
         Settings(**_valid_kwargs(refresh_token_key="not-a-real-fernet-key"))  # type: ignore[arg-type]
-
-
-def test_empty_allowlist_is_rejected() -> None:
-    with pytest.raises(ValidationError):
-        Settings(**_valid_kwargs(allowed_spotify_user_id=""))  # type: ignore[arg-type]

@@ -9,7 +9,7 @@
 
 GitHub Codespaces で開く場合:
 
-1. https://github.com/settings/codespaces で `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` / `ALLOWED_SPOTIFY_USER_ID` / `JWT_SECRET` / `REFRESH_TOKEN_KEY` を登録し、本リポジトリに access 許可
+1. https://github.com/settings/codespaces で `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` / `JWT_SECRET` / `REFRESH_TOKEN_KEY` を登録し、本リポジトリに access 許可
 2. codespace を Stop → Start（secret は shell 起動時に注入される）
 
 そのうえで:
@@ -99,6 +99,33 @@ npm run typecheck
 
 CI（[.github/workflows/backend.yml](.github/workflows/backend.yml)）: backend 変更で ruff format/check + mypy + pytest (unit / integration マトリクス) が走る。
 
+## Railway デプロイ（最小手順）
+
+ローカル開発と同じコードベースで動かす。差分は環境変数のみ（[ADR-005](docs/005-railway-deploy-prep.md) 参照）。
+
+1. Railway で **Postgres** プラグインを追加（`DATABASE_URL` が自動注入される）。
+2. **backend** service を追加。Build context: `app/backend`。env を以下で設定:
+   ```
+   SPOTIFY_CLIENT_ID        = <secret>
+   SPOTIFY_CLIENT_SECRET    = <secret>
+   JWT_SECRET               = <32+ chars>
+   REFRESH_TOKEN_KEY        = <Fernet.generate_key() 出力>
+   SPOTIFY_REDIRECT_URI     = https://<backend>.up.railway.app/api/auth/callback
+   FRONTEND_BASE_URL        = https://<frontend>.up.railway.app
+   CORS_ALLOW_ORIGINS       = https://<frontend>.up.railway.app
+   COOKIE_SECURE            = true
+   COOKIE_SAMESITE          = none
+   ```
+   invite 制御は **Spotify Developer Dashboard の Users and Access** に集約する（ADR-005）。アプリ側 allowlist は持たないので、Dashboard で許可した Spotify アカウントだけが OAuth を完了できる。
+3. **frontend** service を追加。Build context: `app/frontend`、Dockerfile target: `prod`。Build-time args:
+   ```
+   VITE_API_BASE   = https://<backend>.up.railway.app
+   VITE_USE_MOCK   = false
+   ```
+4. Spotify Developer Dashboard で `SPOTIFY_REDIRECT_URI` を **完全一致** で事前登録（trailing slash も含めて）。
+
+Migration は backend container 起動時に `alembic upgrade head` が走る（[entrypoint.sh](app/backend/entrypoint.sh)）。
+
 ## ドキュメント
 
 | ファイル | 内容 |
@@ -107,6 +134,8 @@ CI（[.github/workflows/backend.yml](.github/workflows/backend.yml)）: backend 
 | [docs/001-phase-a-revisions.md](docs/001-phase-a-revisions.md) | Phase A 終了時の確定事項（VinylRecord スキーマ改訂、既読、jacket 仕様等） |
 | [docs/002-phase-b-decisions.md](docs/002-phase-b-decisions.md) | Phase B 開始時の方針再評価（PostgreSQL / クリーンアーキ / orval / UUID v7 / 寛容 PUT 等）。**000 と矛盾時は 002 を正とする** |
 | [docs/003-artist-management.md](docs/003-artist-management.md) | アーティスト管理の 3 層構造 (registry / user_follows / records) と体験ライフサイクル。ADR-001 §1 の "followed" を supersede |
+| [docs/004-record-reorder.md](docs/004-record-reorder.md) | レコードの DnD 並び替え機能の設計（実装は別 PR） |
+| [docs/005-railway-deploy-prep.md](docs/005-railway-deploy-prep.md) | Railway デプロイ準備（env 駆動化 + frontend 本番ビルド） |
 | [docs/010-place.md](docs/010-place.md) | 場所マスタと訪問体験の設計 (Phase C 以降の concerts スクレイピングの土台) |
 | [docs/999-vision.md](docs/999-vision.md) | プロダクトビジョン |
 | [CLAUDE.md](CLAUDE.md) | Claude Code セッション向け作業規約 |

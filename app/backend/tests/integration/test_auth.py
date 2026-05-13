@@ -21,17 +21,12 @@ from app.main import app
 from app.models.user import User
 from app.services import auth_service as auth_service_module
 from app.services.auth_service import AuthService
-from tests.conftest import make_settings
 
-# `test_settings` fixture は conftest で提供。本ファイルでは
-# `allowed_spotify_user_id` を固定して使う必要があるので上書きする。
+# 旧 ALLOWED_SPOTIFY_USER_ID gate を撤廃済 (ADR-005)。本ファイルでは「正規ユーザー」
+# として固定の Spotify ID を使うが、これは callback で users テーブルに保存される
+# ID を識別するためだけのもので、403 判定には使われない。
 ALLOWED_USER = "owner-spotify-id"
 COOKIE_NAME = "jl_session"  # Settings.cookie_name のデフォルトと一致
-
-
-@pytest.fixture
-def test_settings() -> Settings:  # type: ignore[no-redef]
-    return make_settings(allowed_spotify_user_id=ALLOWED_USER)
 
 
 @pytest.fixture
@@ -134,32 +129,6 @@ def test_callback_happy_path_sets_session_and_persists_user(
     # refresh_token は Fernet 暗号化済みのため、平文と異なるはず
     assert user.refresh_token != "AQB-real-refresh-token"
     assert len(user.refresh_token) > len("AQB-real-refresh-token")
-
-
-def test_callback_disallowed_user_returns_403(
-    auth_client: TestClient,
-    httpx_mock: HTTPXMock,
-) -> None:
-    state, cookie_state = _login_and_capture_state(auth_client)
-
-    httpx_mock.add_response(
-        method="POST",
-        url="https://accounts.spotify.com/api/token",
-        json=_spotify_token_response(),
-    )
-    httpx_mock.add_response(
-        method="GET",
-        url="https://api.spotify.com/v1/me",
-        json=_spotify_me_response(spotify_id="intruder"),
-    )
-
-    auth_client.cookies.set(OAUTH_STATE_COOKIE_NAME, cookie_state)
-    res = auth_client.get(
-        "/api/auth/callback",
-        params={"code": "spotify-code", "state": state},
-        follow_redirects=False,
-    )
-    assert res.status_code == 403
 
 
 def test_callback_state_cookie_mismatch_returns_400(
