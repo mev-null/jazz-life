@@ -17,6 +17,8 @@ import type {
   VinylRecordCreateStatus,
   VinylRecordUpdate,
 } from "../../api/generated/model";
+import { useBreakpoint } from "../../hooks/useBreakpoint";
+import { MOBILE_UI_ENABLED } from "../../lib/featureFlags";
 import { InlineConfirm } from "../InlineConfirm";
 import { ModalShell } from "../ModalShell";
 
@@ -52,6 +54,11 @@ const inputClass =
 export function RecordFormModal({ mode, artists, onClose }: Props) {
   const queryClient = useQueryClient();
   const isEdit = mode?.kind === "edit";
+  const { isMobile } = useBreakpoint();
+  const mobile = MOBILE_UI_ENABLED && isMobile;
+  // Mobile では autoFocus で keyboard が即立ち上がるとモーダル本体が下に押し下げられて
+  // 操作しづらいので、初回フォーカスを抑止する。タップで明示的に focus する運用に倒す。
+  const autoFocusTitle = !mobile;
 
   const [title, setTitle] = useState("");
   // artistId は spotify_id を保持。artistQuery は input に表示する name の現値。
@@ -382,8 +389,13 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
       <form
         onSubmit={handleSubmit}
         autoComplete="off"
-        className="max-h-[90vh] w-[min(90vw,560px)] overflow-y-auto bg-paper p-8 text-left text-ink shadow-xl ring-1 ring-ink/10"
+        className={
+          mobile
+            ? "flex max-h-[90vh] w-[min(90vw,560px)] flex-col bg-paper text-left text-ink shadow-xl ring-1 ring-ink/10"
+            : "max-h-[90vh] w-[min(90vw,560px)] overflow-y-auto bg-paper p-8 text-left text-ink shadow-xl ring-1 ring-ink/10"
+        }
       >
+        <div className={mobile ? "min-h-0 flex-1 overflow-y-auto p-8" : "contents"}>
         <h2 className="border-b border-ink/15 pb-3 text-lg font-medium">
           {isEdit
             ? "Edit Record"
@@ -433,20 +445,24 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
           </div>
 
           <div>
-            <div className="flex items-end gap-3">
-              <div className="flex-1">
+            <div
+              className={
+                mobile ? "space-y-4" : "flex items-end gap-3"
+              }
+            >
+              <div className={mobile ? "" : "flex-1"}>
                 <span className={labelClass}>Title</span>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   required
-                  autoFocus
+                  autoFocus={autoFocusTitle}
                   autoComplete="off"
                   className={inputClass}
                 />
               </div>
-              <div className="relative flex-1">
+              <div className={mobile ? "relative" : "relative flex-1"}>
                 <span className={labelClass}>Artist</span>
                 <input
                   type="text"
@@ -484,7 +500,11 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
                 type="button"
                 onClick={handleSpotifySearch}
                 disabled={!title.trim() || spotifySearching}
-                className="shrink-0 bg-ink/10 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/20 disabled:cursor-not-allowed disabled:opacity-50"
+                className={
+                  mobile
+                    ? "w-full bg-ink/10 px-4 py-2.5 text-sm text-ink transition-colors hover:bg-ink/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    : "shrink-0 bg-ink/10 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/20 disabled:cursor-not-allowed disabled:opacity-50"
+                }
               >
                 {spotifySearching ? "Searching…" : "Search"}
               </button>
@@ -612,7 +632,15 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
           </label>
         </div>
 
-        <div className="mt-8 flex items-center gap-6 text-sm">
+        </div>
+
+        <div
+          className={
+            mobile
+              ? "flex items-center gap-6 border-t border-rule bg-paper px-8 py-5 text-sm"
+              : "mt-8 flex items-center gap-6 text-sm"
+          }
+        >
           {isEdit && mode.kind === "edit" && (
             <InlineConfirm
               // edit A → edit B のとき confirm 状態が引き継がれないよう
