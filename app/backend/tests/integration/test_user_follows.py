@@ -14,6 +14,12 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from app.core.db import get_session
+from app.core.repositories.artist_repository import ArtistRepository
+from app.core.repositories.record_favorite_track_repository import (
+    RecordFavoriteTrackRepository,
+)
+from app.core.repositories.record_repository import RecordRepository
+from app.core.repositories.user_collection_repository import UserCollectionRepository
 from app.core.repositories.user_follow_repository import UserFollowRepository
 from app.core.settings import Settings, get_settings
 from app.main import app
@@ -21,6 +27,8 @@ from app.models.artist import Artist
 from app.models.user import User
 from app.models.user_follow import UserFollow
 from app.routers.deps import get_current_user
+from app.schemas.record import VinylRecordCreate
+from app.services.record_service import RecordService
 from tests.conftest import make_settings
 
 
@@ -40,6 +48,16 @@ def _seed_artist(session: Session, spotify_id: str) -> None:
 def _seed_follow(session: Session, user_id, artist_id: str, archived: bool = False) -> None:
     session.add(UserFollow(user_id=user_id, artist_id=artist_id, archived_flag=archived))
     session.commit()
+
+
+def _make_record_service(session: Session) -> RecordService:
+    return RecordService(
+        record_repo=RecordRepository(session),
+        collection_repo=UserCollectionRepository(session),
+        favorite_track_repo=RecordFavoriteTrackRepository(session),
+        artist_repo=ArtistRepository(session),
+        follow_repo=UserFollowRepository(session),
+    )
 
 
 @pytest.fixture
@@ -159,87 +177,74 @@ def test_record_counts_empty_when_no_records(authed_client: TestClient) -> None:
     assert res.json() == {"items": []}
 
 
-def test_record_counts_counts_only_owned_for_active_follows(
+def test_record_counts_counts_only_owned_collections(
     authed_client: TestClient, session: Session
 ) -> None:
-    """current user の所有 (status='owned') レコードを follow 中 artist ごとに集計する。
+    """current user の status='owned' な user_collections を artist_id ごとに集計する。
 
-    検証する観点:
-    - status='wanted' な record は数えない (want list 除外)
-    - archived な follow の artist の record も数えない (followed_artists と整合)
-    - そもそも follow していない artist の record は数えない (理屈上は auto-follow
-      で発生しないはずだが、念のため JOIN 条件として担保)
+    ADR-006 後の挙動:
+    - status='wanted' は除外
+    - 他 user の collection は cross-user で混ざらない (user_id ガード)
+    - follow の archived 状態とは独立 (collection が user に直接 scope されているため)
     """
-    from datetime import UTC, datetime
-
     from sqlmodel import select
 
-    from app.models.record import VinylRecord
-
-    now = datetime.now(UTC)
     user = session.exec(select(User).where(User.spotify_id == "test-owner")).one()
-
     _seed_artist(session, "art-bill")
     _seed_artist(session, "art-avishai")
-    _seed_artist(session, "art-archived")
-    _seed_artist(session, "art-unfollowed")
-    _seed_follow(session, user.id, "art-bill", archived=False)
-    _seed_follow(session, user.id, "art-avishai", archived=False)
-    _seed_follow(session, user.id, "art-archived", archived=True)
 
-    session.add_all(
-        [
-            VinylRecord(
-                artist_id="art-bill",
-                title="owned-1",
-                source="manual",
-                status="owned",
-                display_order=1,
-                created_at=now,
-                updated_at=now,
-            ),
-            VinylRecord(
-                artist_id="art-bill",
-                title="owned-2",
-                source="manual",
-                status="owned",
-                display_order=2,
-                created_at=now,
-                updated_at=now,
-            ),
-            VinylRecord(
-                artist_id="art-avishai",
-                title="wanted-1",
-                source="manual",
-                status="wanted",  # 数えない
-                display_order=3,
-                created_at=now,
-                updated_at=now,
-            ),
-            VinylRecord(
-                artist_id="art-archived",
-                title="archived-owned",
-                source="manual",
-                status="owned",  # follow が archived なので数えない
-                display_order=4,
-                created_at=now,
-                updated_at=now,
-            ),
-            VinylRecord(
-                artist_id="art-unfollowed",
-                title="unfollowed-owned",
-                source="manual",
-                status="owned",  # そもそも follow 行が無いので数えない
-                display_order=5,
-                created_at=now,
-                updated_at=now,
-            ),
-        ]
+    service = _make_record_service(session)
+    service.create(
+        VinylRecordCreate(artist_id="art-bill", title="owned-1", status="owned"),
+        user.id,
     )
-    session.commit()
+    service.create(
+        VinylRecordCreate(artist_id="art-bill", title="owned-2", status="owned"),
+        user.id,
+    )
+    service.create(
+        VinylRecordCreate(artist_id="art-avishai", title="wanted-1", status="wanted"),
+        user.id,
+    )
 
     res = authed_client.get("/api/user-follows/record-counts")
 
     assert res.status_code == 200
     items = {item["artist_id"]: item["count"] for item in res.json()["items"]}
     assert items == {"art-bill": 2}
+
+
+def test_record_counts_isolated_between_users(session: Session, _test_settings: Settings) -> None:
+    """user A の collection は user B の record-counts に現れない。"""
+    from sqlmodel import select
+
+    _seed_artist(session, "art-x")
+    user_b = User(spotify_id="user-b", display_name="B", refresh_token="")
+    session.add(user_b)
+    session.commit()
+    session.refresh(user_b)
+    user_a = session.exec(select(User).where(User.spotify_id == "test-owner")).first()
+    if user_a is None:
+        user_a = User(spotify_id="test-owner", display_name="A", refresh_token="")
+        session.add(user_a)
+        session.commit()
+        session.refresh(user_a)
+
+    _make_record_service(session).create(
+        VinylRecordCreate(artist_id="art-x", title="A only"), user_a.id
+    )
+
+    def _override_session() -> Iterator[Session]:
+        yield session
+
+    app.dependency_overrides[get_session] = _override_session
+    app.dependency_overrides[get_settings] = lambda: _test_settings
+    app.dependency_overrides[get_current_user] = lambda: user_b
+    try:
+        c = TestClient(app)
+        res = c.get("/api/user-follows/record-counts")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert res.status_code == 200
+    assert res.json() == {"items": []}

@@ -7,15 +7,20 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.core.db import get_session
 from app.core.repositories.artist_repository import ArtistRepository
+from app.core.repositories.record_favorite_track_repository import (
+    RecordFavoriteTrackRepository,
+)
 from app.core.repositories.record_repository import RecordRepository
+from app.core.repositories.user_collection_repository import UserCollectionRepository
 from app.core.repositories.user_follow_repository import UserFollowRepository
 from app.core.settings import Settings, get_settings
 from app.main import app
 from app.models.artist import Artist
+from app.models.record import VinylRecord
 from app.models.user import User
 from app.routers.deps import get_current_user
 from app.schemas.record import VinylRecordCreate
@@ -39,11 +44,6 @@ def _new_record_payload(**overrides) -> dict:
 
 
 def _seed_artists_for_records(session: Session) -> None:
-    """records テストが使う 2 アーティストを直接投入する。
-
-    Phase B-3 で seeds/artists.json を空にしたため、`seeded_client` は
-    artists を作らない。records 側で必要な fixture artist は SQL で投入する。
-    """
     now = dt.datetime.now(dt.UTC)
     session.add_all(
         [
@@ -54,13 +54,28 @@ def _seed_artists_for_records(session: Session) -> None:
     session.commit()
 
 
-def _seed_user(session: Session) -> User:
-    """records POST が auth 必須になったので user_id を持つテストユーザを 1 件作る。"""
-    user = User(spotify_id="test-owner", display_name="Test Owner", refresh_token="")
+def _seed_user(session: Session, spotify_id: str = "test-owner") -> User:
+    user = User(spotify_id=spotify_id, display_name=f"User {spotify_id}", refresh_token="")
     session.add(user)
     session.commit()
     session.refresh(user)
     return user
+
+
+def _user_id(session: Session, spotify_id: str = "test-owner") -> UUID:
+    user = session.exec(select(User).where(User.spotify_id == spotify_id)).first()
+    assert user is not None
+    return user.id
+
+
+def _make_service(session: Session) -> RecordService:
+    return RecordService(
+        record_repo=RecordRepository(session),
+        collection_repo=UserCollectionRepository(session),
+        favorite_track_repo=RecordFavoriteTrackRepository(session),
+        artist_repo=ArtistRepository(session),
+        follow_repo=UserFollowRepository(session),
+    )
 
 
 @pytest.fixture
@@ -70,12 +85,6 @@ def _test_settings() -> Settings:
 
 @pytest.fixture
 def authed_records_client(session: Session, _test_settings: Settings) -> Iterator[TestClient]:
-    """records 全エンドポイント用の auth 済 TestClient。
-
-    - get_current_user override で固定 user を返す
-    - 必要な artist を直接 INSERT する (records が FK 参照するため)
-    - GET / POST / PUT / DELETE すべて auth ガードあり (本 PR で GET も塞いだ)
-    """
     _seed_artists_for_records(session)
     user = _seed_user(session)
 
@@ -94,8 +103,6 @@ def authed_records_client(session: Session, _test_settings: Settings) -> Iterato
 
 @pytest.fixture
 def unauthed_client(session: Session, _test_settings: Settings) -> Iterator[TestClient]:
-    """records に cookie 無しでアクセスして 401 を確認するための client。"""
-
     def _override_session() -> Iterator[Session]:
         yield session
 
@@ -105,6 +112,9 @@ def unauthed_client(session: Session, _test_settings: Settings) -> Iterator[Test
     app.dependency_overrides.clear()
 
 
+# ---- list / auth ----
+
+
 def test_list_empty(authed_records_client: TestClient) -> None:
     res = authed_records_client.get("/api/records")
     assert res.status_code == 200
@@ -112,13 +122,11 @@ def test_list_empty(authed_records_client: TestClient) -> None:
 
 
 def test_get_requires_auth(unauthed_client: TestClient) -> None:
-    """GET /api/records は auth 必須 (records が user-scope されるまでの入口ガード)。"""
     res = unauthed_client.get("/api/records")
     assert res.status_code == 401
 
 
 def test_post_requires_auth(unauthed_client: TestClient) -> None:
-    """records POST は auth 必須 (auto-follow に user_id が要るため)。"""
     res = unauthed_client.post("/api/records", json=_new_record_payload())
     assert res.status_code == 401
 
@@ -133,27 +141,18 @@ def test_create_then_list(authed_records_client: TestClient) -> None:
     assert body["title"] == "Waltz for Debby"
     assert body["source"] == "manual"
     assert body["purchase_currency"] == "JPY"
+    assert body["favorite_tracks"] == []
 
     res2 = authed_records_client.get("/api/records")
     assert len(res2.json()["items"]) == 1
 
 
 def test_create_auto_follows_artist(authed_records_client: TestClient, session: Session) -> None:
-    """POST /api/records が user_follows に (current_user.id, artist_id) を追加する。"""
-    user_id_before = UserFollowRepository(session).list_artist_ids(_seed_user_id(session))
-    assert user_id_before == []
+    user_id = _user_id(session)
+    assert UserFollowRepository(session).list_artist_ids(user_id) == []
     authed_records_client.post("/api/records", json=_new_record_payload())
-    follows = UserFollowRepository(session).list_artist_ids(_seed_user_id(session))
+    follows = UserFollowRepository(session).list_artist_ids(user_id)
     assert follows == [BILL_EVANS_ID]
-
-
-def _seed_user_id(session: Session) -> UUID:
-    """テストユーザの id を取り出すヘルパ。fixture 内で作ったユーザを再取得する。"""
-    from sqlmodel import select
-
-    user = session.exec(select(User).where(User.spotify_id == "test-owner")).first()
-    assert user is not None
-    return user.id
 
 
 def test_display_order_increments(authed_records_client: TestClient) -> None:
@@ -161,6 +160,9 @@ def test_display_order_increments(authed_records_client: TestClient) -> None:
     b = authed_records_client.post("/api/records", json=_new_record_payload(title="B")).json()
     c = authed_records_client.post("/api/records", json=_new_record_payload(title="C")).json()
     assert (a["display_order"], b["display_order"], c["display_order"]) == (1, 2, 3)
+
+
+# ---- update ----
 
 
 def test_partial_update_preserves_unsent_fields(
@@ -192,29 +194,8 @@ def test_put_unknown_id_returns_404(authed_records_client: TestClient) -> None:
 
 
 def test_put_requires_auth(unauthed_client: TestClient, session: Session) -> None:
-    """update_record も create / delete と同様に auth ガード必須。
-
-    record 行は authed client を使わず直接 INSERT する (両 fixture を同テストで
-    使うと dependency_overrides が積み重なって auth ガードが効かなくなる)。
-    """
-    from app.models.record import VinylRecord
-
     _seed_artists_for_records(session)
-    now = dt.datetime.now(dt.UTC)
-    record = VinylRecord(
-        artist_id=BILL_EVANS_ID,
-        title="x",
-        source="manual",
-        status="owned",
-        display_order=1,
-        created_at=now,
-        updated_at=now,
-    )
-    session.add(record)
-    session.commit()
-    session.refresh(record)
-
-    res = unauthed_client.put(f"/api/records/{record.id}", json={"memo": "no auth"})
+    res = unauthed_client.put(f"/api/records/{uuid.uuid4()}", json={"memo": "no auth"})
     assert res.status_code == 401
 
 
@@ -255,7 +236,7 @@ def test_post_unknown_artist_returns_404(authed_records_client: TestClient) -> N
     assert "artist" in res.json()["detail"]
 
 
-def test_put_can_swap_artist_id(authed_records_client: TestClient) -> None:
+def test_put_can_swap_artist_id_for_manual(authed_records_client: TestClient) -> None:
     created = authed_records_client.post(
         "/api/records",
         json=_new_record_payload(artist_id=BILL_EVANS_ID),
@@ -279,7 +260,21 @@ def test_put_to_unknown_artist_returns_404(authed_records_client: TestClient) ->
     assert res.status_code == 404
 
 
-# ---- DELETE /api/records/{id} ----
+# ---- conflict (duplicate Spotify album) ----
+
+
+def test_post_same_spotify_album_twice_returns_409(
+    authed_records_client: TestClient,
+) -> None:
+    """同じ user が同じ Spotify album を 2 回 POST → 1 回目 201、2 回目 409。"""
+    payload = _new_record_payload(spotify_album_id="alb-x", source="spotify", title="X")
+    res1 = authed_records_client.post("/api/records", json=payload)
+    assert res1.status_code == 201
+    res2 = authed_records_client.post("/api/records", json=payload)
+    assert res2.status_code == 409
+
+
+# ---- delete ----
 
 
 def test_delete_returns_204_and_removes(authed_records_client: TestClient) -> None:
@@ -287,34 +282,11 @@ def test_delete_returns_204_and_removes(authed_records_client: TestClient) -> No
 
     res = authed_records_client.delete(f"/api/records/{created['id']}")
     assert res.status_code == 204
-    # GET 一覧から消えていること
     assert authed_records_client.get("/api/records").json()["items"] == []
 
 
 def test_delete_requires_auth(unauthed_client: TestClient, session: Session) -> None:
-    """delete も POST と同様に auth ガード。
-
-    record は authed client を使わず直接 INSERT する (両 fixture を同テストで
-    使うと dependency_overrides が積み重なって auth ガードが効かなくなる)。
-    """
-    from app.models.record import VinylRecord
-
-    _seed_artists_for_records(session)
-    now = dt.datetime.now(dt.UTC)
-    record = VinylRecord(
-        artist_id=BILL_EVANS_ID,
-        title="x",
-        source="manual",
-        status="owned",
-        display_order=1,
-        created_at=now,
-        updated_at=now,
-    )
-    session.add(record)
-    session.commit()
-    session.refresh(record)
-
-    res = unauthed_client.delete(f"/api/records/{record.id}")
+    res = unauthed_client.delete(f"/api/records/{uuid.uuid4()}")
     assert res.status_code == 401
 
 
@@ -326,16 +298,100 @@ def test_delete_unknown_id_returns_404(authed_records_client: TestClient) -> Non
 def test_delete_does_not_touch_user_follows(
     authed_records_client: TestClient, session: Session
 ) -> None:
-    """delete で record は消えるが user_follows 行は残る。"""
     created = authed_records_client.post("/api/records", json=_new_record_payload()).json()
-    user_id = _seed_user_id(session)
+    user_id = _user_id(session)
     assert UserFollowRepository(session).list_artist_ids(user_id) == [BILL_EVANS_ID]
 
     res = authed_records_client.delete(f"/api/records/{created['id']}")
     assert res.status_code == 204
 
-    # follow は残る
     assert UserFollowRepository(session).list_artist_ids(user_id) == [BILL_EVANS_ID]
+
+
+def test_delete_does_not_touch_catalog(authed_records_client: TestClient, session: Session) -> None:
+    """user_collection 削除後も catalog (vinyl_records) 行は残る (ADR-006 §2.7)。"""
+    created = authed_records_client.post("/api/records", json=_new_record_payload()).json()
+    catalog_before = list(session.exec(select(VinylRecord)).all())
+    assert len(catalog_before) == 1
+
+    authed_records_client.delete(f"/api/records/{created['id']}")
+
+    session.expire_all()
+    catalog_after = list(session.exec(select(VinylRecord)).all())
+    assert len(catalog_after) == 1
+
+
+# ---- favorite_tracks via PUT body ----
+
+
+def test_create_with_favorite_tracks(authed_records_client: TestClient) -> None:
+    payload = _new_record_payload(
+        favorite_tracks=[
+            {"track_name": "So What", "spotify_track_id": "t1", "note": "great solo"},
+            {"track_name": "Freddie Freeloader", "spotify_track_id": "t2"},
+        ]
+    )
+    res = authed_records_client.post("/api/records", json=payload)
+    assert res.status_code == 201, res.text
+    body = res.json()
+    assert [t["track_name"] for t in body["favorite_tracks"]] == [
+        "So What",
+        "Freddie Freeloader",
+    ]
+
+
+def test_put_replaces_favorite_tracks(authed_records_client: TestClient) -> None:
+    created = authed_records_client.post(
+        "/api/records",
+        json=_new_record_payload(
+            favorite_tracks=[{"track_name": "Old", "spotify_track_id": "t-old"}]
+        ),
+    ).json()
+
+    res = authed_records_client.put(
+        f"/api/records/{created['id']}",
+        json={
+            "favorite_tracks": [
+                {"track_name": "New 1", "spotify_track_id": "t1"},
+                {"track_name": "New 2", "spotify_track_id": "t2"},
+            ]
+        },
+    )
+    assert res.status_code == 200
+    assert [t["track_name"] for t in res.json()["favorite_tracks"]] == [
+        "New 1",
+        "New 2",
+    ]
+
+
+def test_put_empty_favorite_tracks_clears(authed_records_client: TestClient) -> None:
+    created = authed_records_client.post(
+        "/api/records",
+        json=_new_record_payload(favorite_tracks=[{"track_name": "T", "spotify_track_id": "t1"}]),
+    ).json()
+
+    res = authed_records_client.put(f"/api/records/{created['id']}", json={"favorite_tracks": []})
+    assert res.status_code == 200
+    assert res.json()["favorite_tracks"] == []
+
+
+def test_put_duplicate_favorite_track_spotify_id_returns_409(
+    authed_records_client: TestClient,
+) -> None:
+    created = authed_records_client.post("/api/records", json=_new_record_payload()).json()
+    res = authed_records_client.put(
+        f"/api/records/{created['id']}",
+        json={
+            "favorite_tracks": [
+                {"track_name": "A", "spotify_track_id": "t1"},
+                {"track_name": "B", "spotify_track_id": "t1"},
+            ]
+        },
+    )
+    assert res.status_code == 409
+
+
+# ---- concurrency / display_order ----
 
 
 def test_concurrent_create_assigns_unique_display_order(engine: Engine) -> None:
@@ -349,11 +405,7 @@ def test_concurrent_create_assigns_unique_display_order(engine: Engine) -> None:
 
     def worker(i: int) -> int:
         with Session(engine) as session:
-            service = RecordService(
-                RecordRepository(session),
-                ArtistRepository(session),
-                UserFollowRepository(session),
-            )
+            service = _make_service(session)
             record = service.create(
                 VinylRecordCreate(artist_id=BILL_EVANS_ID, title=f"R{i}"), user_id
             )
@@ -363,3 +415,62 @@ def test_concurrent_create_assigns_unique_display_order(engine: Engine) -> None:
         orders = sorted(ex.map(worker, range(n_workers)))
 
     assert orders == list(range(1, n_workers + 1))
+
+
+# ---- cross-user isolation ----
+
+
+def test_list_for_user_isolates_collections(session: Session, _test_settings: Settings) -> None:
+    """user A の record は user B の GET /api/records に出ない。"""
+    _seed_artists_for_records(session)
+    user_a = _seed_user(session, spotify_id="user-a")
+    user_b = _seed_user(session, spotify_id="user-b")
+
+    _make_service(session).create(
+        VinylRecordCreate(artist_id=BILL_EVANS_ID, title="A only"), user_a.id
+    )
+    _make_service(session).create(
+        VinylRecordCreate(artist_id=BILL_EVANS_ID, title="B only"), user_b.id
+    )
+
+    def _override_session() -> Iterator[Session]:
+        yield session
+
+    app.dependency_overrides[get_session] = _override_session
+    app.dependency_overrides[get_settings] = lambda: _test_settings
+    try:
+        app.dependency_overrides[get_current_user] = lambda: user_a
+        c = TestClient(app)
+        titles_a = [r["title"] for r in c.get("/api/records").json()["items"]]
+        app.dependency_overrides[get_current_user] = lambda: user_b
+        c = TestClient(app)
+        titles_b = [r["title"] for r in c.get("/api/records").json()["items"]]
+    finally:
+        app.dependency_overrides.clear()
+
+    assert titles_a == ["A only"]
+    assert titles_b == ["B only"]
+
+
+def test_update_other_users_record_returns_404(session: Session, _test_settings: Settings) -> None:
+    _seed_artists_for_records(session)
+    user_a = _seed_user(session, spotify_id="user-a")
+    user_b = _seed_user(session, spotify_id="user-b")
+
+    b_record = _make_service(session).create(
+        VinylRecordCreate(artist_id=BILL_EVANS_ID, title="B"), user_b.id
+    )
+
+    def _override_session() -> Iterator[Session]:
+        yield session
+
+    app.dependency_overrides[get_session] = _override_session
+    app.dependency_overrides[get_settings] = lambda: _test_settings
+    app.dependency_overrides[get_current_user] = lambda: user_a
+    try:
+        c = TestClient(app)
+        res = c.put(f"/api/records/{b_record.id}", json={"memo": "hack"})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert res.status_code == 404

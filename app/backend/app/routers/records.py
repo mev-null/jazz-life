@@ -15,12 +15,15 @@ router = APIRouter(prefix="/api/records", tags=["records"])
 @router.get("", response_model=ListResponse[VinylRecordRead])
 def list_records(
     service: RecordService = Depends(get_record_service),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> ListResponse[VinylRecordRead]:
-    """auth 必須。records が user-scope されるのは別 PR (ADR-006) で対応。
-    本 PR は「未認証で全レコードが list できる」状態を閉塞するための入口ガード。"""
-    rows = service.list_all()
-    return ListResponse(items=[VinylRecordRead.model_validate(row) for row in rows])
+    """current user の collection を返す (ADR-006 §3.4)。
+
+    response の `id` は `user_collections.id`、flat shape で catalog + ownership
+    + favorite_tracks を 1 件に詰める。
+    """
+    items = service.list_for_user(current_user.id)
+    return ListResponse(items=items)
 
 
 @router.post("", response_model=VinylRecordRead, status_code=status.HTTP_201_CREATED)
@@ -29,11 +32,10 @@ def create_record(
     service: RecordService = Depends(get_record_service),
     current_user: User = Depends(get_current_user),
 ) -> VinylRecordRead:
-    """record を 1 件作成。RecordService.create が同時に user_follows に
-    auto-follow を入れるので、続く release sync で正しく対象になる。"""
+    """record を 1 件作成。catalog find-or-create + user_collections INSERT +
+    auto-follow を 1 TX で行う。UNIQUE(user_id, vinyl_record_id) 違反は 409。"""
     with http_errors():
-        record = service.create(body, current_user.id)
-        return VinylRecordRead.model_validate(record)
+        return service.create(body, current_user.id)
 
 
 @router.put("/{id}", response_model=VinylRecordRead)
@@ -41,23 +43,21 @@ def update_record(
     id: uuid.UUID,
     body: VinylRecordUpdate,
     service: RecordService = Depends(get_record_service),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> VinylRecordRead:
+    """user_collections を user_id ガード付きで部分更新。catalog 系は
+    `source='manual'` のみ書く (ADR-006 §2.5)。`spotify_album_id` を埋め直すと
+    manual→spotify promote 経路 (§2.9)。"""
     with http_errors():
-        record = service.update_partial(id, body)
-        return VinylRecordRead.model_validate(record)
+        return service.update_partial(id, body, current_user.id)
 
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_record(
     id: uuid.UUID,
     service: RecordService = Depends(get_record_service),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> None:
-    """record を物理削除。auth 必須 (POST と揃える)。
-
-    user_follows は意図的に触らないので、最後の 1 件を消しても follow は残り、
-    次の sync では引き続き対象になる。
-    """
+    """user_collections を物理削除 (favorites も CASCADE)。catalog は触らない。"""
     with http_errors():
-        service.delete(id)
+        service.delete(id, current_user.id)
