@@ -25,8 +25,13 @@ RUN chmod +x ./entrypoint.sh
 EXPOSE 8000
 
 ENTRYPOINT ["./entrypoint.sh"]
-# CMD は shell 形式にして ${PORT} を取り込む。Railway は app に PORT env を
-# 注入してくる仕様で、これを無視するとルーティング不整合になりうる。
-# ローカル / docker-compose では override が exec 形式 (port 8000 固定) で
-# CMD を完全置換するため、この shell 形式は触られない。
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# dual-stack (IPv4 + IPv6) で listen する launcher を経由して uvicorn を起動。
+# Railway は edge → container を IPv4 で、service-to-service の private network
+# を IPv6 で来るため、両方受ける必要がある。`uvicorn --host ::` だけでは kernel の
+# `bindv6only` 設定次第になり、Railway コンテナでは IPv4 が受けられず 502 になる
+# 事例があったため、socket を `IPV6_V6ONLY=0` で事前 bind して fd 経由で渡す。
+# 詳細は app/server.py の docstring 参照。
+#
+# ローカル / docker-compose では override が exec 形式で CMD を完全置換するため、
+# この launcher は触られない (=既存挙動を維持)。
+CMD ["python", "-m", "app.server"]
