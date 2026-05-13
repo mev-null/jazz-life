@@ -36,16 +36,21 @@ RUN npm run build
 FROM nginx:1.27-alpine AS prod
 COPY --from=builder /app/dist /usr/share/nginx/html
 # nginx:alpine の既定 entrypoint が /etc/nginx/templates/*.template を envsubst で
-# 展開してから /etc/nginx/conf.d/ に書き出す。${PORT} / backend 内部接続先 /
-# ${NGINX_LOCAL_RESOLVERS} を実値に差し替える。NGINX_ENVSUBST_FILTER で展開対象を
-# 限定し、nginx 内部変数 ($uri など) を保護する。NGINX_LOCAL_RESOLVERS が filter に
-# 含まれていないと文字列のまま残り、nginx が起動時に host-not-found で落ちる。
+# 展開してから /etc/nginx/conf.d/ に書き出す。${PORT} と backend 内部接続先のみを
+# envsubst で展開し、resolver は別途 25-patch-resolver.sh が sed 置換する。
+# (PR #20 / #21 で envsubst 経由の ${NGINX_LOCAL_RESOLVERS} 展開が動かず 2 回事故
+# 発生。原因が確定できないので envsubst から外す。)
 COPY nginx.conf /etc/nginx/templates/default.conf.template
+# --chmod=755 で実行権限を確実に付与 (git の +x bit に依らない)。
+COPY --chmod=755 docker-entrypoint.d/25-patch-resolver.sh /docker-entrypoint.d/25-patch-resolver.sh
 ENV PORT=80
 # Railway 環境では BACKEND_INTERNAL_HOST=backend.railway.internal, _PORT=8080 を
 # service 変数で上書きする。デフォルトはローカル docker-compose 用 (backend:8000)。
 ENV BACKEND_INTERNAL_HOST=backend
 ENV BACKEND_INTERNAL_PORT=8000
-ENV NGINX_ENVSUBST_FILTER=^(PORT|BACKEND_INTERNAL_HOST|BACKEND_INTERNAL_PORT|NGINX_LOCAL_RESOLVERS)$
+# NGINX_ENVSUBST_FILTER の末尾 $ は BuildKit が変数開始記号として誤認しうるため
+# \$ で escape する。Dockerfile のこの ENV 行で末尾を quote / escape しないと
+# regex anchor が脱落して PORT_X など余計な env まで envsubst の対象になる。
+ENV NGINX_ENVSUBST_FILTER=^(PORT|BACKEND_INTERNAL_HOST|BACKEND_INTERNAL_PORT)\$
 EXPOSE 80
 # CMD は nginx:alpine 既定 (envsubst → nginx) に任せる
