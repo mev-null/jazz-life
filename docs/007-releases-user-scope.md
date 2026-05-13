@@ -1,6 +1,6 @@
 # ADR-007: releases を catalog + release_read_states に分離 + 配信スコープを follow でフィルタ
 
-**Status**: Proposed | **Date**: 2026-05-13
+**Status**: Accepted | **Date**: 2026-05-13
 **Related**: [ADR-001](./001-phase-a-revisions.md) §2.2（元案の feed_read_state）, [ADR-003](./003-artist-management.md) §1.2 原則 1 / 7（主従の反転、物質性の度合いがメモの粒度を決める）, [ADR-005](./005-railway-deploy-prep.md) §2.10（運用ガード）, [ADR-006](./006-records-user-scope-schema.md)（catalog/ownership 2 層分離パターン）
 
 ---
