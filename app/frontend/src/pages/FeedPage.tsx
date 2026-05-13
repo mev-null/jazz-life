@@ -19,15 +19,21 @@ import {
   RecordFormModal,
   type FormMode,
 } from "../components/records/RecordFormModal";
+import { useBreakpoint } from "../hooks/useBreakpoint";
 import {
   formatLongDate,
   formatShortDate,
   partitionByToday,
 } from "../lib/dates";
+import { MOBILE_UI_ENABLED } from "../lib/featureFlags";
 import { formatVenue } from "../lib/formatVenue";
 import { findArtistInConcert } from "../lib/matchArtist";
 import { useReadState } from "../lib/useReadState";
 import type { Artist, Concert, Release } from "../types/api";
+
+type FeedTimelineItem =
+  | { kind: "release"; date: string; data: Release }
+  | { kind: "concert"; date: string; data: Concert };
 
 function ConcertRow({
   concert,
@@ -39,7 +45,7 @@ function ConcertRow({
 }: {
   concert: Concert;
   artists: Artist[];
-  index: number;
+  index?: number;
   isPast: boolean;
   isRead: boolean;
   onClick: () => void;
@@ -56,9 +62,11 @@ function ConcertRow({
           <span className="block h-1.5 w-1.5 rounded-full bg-ink" />
         )}
       </span>
-      <span className="w-6 shrink-0 text-ink-faint tabular-nums">
-        {String(index).padStart(2, "0")}
-      </span>
+      {index !== undefined && (
+        <span className="w-6 shrink-0 text-ink-faint tabular-nums">
+          {String(index).padStart(2, "0")}
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <div className="truncate font-medium">
           {concert.title}
@@ -197,6 +205,9 @@ export function FeedPage() {
 
   const todayLabel = formatLongDate(new Date().toISOString());
 
+  const { isMobile } = useBreakpoint();
+  const unifiedMobile = MOBILE_UI_ENABLED && isMobile;
+
   const releaseParts = partitionByToday(
     releases.data?.items ?? [],
     (r) => r.release_date,
@@ -206,10 +217,105 @@ export function FeedPage() {
     (c) => c.date,
   );
 
+  // Mobile 統合タイムライン用のマージ。release / concert を 1 配列にして
+  // partitionByToday に通す。順序は partitionByToday に揃えるので
+  // ここでは sort 不要 (upcoming 昇順 / past 降順は内部で行う)。
+  const mergedItems: FeedTimelineItem[] = unifiedMobile
+    ? [
+        ...(releases.data?.items ?? []).map((r) => ({
+          kind: "release" as const,
+          date: r.release_date,
+          data: r,
+        })),
+        ...(concerts.data?.items ?? []).map((c) => ({
+          kind: "concert" as const,
+          date: c.date,
+          data: c,
+        })),
+      ]
+    : [];
+  const mergedParts = partitionByToday(mergedItems, (i) => i.date);
+
+  function renderTimelineItem(item: FeedTimelineItem, isPast: boolean) {
+    if (item.kind === "release") {
+      return (
+        <ReleaseRow
+          key={`release:${item.data.spotify_id}`}
+          release={item.data}
+          artist={artistById(item.data.artist_id)}
+          isPast={isPast}
+          isRead={item.data.is_read}
+          onClick={() => handleReleaseRowClick(item.data)}
+        />
+      );
+    }
+    return (
+      <ConcertRow
+        key={`concert:${item.data.id}`}
+        concert={item.data}
+        artists={artists.data?.items ?? []}
+        isPast={isPast}
+        isRead={isRead(`concert:${item.data.id}`)}
+        onClick={() => openConcert(item.data)}
+      />
+    );
+  }
+
+  const syncStatusLine = syncMutation.isError ? (
+    <span className="text-ink-mute">sync failed</span>
+  ) : syncMutation.data?.first_error ? (
+    <span className="text-ink-mute">
+      partial: {syncMutation.data.albums_ingested} ingested ·{" "}
+      {syncMutation.data.artists_total - syncMutation.data.artists_succeeded}{" "}
+      failed
+    </span>
+  ) : syncStatusQ.data?.last_success_at ? (
+    <span>last sync {formatShortDate(syncStatusQ.data.last_success_at)}</span>
+  ) : (
+    <span>not synced yet</span>
+  );
+
   return (
     <section>
       <p className="text-right text-lg italic text-ink-mute">{todayLabel}</p>
 
+      {unifiedMobile ? (
+        <div className="mt-10">
+          <h1 className="flex items-baseline gap-3 text-base">
+            <span className="font-medium">Feed</span>
+            <span className="text-ink-faint tabular-nums">
+              {mergedParts.upcoming.length} upcoming ·{" "}
+              {mergedParts.past.length} past
+            </span>
+            <button
+              type="button"
+              onClick={() => syncMutation.mutate()}
+              disabled={syncMutation.isPending}
+              className="ml-auto cursor-pointer text-xs italic text-ink-mute transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {syncMutation.isPending ? "syncing…" : "sync now"}
+            </button>
+          </h1>
+          <div className="mt-1 text-xs italic text-ink-faint">
+            {syncStatusLine}
+          </div>
+          <div className="mt-4">
+            {mergedParts.upcoming.length > 0 && (
+              <div className="divide-y divide-ink-faint/30">
+                {mergedParts.upcoming.map((item) =>
+                  renderTimelineItem(item, false),
+                )}
+              </div>
+            )}
+            <TodayDivider />
+            {mergedParts.past.length > 0 && (
+              <div className="divide-y divide-ink-faint/30">
+                {mergedParts.past.map((item) => renderTimelineItem(item, true))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
       <div className="mt-10 grid grid-cols-1 gap-x-30 gap-y-16 md:grid-cols-2">
         {/* Releases */}
         <div>
@@ -231,21 +337,7 @@ export function FeedPage() {
             </button>
           </h1>
           <div className="mt-1 text-xs italic text-ink-faint">
-            {syncMutation.isError ? (
-              <span className="text-ink-mute">sync failed</span>
-            ) : syncMutation.data?.first_error ? (
-              <span className="text-ink-mute">
-                partial: {syncMutation.data.albums_ingested} ingested ·{" "}
-                {syncMutation.data.artists_total - syncMutation.data.artists_succeeded}{" "}
-                failed
-              </span>
-            ) : syncStatusQ.data?.last_success_at ? (
-              <span>
-                last sync {formatShortDate(syncStatusQ.data.last_success_at)}
-              </span>
-            ) : (
-              <span>not synced yet</span>
-            )}
+            {syncStatusLine}
           </div>
           <div className="mt-4">
             {releaseParts.upcoming.length > 0 && (
@@ -326,6 +418,7 @@ export function FeedPage() {
           </div>
         </div>
       </div>
+      )}
 
       <FeedDetailModal
         item={openItem}

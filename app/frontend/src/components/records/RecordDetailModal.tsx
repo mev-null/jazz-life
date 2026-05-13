@@ -136,7 +136,7 @@ export function RecordDetailModal({
 
   return (
     <ModalShell onClose={onClose}>
-      <div className="relative aspect-square w-[min(72vh,520px)]">
+      <div className="relative aspect-square w-[min(72vh,90vw,440px)]">
         <BackFace
           record={record}
           artistName={artistName}

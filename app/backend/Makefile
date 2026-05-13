@@ -13,7 +13,7 @@ unexport VIRTUAL_ENV
 
 .DEFAULT_GOAL := help
 .PHONY: help \
-        dev run sync sync-dev add lock \
+        dev dev-mobile run sync sync-dev add lock \
         test lint lint-fix fmt typecheck check \
         shell logs restart db-shell \
         migrate migration migrate-down
@@ -23,6 +23,7 @@ help:
 	@echo ""
 	@echo "  起動 (docker, 通常の開発はこっち)"
 	@echo "    dev                 backend コンテナをフォアグラウンドで起動 (HMR + ログ)"
+	@echo "    dev-mobile          Codespaces 公開 URL でバインドして起動 (iPhone 実機確認用)"
 	@echo ""
 	@echo "  起動 (host, no docker)"
 	@echo "    run                 uvicorn を host で --reload 起動"
@@ -57,6 +58,27 @@ help:
 # 初回は image build が走るので時間がかかる。db は devcontainer postStartCommand で既に上がっている前提。
 dev:
 	cd $(COMPOSE_DIR) && docker compose up --build backend
+
+# ---------- 起動（docker, Codespaces 公開 URL バインド） ----------
+# iPhone 等の実機から確認したい時用。Codespaces 限定。
+# 事前準備:
+#   1. Spotify Dashboard で Redirect URI に
+#      `https://<CODESPACE_NAME>-8000.app.github.dev/api/auth/callback` を追加
+#   2. VS Code の PORTS タブで 5173 / 8000 の visibility を Public に変更
+# 5173 と 8000 は別ホスト扱いになるため SameSite=None; Secure cookie が必須。
+dev-mobile:
+	@test -n "$$CODESPACE_NAME" || { echo "CODESPACE_NAME 未設定 (Codespaces 専用 target)"; exit 1; }
+	@DOMAIN=$${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}; \
+	echo "→ frontend public URL: https://$$CODESPACE_NAME-5173.$$DOMAIN"; \
+	echo "→ backend  public URL: https://$$CODESPACE_NAME-8000.$$DOMAIN"; \
+	echo "  (verify the redirect URI is registered in Spotify Dashboard / PORTS are set to Public)"; \
+	cd $(COMPOSE_DIR) && \
+	SPOTIFY_REDIRECT_URI="https://$$CODESPACE_NAME-8000.$$DOMAIN/api/auth/callback" \
+	FRONTEND_BASE_URL="https://$$CODESPACE_NAME-5173.$$DOMAIN" \
+	CORS_ALLOW_ORIGINS="https://$$CODESPACE_NAME-5173.$$DOMAIN" \
+	COOKIE_SECURE=true \
+	COOKIE_SAMESITE=none \
+	docker compose up --build backend
 
 # ---------- 起動（host） ----------
 run:

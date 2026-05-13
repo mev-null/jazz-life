@@ -13,6 +13,8 @@ import {
   formatShortDate,
   partitionByToday,
 } from "../../lib/dates";
+import { useBreakpoint } from "../../hooks/useBreakpoint";
+import { MOBILE_UI_ENABLED } from "../../lib/featureFlags";
 import { formatVenue } from "../../lib/formatVenue";
 import { concertMatchesArtist } from "../../lib/matchArtist";
 import type {
@@ -31,9 +33,11 @@ import { RecordsAllModal } from "../records/RecordsAllModal";
 import { ArtistAvatar } from "./ArtistAvatar";
 
 // detail modal のセクションが「拡大表示」(別 modal で全件) に切り替わる件数閾値。
-// 8 = sm+ の 4 列 grid で 2 行分。これ以上溜まったらグリッド内の「+」タイルは
-// 隠して "view all" 経由で拡大表示モーダルに誘導する。
+// PC は 4 列 grid で 2 行分 = 8 件。Mobile は 2 列 grid だが詳細モーダル自体が
+// 縦長で 3 セクション (owned/wanted/activity) を同時に出すので、各セクションは
+// プレビュー 2 件に抑えて "view all" 経由で全件閲覧へ。
 const SECTION_PREVIEW_LIMIT = 8;
+const SECTION_MOBILE_PREVIEW_LIMIT = 2;
 
 type TimelineItem =
   | { kind: "release"; data: Release; date: string }
@@ -137,23 +141,23 @@ function ActivityRow({
 function RecordsSection({
   label,
   records,
+  previewLimit,
   onRecordClick,
   onAddRecord,
   onViewAll,
 }: {
   label: string;
   records: VinylRecord[];
+  previewLimit: number;
   onRecordClick: (record: VinylRecord) => void;
   onAddRecord: () => void;
   onViewAll: () => void;
 }) {
-  // ≤ SECTION_PREVIEW_LIMIT - 1 件: detail 内グリッドに「+」も並べる (現状維持)
-  // ≥ SECTION_PREVIEW_LIMIT 件: 先頭 N 件だけプレビューし、"view all" 経由で
+  // ≤ previewLimit - 1 件: detail 内グリッドに「+」も並べる (現状維持)
+  // ≥ previewLimit 件: 先頭 N 件だけプレビューし、"view all" 経由で
   // 拡大表示モーダルに誘導する。グリッド内の「+」は出さない。
-  const exceedsPreview = records.length >= SECTION_PREVIEW_LIMIT;
-  const visible = exceedsPreview
-    ? records.slice(0, SECTION_PREVIEW_LIMIT)
-    : records;
+  const exceedsPreview = records.length >= previewLimit;
+  const visible = exceedsPreview ? records.slice(0, previewLimit) : records;
   return (
     <section className="mt-8">
       <h3 className="flex items-baseline gap-3 text-base">
@@ -169,7 +173,7 @@ function RecordsSection({
           </button>
         )}
       </h3>
-      <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {visible.map((r) => (
           <button
             key={r.id}
@@ -210,6 +214,12 @@ export function ArtistDetailModal({
   onConcertClick,
   onAddRecord,
 }: Props) {
+  const { isMobile } = useBreakpoint();
+  const previewLimit =
+    MOBILE_UI_ENABLED && isMobile
+      ? SECTION_MOBILE_PREVIEW_LIMIT
+      : SECTION_PREVIEW_LIMIT;
+
   // どちらのセクションを「拡大表示」しているか。null = 拡大表示は閉じている。
   // detail modal が閉じる (artist=null) / 別アーティストに切り替わる時にリセットして、
   // 「Artist A の Records を拡大表示したまま Artist B を開く」ような状態の引きずりを防ぐ。
@@ -307,6 +317,7 @@ export function ArtistDetailModal({
         <RecordsSection
           label="On the shelf"
           records={ownedRecords}
+          previewLimit={previewLimit}
           onRecordClick={onRecordClick}
           onAddRecord={() => onAddRecord(artist, "owned")}
           onViewAll={() => setExpandedSection("owned")}
@@ -316,6 +327,7 @@ export function ArtistDetailModal({
         <RecordsSection
           label="On the hunt"
           records={wantedRecords}
+          previewLimit={previewLimit}
           onRecordClick={onRecordClick}
           onAddRecord={() => onAddRecord(artist, "wanted")}
           onViewAll={() => setExpandedSection("wanted")}

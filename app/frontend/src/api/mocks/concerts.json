@@ -54,6 +54,50 @@
       "status": "scheduled",
       "first_seen_at": "2026-03-10T03:00:00Z",
       "last_seen_at": "2026-04-22T03:00:00Z"
+    },
+    {
+      "id": "blue_note_tokyo_2026-03-04_makoto-ozone",
+      "venue_id": "blue_note_tokyo",
+      "date": "2026-03-04",
+      "title": "Makoto Ozone Solo",
+      "url": "https://www.bluenote.co.jp/jp/artists/makoto-ozone/",
+      "stage_times": "18:30,21:00",
+      "status": "scheduled",
+      "first_seen_at": "2026-01-15T03:00:00Z",
+      "last_seen_at": "2026-03-04T03:00:00Z"
+    },
+    {
+      "id": "blue_note_tokyo_2026-10-15_gabrielle-cavassa",
+      "venue_id": "blue_note_tokyo",
+      "date": "2026-10-15",
+      "title": "Gabrielle Cavassa Quartet",
+      "url": "https://www.bluenote.co.jp/jp/artists/gabrielle-cavassa/",
+      "stage_times": "18:30,21:00",
+      "status": "scheduled",
+      "first_seen_at": "2026-05-10T03:00:00Z",
+      "last_seen_at": "2026-05-12T03:00:00Z"
+    },
+    {
+      "id": "cotton_club_2026-11-20_bill-evans-tribute",
+      "venue_id": "cotton_club",
+      "date": "2026-11-20",
+      "title": "Bill Evans Tribute featuring Eddie Gomez",
+      "url": "https://www.cottonclubjapan.co.jp/",
+      "stage_times": "19:00",
+      "status": "scheduled",
+      "first_seen_at": "2026-05-12T03:00:00Z",
+      "last_seen_at": "2026-05-12T03:00:00Z"
+    },
+    {
+      "id": "billboard_live_tokyo_2027-01-22_avishai-cohen-trio",
+      "venue_id": "billboard_live_tokyo",
+      "date": "2027-01-22",
+      "title": "Avishai Cohen Trio Japan Tour 2027",
+      "url": "https://www.billboard-live.com/",
+      "stage_times": "19:30",
+      "status": "scheduled",
+      "first_seen_at": "2026-05-12T03:00:00Z",
+      "last_seen_at": "2026-05-12T03:00:00Z"
     }
   ]
 }
