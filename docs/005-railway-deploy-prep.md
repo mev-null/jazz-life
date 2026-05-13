@@ -124,6 +124,18 @@ git show <commit>:app/backend/app/services/auth_service.py > /tmp/old_auth_servi
 
 Railway の "release command" / "deploy hook" に分離するのが本来の作法だが、シングルインスタンス運用かつ migration が冪等な前提で、当面は [entrypoint.sh](../app/backend/entrypoint.sh) の `alembic upgrade head` を維持する。複数インスタンスでの競合は advisory lock で守る Alembic 構成は本 ADR のスコープ外。
 
+### 2.10 Replicas は 1 必須 / Spotify Dashboard は自分のみ（運用ガード）
+
+OAuth state を [auth_service.py](../app/backend/app/services/auth_service.py) の `_state_store` (process-local dict) で保持しているため、**Railway service の Replicas は 1 のまま運用する**。callback が別 replica にルーティングされると state 検証が破綻し、OAuth フロー全体が落ちる。マルチ replica 化する場合は state を Redis 等に外出しする別作業が必要。
+
+加えて、`vinyl_records` が user_id でスコープされていない状態のため、**Spotify Developer Dashboard には自分の Spotify アカウントだけを登録する**。複数 user が OAuth を完了すると同じ records を共有・改竄できてしまう。schema 刷新で本問題を恒久解決する設計は [ADR-006](./006-records-user-scope-schema.md) で計画中、実装は別 PR で行う。
+
+### 2.11 `/docs` / `/openapi.json` の露出を env で切り替え
+
+FastAPI は既定で `/docs` (Swagger UI) と `/openapi.json` を晒す。本番ではこれを **`EXPOSE_OPENAPI_DOCS=false`** で塞ぐ。ローカル / CI では既定 true で残す (frontend orval や手動 API 探索のため)。
+
+実装は [main.py](../app/backend/app/main.py) の `_resolve_docs_kwargs()` で env を直読み (CORS と同じく Settings 経由にすると test 環境で評価できなくなるため module-level の env 直読みに倒す)。
+
 ---
 
 ## 3. Specification
@@ -210,11 +222,14 @@ FRONTEND_BASE_URL (https://<frontend>.up.railway.app)
 CORS_ALLOW_ORIGINS (https://<frontend>.up.railway.app)
 COOKIE_SECURE=true
 COOKIE_SAMESITE=none
+EXPOSE_OPENAPI_DOCS=false
 ```
 
 `ALLOWED_SPOTIFY_USER_ID` は本 ADR §2.8 で撤廃したため env リストに含めない。
 
 Spotify Developer Dashboard に上記 `SPOTIFY_REDIRECT_URI` を **完全一致** で事前登録する旨も明記。
+
+加えて、本 PR 時点では **Replicas=1 / Dashboard に自分のみ登録 / `EXPOSE_OPENAPI_DOCS=false`** の 3 点を README の「Railway デプロイ手順」セクションで明示する (詳細は §2.10 / §2.11)。
 
 ---
 

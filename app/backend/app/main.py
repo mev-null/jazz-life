@@ -28,6 +28,20 @@ def _resolve_cors_allow_origins() -> list[str]:
     return parsed or _DEFAULT_CORS_ORIGINS
 
 
+def _resolve_docs_kwargs() -> dict[str, str | None]:
+    """`EXPOSE_OPENAPI_DOCS` env で `/docs` / `/redoc` / `/openapi.json` の露出を
+    切り替える。デフォルト true (ローカル開発と CI のため)。本番では false を
+    設定して API surface を外に出さない。
+
+    CORS と同じく、Settings に置かず env を直読みする (test 環境で env 未設定の
+    まま app を構築できるようにするため)。
+    """
+    raw = os.environ.get("EXPOSE_OPENAPI_DOCS", "true").strip().lower()
+    if raw in ("1", "true", "yes"):
+        return {}
+    return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     with Session(get_engine()) as session:
@@ -35,7 +49,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
 
 
-app = FastAPI(title="jazz-life", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="jazz-life",
+    version="0.1.0",
+    lifespan=lifespan,
+    **_resolve_docs_kwargs(),  # type: ignore[arg-type]
+)
 
 # 許可 origin は `CORS_ALLOW_ORIGINS` (CSV) で env から渡す。
 # 既定: ローカル開発の Vite dev server 2 origin (localhost / 127.0.0.1)。

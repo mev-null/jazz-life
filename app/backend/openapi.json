@@ -248,6 +248,7 @@
           "records"
         ],
         "summary": "List Records",
+        "description": "auth 必須。records が user-scope されるのは別 PR (ADR-006) で対応。\n本 PR は「未認証で全レコードが list できる」状態を閉塞するための入口ガード。",
         "operationId": "list_records_api_records_get",
         "responses": {
           "200": {
