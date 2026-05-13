@@ -248,7 +248,7 @@
           "records"
         ],
         "summary": "List Records",
-        "description": "auth 必須。records が user-scope されるのは別 PR (ADR-006) で対応。\n本 PR は「未認証で全レコードが list できる」状態を閉塞するための入口ガード。",
+        "description": "current user の collection を返す (ADR-006 §3.4)。\n\nresponse の `id` は `user_collections.id`、flat shape で catalog + ownership\n+ favorite_tracks を 1 件に詰める。",
         "operationId": "list_records_api_records_get",
         "responses": {
           "200": {
@@ -268,7 +268,7 @@
           "records"
         ],
         "summary": "Create Record",
-        "description": "record を 1 件作成。RecordService.create が同時に user_follows に\nauto-follow を入れるので、続く release sync で正しく対象になる。",
+        "description": "record を 1 件作成。catalog find-or-create + user_collections INSERT +\nauto-follow を 1 TX で行う。UNIQUE(user_id, vinyl_record_id) 違反は 409。",
         "operationId": "create_record_api_records_post",
         "requestBody": {
           "content": {
@@ -310,6 +310,7 @@
           "records"
         ],
         "summary": "Update Record",
+        "description": "user_collections を user_id ガード付きで部分更新。catalog 系は\n`source='manual'` のみ書く (ADR-006 §2.5)。`spotify_album_id` を埋め直すと\nmanual→spotify promote 経路 (§2.9)。",
         "operationId": "update_record_api_records__id__put",
         "parameters": [
           {
@@ -361,7 +362,7 @@
           "records"
         ],
         "summary": "Delete Record",
-        "description": "record を物理削除。auth 必須 (POST と揃える)。\n\nuser_follows は意図的に触らないので、最後の 1 件を消しても follow は残り、\n次の sync では引き続き対象になる。",
+        "description": "user_collections を物理削除 (favorites も CASCADE)。catalog は触らない。",
         "operationId": "delete_record_api_records__id__delete",
         "parameters": [
           {
@@ -923,6 +924,42 @@
         ],
         "title": "AuthUserRead"
       },
+      "FavoriteTrack": {
+        "properties": {
+          "spotify_track_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spotify Track Id"
+          },
+          "track_name": {
+            "type": "string",
+            "title": "Track Name"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "track_name"
+        ],
+        "title": "FavoriteTrack",
+        "description": "ADR-006 §2.8: アルバム内の「お気に入り曲」1 件分。\n\n`spotify_track_id` は Spotify Get Album Tracks の id (manual 時は省略可)。\n`note` は曲ごとの短い所感 (裏ジャケに走り書きしたメモ)。"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1460,7 +1497,10 @@
           "favorite_tracks": {
             "anyOf": [
               {
-                "type": "string"
+                "items": {
+                  "$ref": "#/components/schemas/FavoriteTrack"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
@@ -1612,14 +1652,10 @@
             "title": "Memo"
           },
           "favorite_tracks": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "items": {
+              "$ref": "#/components/schemas/FavoriteTrack"
+            },
+            "type": "array",
             "title": "Favorite Tracks"
           },
           "display_order": {
@@ -1659,7 +1695,8 @@
           "created_at",
           "updated_at"
         ],
-        "title": "VinylRecordRead"
+        "title": "VinylRecordRead",
+        "description": "ADR-006: response shape は catalog + ownership を flat に並べて維持。\n\n`id` は `user_collections.id` を返す (frontend からは 1 件の record と見える)。\n`favorite_tracks` は構造化リスト (position 昇順)。"
       },
       "VinylRecordUpdate": {
         "properties": {
@@ -1833,7 +1870,10 @@
           "favorite_tracks": {
             "anyOf": [
               {
-                "type": "string"
+                "items": {
+                  "$ref": "#/components/schemas/FavoriteTrack"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
@@ -1854,7 +1894,8 @@
           }
         },
         "type": "object",
-        "title": "VinylRecordUpdate"
+        "title": "VinylRecordUpdate",
+        "description": "ADR-002 寛容 PUT: omit したフィールドは no-op、明示的に null/`[]` を\n送った場合のみ clear する (`exclude_unset` 経由)。"
       }
     }
   }

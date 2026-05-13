@@ -71,11 +71,11 @@ function BackFace({
             “{record.memo}”
           </p>
         )}
-        {record.favorite_tracks && (
+        {record.favorite_tracks.length > 0 && (
           <div>
             <div className="italic text-ink-mute">Favorites</div>
-            <div className="leading-relaxed text-ink">
-              {record.favorite_tracks}
+            <div className="whitespace-pre-line leading-relaxed text-ink">
+              {record.favorite_tracks.map((t) => t.track_name).join("\n")}
             </div>
           </div>
         )}

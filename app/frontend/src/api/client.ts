@@ -307,7 +307,7 @@ export async function createVinylRecord(
       purchase_currency: input.purchase_currency ?? "JPY",
       rating: input.rating ?? null,
       memo: input.memo ?? null,
-      favorite_tracks: input.favorite_tracks ?? null,
+      favorite_tracks: input.favorite_tracks ?? [],
       display_order: mockRecordsStore.length + 1,
       created_at: now,
       updated_at: now,

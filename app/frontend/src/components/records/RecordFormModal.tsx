@@ -12,6 +12,7 @@ import {
 } from "../../api/client";
 import type { Artist, VinylRecord } from "../../types/api";
 import type {
+  FavoriteTrack,
   SpotifyAlbumSummary,
   VinylRecordCreate,
   VinylRecordCreateStatus,
@@ -50,6 +51,19 @@ type Props = {
 const labelClass = "block italic text-sm text-ink-mute mb-1.5";
 const inputClass =
   "w-full border-b border-ink-faint bg-transparent py-1.5 text-[15px] text-ink placeholder:text-ink-faint focus:border-ink focus:outline-none";
+
+// ADR-006 で favorite_tracks は string → FavoriteTrack[] に構造化された。本 UI は
+// 暫定で「改行区切りのテキストエリア」を維持し、submit 時に [{track_name: line}, ...]
+// に変換する。Spotify track 検索 + note 入力の本格 UI は別 PR で。
+const favoritesToString = (favs: readonly FavoriteTrack[] | null | undefined): string =>
+  (favs ?? []).map((t) => t.track_name).join("\n");
+
+const stringToFavorites = (s: string): FavoriteTrack[] =>
+  s
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => ({ spotify_track_id: null, track_name: line, note: null }));
 
 export function RecordFormModal({ mode, artists, onClose }: Props) {
   const queryClient = useQueryClient();
@@ -140,7 +154,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
       setPurchaseStore(r.purchase_store ?? "");
       setPurchaseDate(r.purchase_date ?? "");
       setMemo(r.memo ?? "");
-      setFavoriteTracks(r.favorite_tracks ?? "");
+      setFavoriteTracks(favoritesToString(r.favorite_tracks));
       setExistingImageUrl(r.image_url);
       setPreviewUrl(r.image_url);
       setSpotifyAlbumId(r.spotify_album_id);
@@ -348,7 +362,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
         purchase_date: purchaseDate || null,
         purchase_store: purchaseStore.trim() || null,
         memo: memo.trim() || null,
-        favorite_tracks: favoriteTracks.trim() || null,
+        favorite_tracks: stringToFavorites(favoriteTracks),
       };
       await update.mutateAsync({ id: mode.record.id, input: updateInput });
     } else {
@@ -368,7 +382,7 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
         purchase_date: purchaseDate || null,
         purchase_store: purchaseStore.trim() || null,
         memo: memo.trim() || null,
-        favorite_tracks: favoriteTracks.trim() || null,
+        favorite_tracks: stringToFavorites(favoriteTracks),
       };
       const created = await create.mutateAsync(createInput);
       if (pendingFile) {

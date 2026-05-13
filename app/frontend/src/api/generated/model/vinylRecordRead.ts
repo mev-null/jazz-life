@@ -4,9 +4,16 @@
  * jazz-life
  * OpenAPI spec version: 0.1.0
  */
+import type { FavoriteTrack } from './favoriteTrack';
 import type { VinylRecordReadSource } from './vinylRecordReadSource';
 import type { VinylRecordReadStatus } from './vinylRecordReadStatus';
 
+/**
+ * ADR-006: response shape は catalog + ownership を flat に並べて維持。
+
+`id` は `user_collections.id` を返す (frontend からは 1 件の record と見える)。
+`favorite_tracks` は構造化リスト (position 昇順)。
+ */
 export interface VinylRecordRead {
   id: string;
   artist_id: string;
@@ -23,7 +30,7 @@ export interface VinylRecordRead {
   purchase_currency: string;
   rating: number | null;
   memo: string | null;
-  favorite_tracks: string | null;
+  favorite_tracks: FavoriteTrack[];
   display_order: number;
   created_at: string;
   updated_at: string;
