@@ -4,7 +4,12 @@
  * jazz-life
  * OpenAPI spec version: 0.1.0
  */
+import type { FavoriteTrack } from './favoriteTrack';
 
+/**
+ * ADR-002 寛容 PUT: omit したフィールドは no-op、明示的に null/`[]` を
+送った場合のみ clear する (`exclude_unset` 経由)。
+ */
 export interface VinylRecordUpdate {
   artist_id?: string | null;
   spotify_album_id?: string | null;
@@ -20,6 +25,6 @@ export interface VinylRecordUpdate {
   purchase_currency?: string | null;
   rating?: number | null;
   memo?: string | null;
-  favorite_tracks?: string | null;
+  favorite_tracks?: FavoriteTrack[] | null;
   display_order?: number | null;
 }

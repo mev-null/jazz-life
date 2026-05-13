@@ -204,20 +204,17 @@ def test_post_sync_requires_auth(unauthed_client: TestClient) -> None:
     assert res.status_code == 401
 
 
-def test_post_sync_seeds_follows_and_ingests_albums(
+def test_post_sync_ingests_albums_for_followed_artists(
     authed_client: TestClient,
     session: Session,
     httpx_mock: HTTPXMock,
 ) -> None:
-    """user_follows が空の状態から POST sync 1 発で:
-    1. records 由来で user_follows が backfill される (auto-follow 実装前のレガシー
-       records を持つユーザの one-shot 移行経路)
-    2. 各 artist の Spotify アルバムが releases に upsert される
-    3. sync_status が last_success_at 付きで更新される
-    """
-    from app.models.record import VinylRecord
+    """user_follows に登録された artist を対象に Spotify から albums を取り込み、
+    sync_status を last_success_at 付きで更新する。
 
-    # records が先にある状態 (auto-follow 前のレガシー状態を再現)
+    ADR-006 後 auto-follow が user_collections 作成と同 TX で走るので、
+    本テストでは user_follows を直接 INSERT して既に follow 済の状態を作る。
+    """
     now = datetime.now(UTC)
     session.add_all(
         [
@@ -226,26 +223,13 @@ def test_post_sync_seeds_follows_and_ingests_albums(
         ]
     )
     session.commit()
+    from sqlmodel import select
+
+    user = session.exec(select(User).where(User.spotify_id == "test-owner")).one()
     session.add_all(
         [
-            VinylRecord(
-                artist_id="art-A",
-                title="t1",
-                source="manual",
-                status="owned",
-                display_order=1,
-                created_at=now,
-                updated_at=now,
-            ),
-            VinylRecord(
-                artist_id="art-B",
-                title="t2",
-                source="manual",
-                status="owned",
-                display_order=2,
-                created_at=now,
-                updated_at=now,
-            ),
+            UserFollow(user_id=user.id, artist_id="art-A"),
+            UserFollow(user_id=user.id, artist_id="art-B"),
         ]
     )
     session.commit()
@@ -270,18 +254,10 @@ def test_post_sync_seeds_follows_and_ingests_albums(
     assert body["albums_ingested"] == 2
     assert body["first_error"] is None
 
-    # follow bootstrap が走ったこと
     session.expire_all()
-    from sqlmodel import select
-
-    follows_rows = list(session.exec(select(UserFollow)).all())
-    assert {f.artist_id for f in follows_rows} == {"art-A", "art-B"}
-
-    # releases が入っていること
     release_rows = list(session.exec(select(Release)).all())
     assert {r.spotify_id for r in release_rows} == {"alb-A1", "alb-B1"}
 
-    # sync_status が success マークされていること
     status_res = authed_client.get("/api/releases/sync-status").json()
     assert status_res["last_success_at"] is not None
     assert status_res["last_error"] is None
@@ -294,23 +270,13 @@ def test_post_sync_marks_error_when_all_artists_fail(
 ) -> None:
     """全 artist が Spotify 5xx を返したら sync_status.last_error が立ち、
     last_success_at は据え置き (None)。"""
-    from app.models.record import VinylRecord
-
     now = datetime.now(UTC)
     session.add(Artist(spotify_id="art-A", name="A", source="manual", added_at=now))
     session.commit()
-    # records 由来で follow が backfill されるよう 1 件挿入
-    session.add(
-        VinylRecord(
-            artist_id="art-A",
-            title="t",
-            source="manual",
-            status="owned",
-            display_order=1,
-            created_at=now,
-            updated_at=now,
-        )
-    )
+    from sqlmodel import select
+
+    user = session.exec(select(User).where(User.spotify_id == "test-owner")).one()
+    session.add(UserFollow(user_id=user.id, artist_id="art-A"))
     session.commit()
     httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
     httpx_mock.add_response(url=_ARTIST_ALBUMS_URL_PATTERN, method="GET", status_code=500)

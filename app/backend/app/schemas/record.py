@@ -12,7 +12,27 @@ _DATE_PATTERN = r"^\d{4}(-\d{2}(-\d{2})?)?$"
 _CURRENCY_PATTERN = r"^[A-Z]{3}$"
 
 
+class FavoriteTrack(BaseModel):
+    """ADR-006 §2.8: アルバム内の「お気に入り曲」1 件分。
+
+    `spotify_track_id` は Spotify Get Album Tracks の id (manual 時は省略可)。
+    `note` は曲ごとの短い所感 (裏ジャケに走り書きしたメモ)。
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    spotify_track_id: str | None = None
+    track_name: str
+    note: str | None = None
+
+
 class VinylRecordRead(BaseModel):
+    """ADR-006: response shape は catalog + ownership を flat に並べて維持。
+
+    `id` は `user_collections.id` を返す (frontend からは 1 件の record と見える)。
+    `favorite_tracks` は構造化リスト (position 昇順)。
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
@@ -30,7 +50,7 @@ class VinylRecordRead(BaseModel):
     purchase_currency: str
     rating: int | None
     memo: str | None
-    favorite_tracks: str | None
+    favorite_tracks: list[FavoriteTrack]
     display_order: int
     created_at: datetime
     updated_at: datetime
@@ -51,10 +71,14 @@ class VinylRecordCreate(BaseModel):
     purchase_currency: Annotated[str, Field(pattern=_CURRENCY_PATTERN)] = "JPY"
     rating: Annotated[int | None, Field(ge=1, le=5)] = None
     memo: str | None = None
-    favorite_tracks: str | None = None
+    favorite_tracks: list[FavoriteTrack] | None = None
 
 
 class VinylRecordUpdate(BaseModel):
+    """ADR-002 寛容 PUT: omit したフィールドは no-op、明示的に null/`[]` を
+    送った場合のみ clear する (`exclude_unset` 経由)。
+    """
+
     artist_id: str | None = None
     spotify_album_id: str | None = None
     source: RecordSource | None = None
@@ -69,5 +93,5 @@ class VinylRecordUpdate(BaseModel):
     purchase_currency: Annotated[str | None, Field(pattern=_CURRENCY_PATTERN)] = None
     rating: Annotated[int | None, Field(ge=1, le=5)] = None
     memo: str | None = None
-    favorite_tracks: str | None = None
+    favorite_tracks: list[FavoriteTrack] | None = None
     display_order: int | None = None

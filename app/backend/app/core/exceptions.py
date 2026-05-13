@@ -6,6 +6,14 @@ class NotFoundError(DomainError):
     """Raised when a referenced entity does not exist."""
 
 
+class ConflictError(DomainError):
+    """Raised when an operation conflicts with current state (e.g. UNIQUE 違反).
+
+    Router 側で 409 にマップする。`safe_message` 相当のシンプルな文字列を
+    コンストラクタに渡す。
+    """
+
+
 class SpotifyAuthError(DomainError):
     """Spotify OAuth フロー中の失敗を表す。
 

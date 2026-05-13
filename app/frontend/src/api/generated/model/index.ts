@@ -12,6 +12,7 @@ export * from './artistReadSource';
 export * from './artistRecordCount';
 export * from './authUserRead';
 export * from './callbackApiAuthCallbackGetParams';
+export * from './favoriteTrack';
 export * from './healthzHealthzGet200';
 export * from './hTTPValidationError';
 export * from './listReleasesApiReleasesGetParams';

@@ -4,6 +4,7 @@
  * jazz-life
  * OpenAPI spec version: 0.1.0
  */
+import type { FavoriteTrack } from './favoriteTrack';
 import type { VinylRecordCreateSource } from './vinylRecordCreateSource';
 import type { VinylRecordCreateStatus } from './vinylRecordCreateStatus';
 
@@ -23,5 +24,5 @@ export interface VinylRecordCreate {
   purchase_currency?: string;
   rating?: number | null;
   memo?: string | null;
-  favorite_tracks?: string | null;
+  favorite_tracks?: FavoriteTrack[] | null;
 }

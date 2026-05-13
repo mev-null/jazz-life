@@ -6,8 +6,8 @@
 - 1 アーティストが Spotify 側で 4xx / 5xx / network エラーを返しても他のアーティストの
   ingest は継続する (best-effort)。全件失敗時のみ SyncStatus.last_error にエラー
   メッセージを残し、それ以外は last_success_at を更新する
-- `user_follows` が空のユーザに対しては artists マスタを bootstrap として seed
-  する (Phase B-3 では Spotify follow 同期が未実装のため)
+- ADR-006 以降 auto-follow が `user_collections` create と同 TX で走るため、
+  follow の backfill seed は不要 (旧 `seed_user_follows_if_empty` は削除)
 """
 
 from __future__ import annotations
@@ -18,12 +18,10 @@ from datetime import date
 from uuid import UUID
 
 from app.core.exceptions import SpotifyApiError
-from app.core.repositories.record_repository import RecordRepository
 from app.core.repositories.release_repository import ReleaseRepository
 from app.core.repositories.sync_status_repository import SyncStatusRepository
 from app.core.repositories.user_follow_repository import UserFollowRepository
 from app.models.release import Release
-from app.seed import seed_user_follows_if_empty
 from app.services.spotify_app_client import SpotifyAlbumIngest, SpotifyAppClient
 
 logger = logging.getLogger("uvicorn.error")
@@ -46,12 +44,10 @@ class ReleaseService:
         self,
         release_repo: ReleaseRepository,
         follow_repo: UserFollowRepository,
-        record_repo: RecordRepository,
         sync_repo: SyncStatusRepository,
     ) -> None:
         self.release_repo = release_repo
         self.follow_repo = follow_repo
-        self.record_repo = record_repo
         self.sync_repo = sync_repo
 
     def list_window(self, from_date: date, to_date: date) -> list[Release]:
@@ -67,15 +63,13 @@ class ReleaseService:
         """フォロー中アーティストの新譜を Spotify から取り込んで upsert する。
 
         フロー:
-        1. user_follows が空なら既存 records の artist_id を backfill seed
-           (auto-follow 実装前から records を持っているユーザ向けの one-shot)
-        2. follow 中の artist_id 配列を取得
-        3. 各 artist について `spotify.get_artist_albums` → `Release` に map →
+        1. follow 中の artist_id 配列を取得 (auto-follow が record 作成時に走る
+           ため、record を持っていれば既に follow にも入っている)
+        2. 各 artist について `spotify.get_artist_albums` → `Release` に map →
            `release_repo.upsert_many` で 1 アーティストずつ commit
-        4. 全成功 / 部分成功 → mark_success、全件失敗 → mark_error
+        3. 全成功 / 部分成功 → mark_success、全件失敗 → mark_error
         """
         self.sync_repo.mark_attempt(RELEASE_SYNC_SOURCE)
-        seed_user_follows_if_empty(user_id, self.follow_repo, self.record_repo)
         artist_ids = self.follow_repo.list_artist_ids(user_id)
         total = len(artist_ids)
         succeeded = 0
