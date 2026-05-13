@@ -1,4 +1,4 @@
-.PHONY: up down logs ps spec gen migrate db
+.PHONY: up down logs ps spec gen migrate db deploy deploy-backend deploy-frontend deploy-logs-backend deploy-logs-frontend
 
 # db だけ起動（devcontainer の postStartCommand と同じ動作。手動で再起動したい時用）
 # backend / frontend は cd app/backend && make dev / cd app/frontend && make dev で個別に起動する。
@@ -43,3 +43,28 @@ gen:
 migrate:
 	docker compose exec backend alembic revision --autogenerate -m "$(name)"
 	docker compose exec backend alembic upgrade head
+
+# ===== Railway deploy =====
+# Railway への手動 deploy。git push とは独立 (push しても自動 deploy はしない)。
+# 認証は `railway login --browserless` を 1 度実行して ~/.railway/config.json に
+# トークンが保存されている前提。devcontainer を作り直すと消えるので再ログイン要。
+#
+# --path-as-root で `backend/` 以下だけを build context にする (= Dockerfile から
+# 見たカレントが `app/backend/`)。--detach で deploy 完了を待たずに戻る (ログは
+# `make deploy-logs-backend` か Railway dashboard で追える)。
+deploy-backend:
+	railway up backend --path-as-root --service backend --detach
+
+deploy-frontend:
+	railway up frontend --path-as-root --service frontend --detach
+
+# 両方まとめて (frontend は VITE_API_BASE が build に焼き込まれるので、backend URL を
+# 変えた時は backend → frontend の順で deploy する)。
+deploy: deploy-backend deploy-frontend
+
+# Railway 上のコンテナログ follow
+deploy-logs-backend:
+	railway logs --service backend
+
+deploy-logs-frontend:
+	railway logs --service frontend
