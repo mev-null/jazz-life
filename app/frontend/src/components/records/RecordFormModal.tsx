@@ -54,6 +54,11 @@ const inputClass =
 export function RecordFormModal({ mode, artists, onClose }: Props) {
   const queryClient = useQueryClient();
   const isEdit = mode?.kind === "edit";
+  // ArtistsPage / ArtistDetailModal / FeedDetailModal 起点で artist が事前に
+  // 決まっている場合は Artist 入力欄をロックする (placeholder の「既存から選ぶ
+  // or Spotify 検索」誘導が文脈に合わないため)。HomePage の "+" 追加 や
+  // edit mode では従来通り typeahead を許可する。
+  const artistLocked = mode?.kind === "add" && Boolean(mode.defaults?.artistId);
   const { isMobile } = useBreakpoint();
   const mobile = MOBILE_UI_ENABLED && isMobile;
   // Mobile では autoFocus で keyboard が即立ち上がるとモーダル本体が下に押し下げられて
@@ -467,19 +472,29 @@ export function RecordFormModal({ mode, artists, onClose }: Props) {
                 <input
                   type="text"
                   value={artistQuery}
-                  onChange={(e) => handleArtistInputChange(e.target.value)}
-                  onFocus={() => setArtistDropdownOpen(true)}
-                  onBlur={() =>
-                    // クリック反映のため少し遅らせる (dropdown 内の button click が
-                    // 走る前に blur で閉じてしまうのを回避)
-                    setTimeout(() => setArtistDropdownOpen(false), 150)
+                  onChange={
+                    artistLocked
+                      ? undefined
+                      : (e) => handleArtistInputChange(e.target.value)
+                  }
+                  onFocus={
+                    artistLocked ? undefined : () => setArtistDropdownOpen(true)
+                  }
+                  onBlur={
+                    artistLocked
+                      ? undefined
+                      : () =>
+                          // クリック反映のため少し遅らせる (dropdown 内の button click が
+                          // 走る前に blur で閉じてしまうのを回避)
+                          setTimeout(() => setArtistDropdownOpen(false), 150)
                   }
                   required
+                  readOnly={artistLocked}
                   autoComplete="off"
-                  placeholder="既存から選ぶ or Spotify 検索で追加"
-                  className={inputClass}
+                  placeholder={artistLocked ? "" : "Artist 名"}
+                  className={`${inputClass} ${artistLocked ? "cursor-not-allowed text-ink-mute" : ""}`}
                 />
-                {artistDropdownOpen && artistMatches.length > 0 && (
+                {!artistLocked && artistDropdownOpen && artistMatches.length > 0 && (
                   <ul className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-y-auto border border-ink/10 bg-paper">
                     {artistMatches.map((a) => (
                       <li key={a.spotify_id}>

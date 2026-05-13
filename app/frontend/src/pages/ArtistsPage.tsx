@@ -176,9 +176,15 @@ export function ArtistsPage() {
                       )}
                     </span>
                     <span className="font-medium">{a.name}</span>
-                    <span className="ml-auto pr-[3px] text-ink-mute tabular-nums">
-                      {count} {count === 1 ? "record" : "records"}
-                    </span>
+                    {count === 0 ? (
+                      <span className="ml-auto pr-[3px] italic text-ink-faint">
+                        no records yet
+                      </span>
+                    ) : (
+                      <span className="ml-auto pr-[3px] text-ink-mute tabular-nums">
+                        {count} {count === 1 ? "record" : "records"}
+                      </span>
+                    )}
                   </button>
                 </li>
               );
