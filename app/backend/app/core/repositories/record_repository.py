@@ -1,9 +1,11 @@
 import uuid
+from uuid import UUID
 
 from sqlalchemy import text
 from sqlmodel import Session, col, func, select
 
 from app.models.record import VinylRecord
+from app.models.user_follow import UserFollow
 
 
 class RecordRepository:
@@ -19,14 +21,24 @@ class RecordRepository:
         stmt = select(VinylRecord).order_by(col(VinylRecord.display_order).asc())
         return list(self.session.exec(stmt).all())
 
-    def count_by_artist(self) -> dict[str, int]:
-        """artist_id ごとの所有レコード数を集計して返す。
+    def count_owned_by_artist_for_user(self, user_id: UUID) -> dict[str, int]:
+        """current user の「所有」レコード数を artist_id ごとに集計して返す。
 
-        ArtistsPage 一覧の「N records」表示用。records 本体は ArtistDetailModal
-        を開くまで取らない設計に振ったので、件数だけを集約で先に返す軽量
-        エンドポイントの裏側として使う。
+        ArtistsPage 一覧の「N records」表示用。VinylRecord に user_id を持たない
+        現スキーマでは user_follows を経由してユーザを絞り込む (auto-follow on
+        record create により、自分が持つ record == 自分が follow している artist
+        の record とほぼ一致する)。status='owned' に絞ることで want list の
+        wanted は数えない。archived な follow も除外し、ArtistsPage に出る
+        followed_artists の列と整合させる。
         """
-        stmt = select(VinylRecord.artist_id, func.count()).group_by(col(VinylRecord.artist_id))
+        stmt = (
+            select(VinylRecord.artist_id, func.count())
+            .join(UserFollow, col(UserFollow.artist_id) == col(VinylRecord.artist_id))
+            .where(col(UserFollow.user_id) == user_id)
+            .where(col(UserFollow.archived_flag).is_(False))
+            .where(col(VinylRecord.status) == "owned")
+            .group_by(col(VinylRecord.artist_id))
+        )
         rows = self.session.exec(stmt).all()
         return {artist_id: count for artist_id, count in rows}
 

@@ -55,6 +55,7 @@ def list_releases(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     service: ReleaseService = Depends(get_release_service),
+    _: User = Depends(get_current_user),
 ) -> ListResponse[ReleaseRead]:
     default_from, default_to = _default_window()
     rows = service.list_window(from_date or default_from, to_date or default_to)
@@ -67,6 +68,7 @@ def list_releases(
 @router.get("/sync-status", response_model=SyncStatusRead)
 def get_sync_status(
     repo: SyncStatusRepository = Depends(get_sync_status_repository),
+    _: User = Depends(get_current_user),
 ) -> SyncStatusRead:
     row = repo.get(RELEASE_SYNC_SOURCE)
     if row is None:

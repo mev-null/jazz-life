@@ -104,6 +104,14 @@ def logout(
     response: Response,
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    response.delete_cookie(key=settings.cookie_name, path="/")
+    # SameSite=None; Secure で発行した cookie は同属性付きでないと削除が効かない
+    # ブラウザがあるため、login/callback と同じ属性で expire させる。
+    response.delete_cookie(
+        key=settings.cookie_name,
+        path="/",
+        samesite=settings.cookie_samesite,  # type: ignore[arg-type]
+        secure=settings.cookie_secure,
+        httponly=True,
+    )
     response.status_code = status.HTTP_204_NO_CONTENT
     return response

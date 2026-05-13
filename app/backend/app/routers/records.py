@@ -38,6 +38,7 @@ def update_record(
     id: uuid.UUID,
     body: VinylRecordUpdate,
     service: RecordService = Depends(get_record_service),
+    _: User = Depends(get_current_user),
 ) -> VinylRecordRead:
     with http_errors():
         record = service.update_partial(id, body)

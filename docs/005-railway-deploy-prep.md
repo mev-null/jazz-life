@@ -202,7 +202,6 @@ EXPOSE 80
 ```
 SPOTIFY_CLIENT_ID
 SPOTIFY_CLIENT_SECRET
-ALLOWED_SPOTIFY_USER_ID
 JWT_SECRET (32+ chars)
 REFRESH_TOKEN_KEY (Fernet 32-byte base64)
 DATABASE_URL (Railway managed PG が自動注入、postgres:// 形式)
@@ -212,6 +211,8 @@ CORS_ALLOW_ORIGINS (https://<frontend>.up.railway.app)
 COOKIE_SECURE=true
 COOKIE_SAMESITE=none
 ```
+
+`ALLOWED_SPOTIFY_USER_ID` は本 ADR §2.8 で撤廃したため env リストに含めない。
 
 Spotify Developer Dashboard に上記 `SPOTIFY_REDIRECT_URI` を **完全一致** で事前登録する旨も明記。
 
