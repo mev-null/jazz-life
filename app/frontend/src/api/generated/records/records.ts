@@ -59,6 +59,8 @@ export const getListRecordsApiRecordsGetUrl = () => {
 }
 
 /**
+ * auth 必須。records が user-scope されるのは別 PR (ADR-006) で対応。
+本 PR は「未認証で全レコードが list できる」状態を閉塞するための入口ガード。
  * @summary List Records
  */
 export const listRecordsApiRecordsGet = async ( options?: RequestInit): Promise<listRecordsApiRecordsGetResponse> => {
