@@ -21,11 +21,13 @@
         }
       ],
       "display_order": 1,
+      "is_pinned": true,
       "created_at": "2026-01-08T09:00:00Z",
       "updated_at": "2026-01-08T09:00:00Z",
       "source": "manual",
       "purchase_currency": "JPY",
-      "status": "owned"
+      "status": "owned",
+      "pin_order": 1
     },
     {
       "id": "019e0000-0000-7000-8000-000000000002",
@@ -42,11 +44,13 @@
       "memo": "Jeff Hamiltonの初リーダーアルバム。1982年1月録音。",
       "favorite_tracks": [],
       "display_order": 2,
+      "is_pinned": false,
       "created_at": "2026-01-12T09:00:00Z",
       "updated_at": "2026-01-12T09:00:00Z",
       "source": "manual",
       "purchase_currency": "JPY",
-      "status": "owned"
+      "status": "owned",
+      "pin_order": null
     },
     {
       "id": "019e0000-0000-7000-8000-000000000003",
@@ -63,11 +67,13 @@
       "memo": "Gabrielle Cavassa の作品。",
       "favorite_tracks": [],
       "display_order": 3,
+      "is_pinned": true,
       "created_at": "2026-01-22T09:00:00Z",
       "updated_at": "2026-01-22T09:00:00Z",
       "source": "manual",
       "purchase_currency": "JPY",
-      "status": "owned"
+      "status": "owned",
+      "pin_order": 2
     },
     {
       "id": "019e0000-0000-7000-8000-000000000004",
@@ -84,11 +90,13 @@
       "memo": "Scott LaFaro / Paul Motian トリオの最初の傑作。",
       "favorite_tracks": [],
       "display_order": 4,
+      "is_pinned": false,
       "created_at": "2026-02-01T09:00:00Z",
       "updated_at": "2026-02-01T09:00:00Z",
       "source": "manual",
       "purchase_currency": "JPY",
-      "status": "owned"
+      "status": "owned",
+      "pin_order": null
     },
     {
       "id": "019e0000-0000-7000-8000-000000000005",
@@ -105,11 +113,13 @@
       "memo": "Oscar Peterson, Ray Brown, Ed Thigpen のトリオ。",
       "favorite_tracks": [],
       "display_order": 5,
+      "is_pinned": false,
       "created_at": "2026-02-10T09:00:00Z",
       "updated_at": "2026-02-10T09:00:00Z",
       "source": "manual",
       "purchase_currency": "JPY",
-      "status": "owned"
+      "status": "owned",
+      "pin_order": null
     },
     {
       "id": "019e0000-0000-7000-8000-000000000006",
@@ -126,11 +136,13 @@
       "memo": "Avishai Cohen Trio",
       "favorite_tracks": [],
       "display_order": 6,
+      "is_pinned": false,
       "created_at": "2026-02-15T09:00:00Z",
       "updated_at": "2026-02-15T09:00:00Z",
       "source": "manual",
       "purchase_currency": "JPY",
-      "status": "owned"
+      "status": "owned",
+      "pin_order": null
     },
     {
       "id": "019e0000-0000-7000-8000-000000000007",
@@ -147,11 +159,13 @@
       "memo": "Oscar Peterson Trio. NYC Blue Note でのライブ。",
       "favorite_tracks": [],
       "display_order": 7,
+      "is_pinned": false,
       "created_at": "2026-02-22T09:00:00Z",
       "updated_at": "2026-02-22T09:00:00Z",
       "source": "manual",
       "purchase_currency": "JPY",
-      "status": "owned"
+      "status": "owned",
+      "pin_order": null
     },
     {
       "id": "019e0000-0000-7000-8000-000000000008",
@@ -168,11 +182,13 @@
       "memo": "2018年リリースの音源に基づく修正。",
       "favorite_tracks": [],
       "display_order": 8,
+      "is_pinned": false,
       "created_at": "2026-03-01T09:00:00Z",
       "updated_at": "2026-03-01T09:00:00Z",
       "source": "manual",
       "purchase_currency": "JPY",
-      "status": "owned"
+      "status": "owned",
+      "pin_order": null
     },
     {
       "id": "019e0000-0000-7000-8000-000000000009",
@@ -189,11 +205,13 @@
       "memo": null,
       "favorite_tracks": [],
       "display_order": 9,
+      "is_pinned": false,
       "created_at": "2026-03-12T09:00:00Z",
       "updated_at": "2026-03-12T09:00:00Z",
       "source": "manual",
       "purchase_currency": "JPY",
-      "status": "owned"
+      "status": "owned",
+      "pin_order": null
     },
     {
       "id": "019e0000-0000-7000-8000-000000000010",
@@ -210,11 +228,13 @@
       "memo": null,
       "favorite_tracks": [],
       "display_order": 10,
+      "is_pinned": false,
       "created_at": "2026-04-05T09:00:00Z",
       "updated_at": "2026-04-05T09:00:00Z",
       "source": "manual",
       "purchase_currency": "JPY",
-      "status": "owned"
+      "status": "owned",
+      "pin_order": null
     },
     {
       "id": "019e0000-0000-7000-8000-000000000011",
@@ -231,11 +251,14 @@
       "memo": "Waltz for Debby と同じ Vanguard セッションから。",
       "favorite_tracks": [],
       "display_order": 11,
+      "is_pinned": false,
       "created_at": "2026-05-09T09:00:00Z",
       "updated_at": "2026-05-09T09:00:00Z",
       "source": "manual",
       "purchase_currency": "JPY",
-      "status": "owned"
+      "status": "owned",
+      "pin_order": null
     }
-  ]
+  ],
+  "total": 11
 }

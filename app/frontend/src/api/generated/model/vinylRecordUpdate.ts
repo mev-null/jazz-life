@@ -27,4 +27,5 @@ export interface VinylRecordUpdate {
   memo?: string | null;
   favorite_tracks?: FavoriteTrack[] | null;
   display_order?: number | null;
+  is_pinned?: boolean | null;
 }

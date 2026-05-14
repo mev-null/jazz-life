@@ -25,7 +25,9 @@ import type {
 
 import type {
   HTTPValidationError,
+  ListRecordsApiRecordsGetParams,
   ListResponseVinylRecordRead,
+  PinReorderRequest,
   VinylRecordCreate,
   VinylRecordRead,
   VinylRecordUpdate
@@ -43,31 +45,47 @@ export type listRecordsApiRecordsGetResponse200 = {
   status: 200
 }
 
+export type listRecordsApiRecordsGetResponse422 = {
+  data: HTTPValidationError
+  status: 422
+}
+
 export type listRecordsApiRecordsGetResponseSuccess = (listRecordsApiRecordsGetResponse200) & {
   headers: Headers;
 };
-;
+export type listRecordsApiRecordsGetResponseError = (listRecordsApiRecordsGetResponse422) & {
+  headers: Headers;
+};
 
-export type listRecordsApiRecordsGetResponse = (listRecordsApiRecordsGetResponseSuccess)
+export type listRecordsApiRecordsGetResponse = (listRecordsApiRecordsGetResponseSuccess | listRecordsApiRecordsGetResponseError)
 
-export const getListRecordsApiRecordsGetUrl = () => {
+export const getListRecordsApiRecordsGetUrl = (params?: ListRecordsApiRecordsGetParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/records`
+  return stringifiedParams.length > 0 ? `/api/records?${stringifiedParams}` : `/api/records`
 }
 
 /**
  * current user の collection を返す (ADR-006 §3.4)。
 
-response の `id` は `user_collections.id`、flat shape で catalog + ownership
-+ favorite_tracks を 1 件に詰める。
+`limit` を渡すと paginated。レスポンス `total` は user の collection 全件数
+なので、フロント側で `Math.ceil(total / limit)` でページ数を出せる。limit
+省略時は全件 + total を返す (従来挙動を維持)。並び順は
+`is_pinned DESC, display_order ASC` 固定。
  * @summary List Records
  */
-export const listRecordsApiRecordsGet = async ( options?: RequestInit): Promise<listRecordsApiRecordsGetResponse> => {
+export const listRecordsApiRecordsGet = async (params?: ListRecordsApiRecordsGetParams, options?: RequestInit): Promise<listRecordsApiRecordsGetResponse> => {
 
-  return customFetch<listRecordsApiRecordsGetResponse>(getListRecordsApiRecordsGetUrl(),
+  return customFetch<listRecordsApiRecordsGetResponse>(getListRecordsApiRecordsGetUrl(params),
   {
     ...options,
     method: 'GET'
@@ -80,23 +98,23 @@ export const listRecordsApiRecordsGet = async ( options?: RequestInit): Promise<
 
 
 
-export const getListRecordsApiRecordsGetQueryKey = () => {
+export const getListRecordsApiRecordsGetQueryKey = (params?: ListRecordsApiRecordsGetParams,) => {
     return [
-    `/api/records`
+    `/api/records`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListRecordsApiRecordsGetQueryOptions = <TData = Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError = unknown>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export const getListRecordsApiRecordsGetQueryOptions = <TData = Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError = HTTPValidationError>(params?: ListRecordsApiRecordsGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListRecordsApiRecordsGetQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListRecordsApiRecordsGetQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRecordsApiRecordsGet>>> = ({ signal }) => listRecordsApiRecordsGet({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRecordsApiRecordsGet>>> = ({ signal }) => listRecordsApiRecordsGet(params, { signal, ...requestOptions });
 
 
 
@@ -106,11 +124,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type ListRecordsApiRecordsGetQueryResult = NonNullable<Awaited<ReturnType<typeof listRecordsApiRecordsGet>>>
-export type ListRecordsApiRecordsGetQueryError = unknown
+export type ListRecordsApiRecordsGetQueryError = HTTPValidationError
 
 
-export function useListRecordsApiRecordsGet<TData = Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError = unknown>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError, TData>> & Pick<
+export function useListRecordsApiRecordsGet<TData = Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError = HTTPValidationError>(
+ params: undefined |  ListRecordsApiRecordsGetParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof listRecordsApiRecordsGet>>,
           TError,
@@ -119,8 +137,8 @@ export function useListRecordsApiRecordsGet<TData = Awaited<ReturnType<typeof li
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListRecordsApiRecordsGet<TData = Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError, TData>> & Pick<
+export function useListRecordsApiRecordsGet<TData = Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError = HTTPValidationError>(
+ params?: ListRecordsApiRecordsGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof listRecordsApiRecordsGet>>,
           TError,
@@ -129,20 +147,20 @@ export function useListRecordsApiRecordsGet<TData = Awaited<ReturnType<typeof li
       >, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useListRecordsApiRecordsGet<TData = Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export function useListRecordsApiRecordsGet<TData = Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError = HTTPValidationError>(
+ params?: ListRecordsApiRecordsGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
  * @summary List Records
  */
 
-export function useListRecordsApiRecordsGet<TData = Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError = unknown>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+export function useListRecordsApiRecordsGet<TData = Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError = HTTPValidationError>(
+ params?: ListRecordsApiRecordsGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listRecordsApiRecordsGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getListRecordsApiRecordsGetQueryOptions(options)
+  const queryOptions = getListRecordsApiRecordsGetQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -244,6 +262,99 @@ export const useCreateRecordApiRecordsPost = <TError = HTTPValidationError,
         TContext
       > => {
       return useMutation(getCreateRecordApiRecordsPostMutationOptions(options), queryClient);
+    }
+    export type reorderPinsApiRecordsPinsOrderPutResponse204 = {
+  data: void
+  status: 204
+}
+
+export type reorderPinsApiRecordsPinsOrderPutResponse422 = {
+  data: HTTPValidationError
+  status: 422
+}
+
+export type reorderPinsApiRecordsPinsOrderPutResponseSuccess = (reorderPinsApiRecordsPinsOrderPutResponse204) & {
+  headers: Headers;
+};
+export type reorderPinsApiRecordsPinsOrderPutResponseError = (reorderPinsApiRecordsPinsOrderPutResponse422) & {
+  headers: Headers;
+};
+
+export type reorderPinsApiRecordsPinsOrderPutResponse = (reorderPinsApiRecordsPinsOrderPutResponseSuccess | reorderPinsApiRecordsPinsOrderPutResponseError)
+
+export const getReorderPinsApiRecordsPinsOrderPutUrl = () => {
+
+
+
+
+  return `/api/records/pins/order`
+}
+
+/**
+ * ピン済みレコードの並び順を drag & drop 後に保存する。
+
+body の `ids` は現在 pin しているすべての user_collection.id を、望む順序で
+並べたもの。current pin セットと一致しない場合は 409。
+ * @summary Reorder Pins
+ */
+export const reorderPinsApiRecordsPinsOrderPut = async (pinReorderRequest: PinReorderRequest, options?: RequestInit): Promise<reorderPinsApiRecordsPinsOrderPutResponse> => {
+
+  return customFetch<reorderPinsApiRecordsPinsOrderPutResponse>(getReorderPinsApiRecordsPinsOrderPutUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      pinReorderRequest,)
+  }
+);}
+
+
+
+
+export const getReorderPinsApiRecordsPinsOrderPutMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reorderPinsApiRecordsPinsOrderPut>>, TError,{data: PinReorderRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reorderPinsApiRecordsPinsOrderPut>>, TError,{data: PinReorderRequest}, TContext> => {
+
+const mutationKey = ['reorderPinsApiRecordsPinsOrderPut'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reorderPinsApiRecordsPinsOrderPut>>, {data: PinReorderRequest}> = (props) => {
+          const {data} = props ?? {};
+
+          return  reorderPinsApiRecordsPinsOrderPut(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReorderPinsApiRecordsPinsOrderPutMutationResult = NonNullable<Awaited<ReturnType<typeof reorderPinsApiRecordsPinsOrderPut>>>
+    export type ReorderPinsApiRecordsPinsOrderPutMutationBody = PinReorderRequest
+    export type ReorderPinsApiRecordsPinsOrderPutMutationError = HTTPValidationError
+
+    /**
+ * @summary Reorder Pins
+ */
+export const useReorderPinsApiRecordsPinsOrderPut = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reorderPinsApiRecordsPinsOrderPut>>, TError,{data: PinReorderRequest}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof reorderPinsApiRecordsPinsOrderPut>>,
+        TError,
+        {data: PinReorderRequest},
+        TContext
+      > => {
+      return useMutation(getReorderPinsApiRecordsPinsOrderPutMutationOptions(options), queryClient);
     }
     export type updateRecordApiRecordsIdPutResponse200 = {
   data: VinylRecordRead

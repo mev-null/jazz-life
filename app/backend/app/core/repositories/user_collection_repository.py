@@ -49,17 +49,75 @@ class UserCollectionRepository:
         return self.session.exec(stmt).first()
 
     def list_for_user_with_catalog(
-        self, user_id: uuid.UUID
+        self,
+        user_id: uuid.UUID,
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[tuple[UserCollection, VinylRecord]]:
         """user_id の collection と catalog を JOIN して flat row を返す。
 
-        Home マトリクスの一覧用。`display_order` 昇順。
+        Home マトリクスの一覧用。並び順は次の通り (pinned > 非 pinned、
+        pinned 内は drag & drop で決まる `pin_order` 昇順):
+
+            is_pinned DESC, pin_order ASC NULLS LAST, display_order ASC
+
+        フロント側は Home プレビューを slice するだけで「ピン順 → display_order
+        で補完」が成立する。
+
+        `limit=None` で全件、`limit` が指定された時のみページネーション。
         """
         stmt = (
             select(UserCollection, VinylRecord)
             .join(VinylRecord, col(VinylRecord.id) == col(UserCollection.vinyl_record_id))
             .where(col(UserCollection.user_id) == user_id)
-            .order_by(col(UserCollection.display_order).asc())
+            .order_by(
+                col(UserCollection.is_pinned).desc(),
+                col(UserCollection.pin_order).asc().nulls_last(),
+                col(UserCollection.display_order).asc(),
+            )
+        )
+        if offset:
+            stmt = stmt.offset(offset)
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        return list(self.session.exec(stmt).all())
+
+    def count_for_user(self, user_id: uuid.UUID) -> int:
+        """user の collection 総件数 (paginated レスポンスの `total` 用)。"""
+        stmt = (
+            select(func.count())
+            .select_from(UserCollection)
+            .where(col(UserCollection.user_id) == user_id)
+        )
+        return self.session.exec(stmt).one()
+
+    def count_pinned_for_user(self, user_id: uuid.UUID) -> int:
+        """is_pinned=True の件数。pin 上限 (8) を service 層で enforce する用。"""
+        stmt = (
+            select(func.count())
+            .select_from(UserCollection)
+            .where(col(UserCollection.user_id) == user_id)
+            .where(col(UserCollection.is_pinned).is_(True))
+        )
+        return self.session.exec(stmt).one()
+
+    def max_pin_order_for_user(self, user_id: uuid.UUID) -> int:
+        """user のピン済み行の最大 `pin_order`。新規 pin は max+1 で末尾に置く。"""
+        stmt = (
+            select(func.max(col(UserCollection.pin_order)))
+            .where(col(UserCollection.user_id) == user_id)
+            .where(col(UserCollection.is_pinned).is_(True))
+        )
+        result = self.session.exec(stmt).one_or_none()
+        return result if result is not None else 0
+
+    def list_pinned_for_user(self, user_id: uuid.UUID) -> list[UserCollection]:
+        """user のピン済み行を `pin_order ASC` で返す (reorder API の前段検証用)。"""
+        stmt = (
+            select(UserCollection)
+            .where(col(UserCollection.user_id) == user_id)
+            .where(col(UserCollection.is_pinned).is_(True))
+            .order_by(col(UserCollection.pin_order).asc().nulls_last())
         )
         return list(self.session.exec(stmt).all())
 

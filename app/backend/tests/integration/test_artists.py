@@ -34,7 +34,7 @@ def test_list_artists_requires_auth(unauthed_client: TestClient) -> None:
 def test_artists_empty(authed_client: TestClient) -> None:
     res = authed_client.get("/api/artists")
     assert res.status_code == 200
-    assert res.json() == {"items": []}
+    assert res.json() == {"items": [], "total": 0}
 
 
 def test_artists_sorted_by_added_at_desc(authed_client: TestClient, session: Session) -> None:

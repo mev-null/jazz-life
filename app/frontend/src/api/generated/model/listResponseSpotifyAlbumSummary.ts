@@ -8,4 +8,5 @@ import type { SpotifyAlbumSummary } from './spotifyAlbumSummary';
 
 export interface ListResponseSpotifyAlbumSummary {
   items: SpotifyAlbumSummary[];
+  total?: number;
 }

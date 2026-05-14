@@ -32,6 +32,8 @@ export interface VinylRecordRead {
   memo: string | null;
   favorite_tracks: FavoriteTrack[];
   display_order: number;
+  is_pinned: boolean;
+  pin_order: number | null;
   created_at: string;
   updated_at: string;
 }

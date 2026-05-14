@@ -75,7 +75,7 @@ function ReleaseDetail({
   // - status=wanted: 物理的にまだ持ってないので「買った」だけ出して upgrade に使う
   // - 無し         : 両ボタン (parent onCollect で新規追加)
   const queryClient = useQueryClient();
-  const recordsQ = useQuery({ queryKey: ["records"], queryFn: getVinylRecords });
+  const recordsQ = useQuery({ queryKey: ["records"], queryFn: () => getVinylRecords() });
   const existing = (recordsQ.data?.items ?? []).find(
     (r) => r.spotify_album_id === release.spotify_id,
   );

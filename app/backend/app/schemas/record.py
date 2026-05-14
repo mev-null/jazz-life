@@ -4,6 +4,17 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+
+class PinReorderRequest(BaseModel):
+    """drag & drop で並び替えた pinned レコードの id 列。
+
+    `ids` は user が現在 pin している全行を、ユーザが望む順序で並べたもの。
+    backend は 1..N で `pin_order` を再採番する。欠け/重複/未 pin 行混入は 409。
+    """
+
+    ids: list[uuid.UUID]
+
+
 RecordSource = Literal["spotify", "manual"]
 # ADR-003 §2.1: "owned" は Home マトリクスに表示、"wanted" は want list 専用。
 RecordStatus = Literal["owned", "wanted"]
@@ -52,6 +63,10 @@ class VinylRecordRead(BaseModel):
     memo: str | None
     favorite_tracks: list[FavoriteTrack]
     display_order: int
+    is_pinned: bool
+    # ピン済みレコードの並び順 (drag & drop で書き換える)。非 pin 行は null。
+    # フロントが pin リストを表示順で並べるのに使う。
+    pin_order: int | None
     created_at: datetime
     updated_at: datetime
 
@@ -95,3 +110,4 @@ class VinylRecordUpdate(BaseModel):
     memo: str | None = None
     favorite_tracks: list[FavoriteTrack] | None = None
     display_order: int | None = None
+    is_pinned: bool | None = None

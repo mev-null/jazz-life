@@ -49,6 +49,20 @@ class UserCollection(SQLModel, table=True):
     rating: int | None = Field(default=None)
     memo: str | None = Field(default=None, max_length=2000)
     display_order: int = Field(index=True)
+    # Home プレビューに何を見せるかをユーザが編集する手段。上限 8 件は
+    # `record_service` が enforce。`pin_order` は pinned 内での並び順 (drag &
+    # drop で書き換える)。`pinned_at` は将来分析用に残してある (Home の表示順
+    # 自体は pin_order ASC で決まる)。
+    is_pinned: bool = Field(
+        default=False,
+        sa_column_kwargs={"server_default": "false"},
+    )
+    pin_order: int | None = Field(default=None)
+    pinned_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),

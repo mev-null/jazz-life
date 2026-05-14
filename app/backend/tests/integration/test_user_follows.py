@@ -174,7 +174,7 @@ def test_record_counts_requires_auth(unauthed_client: TestClient) -> None:
 def test_record_counts_empty_when_no_records(authed_client: TestClient) -> None:
     res = authed_client.get("/api/user-follows/record-counts")
     assert res.status_code == 200
-    assert res.json() == {"items": []}
+    assert res.json() == {"items": [], "total": 0}
 
 
 def test_record_counts_counts_only_owned_collections(
@@ -247,4 +247,4 @@ def test_record_counts_isolated_between_users(session: Session, _test_settings: 
         app.dependency_overrides.clear()
 
     assert res.status_code == 200
-    assert res.json() == {"items": []}
+    assert res.json() == {"items": [], "total": 0}

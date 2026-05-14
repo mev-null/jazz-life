@@ -118,7 +118,7 @@ def unauthed_client(session: Session, _test_settings: Settings) -> Iterator[Test
 def test_list_empty(authed_records_client: TestClient) -> None:
     res = authed_records_client.get("/api/records")
     assert res.status_code == 200
-    assert res.json() == {"items": []}
+    assert res.json() == {"items": [], "total": 0}
 
 
 def test_get_requires_auth(unauthed_client: TestClient) -> None:
@@ -258,6 +258,117 @@ def test_put_to_unknown_artist_returns_404(authed_records_client: TestClient) ->
         json={"artist_id": "ghost_artist_id"},
     )
     assert res.status_code == 404
+
+
+# ---- pagination ----
+
+
+def test_list_returns_total(authed_records_client: TestClient) -> None:
+    """`total` フィールドが返り、items 件数と一致する (全件取得時)。"""
+    for i in range(3):
+        authed_records_client.post("/api/records", json=_new_record_payload(title=f"R{i}"))
+    body = authed_records_client.get("/api/records").json()
+    assert body["total"] == 3
+    assert len(body["items"]) == 3
+
+
+def test_list_limit_offset_returns_slice(authed_records_client: TestClient) -> None:
+    """`?limit=2&offset=1` で items は slice、total は全件数。"""
+    for i in range(5):
+        authed_records_client.post("/api/records", json=_new_record_payload(title=f"R{i}"))
+    body = authed_records_client.get("/api/records?limit=2&offset=1").json()
+    titles = [r["title"] for r in body["items"]]
+    assert titles == ["R1", "R2"]
+    assert body["total"] == 5
+
+
+def test_list_invalid_limit_returns_422(authed_records_client: TestClient) -> None:
+    """`?limit=0` は ge=1 制約違反で 422。"""
+    res = authed_records_client.get("/api/records?limit=0")
+    assert res.status_code == 422
+
+
+# ---- pin via permissive PUT ----
+
+
+def test_put_is_pinned_sets_pin(authed_records_client: TestClient) -> None:
+    created = authed_records_client.post("/api/records", json=_new_record_payload()).json()
+    res = authed_records_client.put(f"/api/records/{created['id']}", json={"is_pinned": True})
+    assert res.status_code == 200
+    assert res.json()["is_pinned"] is True
+
+
+def test_put_is_pinned_over_limit_returns_409(
+    authed_records_client: TestClient,
+) -> None:
+    """8 件 pin 済の状態で 9 件目を pin しようとすると 409。"""
+    created_ids = [
+        authed_records_client.post("/api/records", json=_new_record_payload(title=f"R{i}")).json()[
+            "id"
+        ]
+        for i in range(9)
+    ]
+    for cid in created_ids[:8]:
+        res = authed_records_client.put(f"/api/records/{cid}", json={"is_pinned": True})
+        assert res.status_code == 200, res.text
+
+    res = authed_records_client.put(f"/api/records/{created_ids[8]}", json={"is_pinned": True})
+    assert res.status_code == 409
+
+
+def test_list_orders_pinned_first(authed_records_client: TestClient) -> None:
+    """pinned レコードが先頭に並ぶ (`is_pinned DESC, display_order ASC`)。"""
+    authed_records_client.post("/api/records", json=_new_record_payload(title="A"))
+    b = authed_records_client.post("/api/records", json=_new_record_payload(title="B")).json()
+    authed_records_client.post("/api/records", json=_new_record_payload(title="C"))
+
+    authed_records_client.put(f"/api/records/{b['id']}", json={"is_pinned": True})
+
+    titles = [r["title"] for r in authed_records_client.get("/api/records").json()["items"]]
+    assert titles == ["B", "A", "C"]
+    # a, c は元の display_order 順を保つ
+    assert titles.index("A") < titles.index("C")
+
+
+# ---- pin reorder ----
+
+
+def test_reorder_pins_changes_list_order(authed_records_client: TestClient) -> None:
+    ids = [
+        authed_records_client.post("/api/records", json=_new_record_payload(title=f"R{i}")).json()[
+            "id"
+        ]
+        for i in range(3)
+    ]
+    for rid in ids:
+        authed_records_client.put(f"/api/records/{rid}", json={"is_pinned": True})
+
+    # 逆順に並び替え
+    res = authed_records_client.put(
+        "/api/records/pins/order", json={"ids": [ids[2], ids[0], ids[1]]}
+    )
+    assert res.status_code == 204
+
+    titles = [r["title"] for r in authed_records_client.get("/api/records").json()["items"]]
+    assert titles == ["R2", "R0", "R1"]
+
+
+def test_reorder_pins_mismatched_returns_409(
+    authed_records_client: TestClient,
+) -> None:
+    a = authed_records_client.post("/api/records", json=_new_record_payload(title="A")).json()
+    b = authed_records_client.post("/api/records", json=_new_record_payload(title="B")).json()
+    authed_records_client.put(f"/api/records/{a['id']}", json={"is_pinned": True})
+    authed_records_client.put(f"/api/records/{b['id']}", json={"is_pinned": True})
+
+    # 1 件足りない
+    res = authed_records_client.put("/api/records/pins/order", json={"ids": [a["id"]]})
+    assert res.status_code == 409
+
+
+def test_reorder_pins_requires_auth(unauthed_client: TestClient) -> None:
+    res = unauthed_client.put("/api/records/pins/order", json={"ids": [str(uuid.uuid4())]})
+    assert res.status_code == 401
 
 
 # ---- conflict (duplicate Spotify album) ----
