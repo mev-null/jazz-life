@@ -1,0 +1,17 @@
+# Railway service config (backend).
+#
+# このファイルは Railway service "backend" の rootDirectory (= app/backend) 直下に
+# 置かれている。Railway は deploy 時にこのファイルを読み、サービス設定を上書きする。
+#
+# rootDirectory 自体は Railway service-level の設定で、このファイルでは指定できない
+# (rootDirectory を決めないとこのファイルの場所が定まらないため、当然そうなる)。
+# rootDirectory は Railway dashboard / `railway environment edit --service-config` で
+# 設定済み (2026-05-14 の Railpack 誤検出インシデント対応で復旧)。
+#
+# 経緯: builder / dockerfilePath / rootDirectory が空のまま git push 経由の
+# auto-deploy が走ると、Railway は pyproject.toml を見て Railpack の Python
+# auto-detect に倒れ、Dockerfile が無視されて起動できないという事故が起きた。
+# 再発を防ぐため、build 設定をコードで pin する。
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
