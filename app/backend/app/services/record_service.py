@@ -25,6 +25,8 @@ from app.models.record import VinylRecord
 from app.models.record_favorite_track import RecordFavoriteTrack
 from app.models.user_collection import UserCollection
 from app.schemas.record import (
+    RECORD_STATUS_OWNED,
+    RECORD_STATUS_WANTED,
     FavoriteTrack,
     VinylRecordCreate,
     VinylRecordRead,
@@ -129,7 +131,7 @@ class RecordService:
         now = dt.datetime.now(dt.UTC)
         # purchase_date は「登録 = 購入」を既定にする。owned で未指定なら今日 (JST)。
         # wanted はまだ買っていない状態なので、明示値が来ても None に強制する。
-        if data.status == "wanted":
+        if data.status == RECORD_STATUS_WANTED:
             purchase_date: dt.date | None = None
         else:
             purchase_date = data.purchase_date if data.purchase_date is not None else _today_jst()
@@ -191,8 +193,8 @@ class RecordService:
         # 補正を尊重)。既存値が残っていれば preserve (履歴を上書きしない)。
         was_wanted_to_owned = (
             "status" in patch_data
-            and patch_data["status"] == "owned"
-            and collection.status == "wanted"
+            and patch_data["status"] == RECORD_STATUS_OWNED
+            and collection.status == RECORD_STATUS_WANTED
         )
 
         # is_pinned の False→True 遷移時のみ上限 (_PIN_LIMIT) を enforce。
