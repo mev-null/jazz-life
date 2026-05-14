@@ -12,10 +12,37 @@ from app.core.exceptions import SpotifyApiError
 from app.models.user import User
 from app.routers.deps import get_current_user, get_spotify_app_client
 from app.schemas.common import ListResponse
-from app.schemas.spotify import SpotifyAlbumSummary
+from app.schemas.spotify import SpotifyAlbumSummary, SpotifyArtistSummary
 from app.services.spotify_app_client import SpotifyAppClient
 
 router = APIRouter(prefix="/api/spotify", tags=["spotify"])
+
+
+@router.get("/artists/search", response_model=ListResponse[SpotifyArtistSummary])
+def search_artists(
+    q: str = Query(min_length=1, description="artist name query"),
+    limit: int = Query(default=10, ge=1, le=10),
+    _: User = Depends(get_current_user),
+    client: SpotifyAppClient = Depends(get_spotify_app_client),
+) -> ListResponse[SpotifyArtistSummary]:
+    """ArtistsPage のフォロー追加モーダルから叩く。
+
+    UI で選んだ結果を `POST /api/artists` (upsert) → `POST /api/user-follows`
+    の 2 段で follow まで進める。
+    """
+    try:
+        items = client.search_artists(query=q, limit=limit)
+    except SpotifyApiError as exc:
+        if exc.status_code == 429:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=str(exc),
+            ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+    return ListResponse[SpotifyArtistSummary](items=items)
 
 
 @router.get("/albums/search", response_model=ListResponse[SpotifyAlbumSummary])

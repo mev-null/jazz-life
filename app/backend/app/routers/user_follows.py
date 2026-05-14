@@ -2,11 +2,12 @@
 
 - GET /api/user-follows/artists: 現ユーザが follow 中 (archived=false) の artists
 - GET /api/user-follows/record-counts: 現ユーザの artist_id ごとの所有レコード数
+- POST /api/user-follows: 明示的に artist を follow に追加 (ArtistsPage の「追加」UI 用)
 - DELETE /api/user-follows/{artist_id}: follow 解除 (soft delete)
 
-follow 追加は records 登録時の auto-follow (RecordService.create 経由) で
-カバーしてあり、明示的な follow POST endpoint は持たない。Phase B-4 で
-Spotify follow 同期や手動 pin を入れる時に拡張する。
+records 登録経由の auto-follow (RecordService.create) と並行して、
+ArtistsPage から Spotify 検索で artist を選んで follow を作る経路も
+このルータが受け持つ。
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -22,6 +23,7 @@ from app.routers.deps import (
 )
 from app.schemas.artist import ArtistRead, ArtistRecordCount
 from app.schemas.common import ListResponse
+from app.schemas.user_follow import UserFollowCreate
 from app.services.record_service import RecordService
 
 router = APIRouter(prefix="/api/user-follows", tags=["user-follows"])
@@ -58,6 +60,33 @@ def list_record_counts(
     """
     counts = service.count_owned_by_artist_for_user(current_user.id)
     return ListResponse(items=[ArtistRecordCount(artist_id=k, count=v) for k, v in counts.items()])
+
+
+@router.post("", response_model=ArtistRead, status_code=status.HTTP_201_CREATED)
+def follow_artist(
+    payload: UserFollowCreate,
+    current_user: User = Depends(get_current_user),
+    artist_repo: ArtistRepository = Depends(get_artist_repository),
+    follow_repo: UserFollowRepository = Depends(get_user_follow_repository),
+) -> ArtistRead:
+    """`artist_id` を current user の follow に追加する。
+
+    `UserFollowRepository.upsert` を使うので冪等:
+    - 既に active follow なら上書きで no-op、201 + 既存 artist
+    - archived 行があれば archived_flag=false に戻して再 follow
+    - 行が無ければ新規 INSERT
+
+    artist が `artists` テーブルに無い場合は 404。UI 側で先に `POST /api/artists`
+    で upsert する想定 (Spotify 検索結果のメタデータをそのまま投入する)。
+    """
+    artist = artist_repo.get(payload.artist_id)
+    if artist is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"artist not found: spotify_id={payload.artist_id}",
+        )
+    follow_repo.upsert(current_user.id, payload.artist_id)
+    return ArtistRead.model_validate(artist)
 
 
 @router.delete("/{artist_id}", status_code=status.HTTP_204_NO_CONTENT)

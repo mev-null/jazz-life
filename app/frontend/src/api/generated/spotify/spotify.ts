@@ -22,13 +22,145 @@ import type {
 import type {
   HTTPValidationError,
   ListResponseSpotifyAlbumSummary,
-  SearchAlbumsApiSpotifyAlbumsSearchGetParams
+  ListResponseSpotifyArtistSummary,
+  SearchAlbumsApiSpotifyAlbumsSearchGetParams,
+  SearchArtistsApiSpotifyArtistsSearchGetParams
 } from '../model';
 
 import { customFetch } from '../../mutator';
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+
+
+export type searchArtistsApiSpotifyArtistsSearchGetResponse200 = {
+  data: ListResponseSpotifyArtistSummary
+  status: 200
+}
+
+export type searchArtistsApiSpotifyArtistsSearchGetResponse422 = {
+  data: HTTPValidationError
+  status: 422
+}
+
+export type searchArtistsApiSpotifyArtistsSearchGetResponseSuccess = (searchArtistsApiSpotifyArtistsSearchGetResponse200) & {
+  headers: Headers;
+};
+export type searchArtistsApiSpotifyArtistsSearchGetResponseError = (searchArtistsApiSpotifyArtistsSearchGetResponse422) & {
+  headers: Headers;
+};
+
+export type searchArtistsApiSpotifyArtistsSearchGetResponse = (searchArtistsApiSpotifyArtistsSearchGetResponseSuccess | searchArtistsApiSpotifyArtistsSearchGetResponseError)
+
+export const getSearchArtistsApiSpotifyArtistsSearchGetUrl = (params: SearchArtistsApiSpotifyArtistsSearchGetParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/spotify/artists/search?${stringifiedParams}` : `/api/spotify/artists/search`
+}
+
+/**
+ * ArtistsPage のフォロー追加モーダルから叩く。
+
+UI で選んだ結果を `POST /api/artists` (upsert) → `POST /api/user-follows`
+の 2 段で follow まで進める。
+ * @summary Search Artists
+ */
+export const searchArtistsApiSpotifyArtistsSearchGet = async (params: SearchArtistsApiSpotifyArtistsSearchGetParams, options?: RequestInit): Promise<searchArtistsApiSpotifyArtistsSearchGetResponse> => {
+
+  return customFetch<searchArtistsApiSpotifyArtistsSearchGetResponse>(getSearchArtistsApiSpotifyArtistsSearchGetUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchArtistsApiSpotifyArtistsSearchGetQueryKey = (params?: SearchArtistsApiSpotifyArtistsSearchGetParams,) => {
+    return [
+    `/api/spotify/artists/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchArtistsApiSpotifyArtistsSearchGetQueryOptions = <TData = Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>, TError = HTTPValidationError>(params: SearchArtistsApiSpotifyArtistsSearchGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchArtistsApiSpotifyArtistsSearchGetQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>> = ({ signal }) => searchArtistsApiSpotifyArtistsSearchGet(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type SearchArtistsApiSpotifyArtistsSearchGetQueryResult = NonNullable<Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>>
+export type SearchArtistsApiSpotifyArtistsSearchGetQueryError = HTTPValidationError
+
+
+export function useSearchArtistsApiSpotifyArtistsSearchGet<TData = Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>, TError = HTTPValidationError>(
+ params: SearchArtistsApiSpotifyArtistsSearchGetParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>,
+          TError,
+          Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchArtistsApiSpotifyArtistsSearchGet<TData = Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>, TError = HTTPValidationError>(
+ params: SearchArtistsApiSpotifyArtistsSearchGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>,
+          TError,
+          Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useSearchArtistsApiSpotifyArtistsSearchGet<TData = Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>, TError = HTTPValidationError>(
+ params: SearchArtistsApiSpotifyArtistsSearchGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Search Artists
+ */
+
+export function useSearchArtistsApiSpotifyArtistsSearchGet<TData = Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>, TError = HTTPValidationError>(
+ params: SearchArtistsApiSpotifyArtistsSearchGetParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof searchArtistsApiSpotifyArtistsSearchGet>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getSearchArtistsApiSpotifyArtistsSearchGetQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
 
 
 

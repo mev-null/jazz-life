@@ -144,3 +144,79 @@ def test_search_translates_500_to_502(spotify_client: TestClient, httpx_mock: HT
 
     res = spotify_client.get("/api/spotify/albums/search", params={"q": "anything"})
     assert res.status_code == 502
+
+
+# ---- GET /api/spotify/artists/search ----
+
+
+def _artist_search_response(items: list[dict[str, Any]]) -> dict[str, Any]:
+    return {"artists": {"items": items}}
+
+
+def _artist_item() -> dict[str, Any]:
+    return {
+        "id": "art-miles",
+        "name": "Miles Davis",
+        "images": [{"url": "https://i.scdn.co/image/miles.jpg"}],
+    }
+
+
+def test_artist_search_requires_auth(unauthed_client: TestClient) -> None:
+    res = unauthed_client.get("/api/spotify/artists/search", params={"q": "anything"})
+    assert res.status_code == 401
+
+
+def test_artist_search_returns_items(spotify_client: TestClient, httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    httpx_mock.add_response(
+        url=_SEARCH_URL_PATTERN,
+        method="GET",
+        json=_artist_search_response([_artist_item()]),
+    )
+
+    res = spotify_client.get("/api/spotify/artists/search", params={"q": "Miles"})
+    assert res.status_code == 200, res.text
+    assert res.json() == {
+        "items": [
+            {
+                "spotify_id": "art-miles",
+                "name": "Miles Davis",
+                "image_url": "https://i.scdn.co/image/miles.jpg",
+            }
+        ]
+    }
+
+
+def test_artist_search_missing_q_is_validation_error(spotify_client: TestClient) -> None:
+    res = spotify_client.get("/api/spotify/artists/search")
+    assert res.status_code == 422
+
+
+def test_artist_search_translates_429(spotify_client: TestClient, httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    httpx_mock.add_response(url=_SEARCH_URL_PATTERN, method="GET", status_code=429)
+
+    res = spotify_client.get("/api/spotify/artists/search", params={"q": "Miles"})
+    assert res.status_code == 429
+
+
+def test_artist_search_skips_items_missing_id_or_name(
+    spotify_client: TestClient, httpx_mock: HTTPXMock
+) -> None:
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    httpx_mock.add_response(
+        url=_SEARCH_URL_PATTERN,
+        method="GET",
+        json=_artist_search_response(
+            [
+                _artist_item(),
+                {"id": "", "name": "no-id"},
+                {"id": "art-2", "name": ""},
+            ]
+        ),
+    )
+
+    res = spotify_client.get("/api/spotify/artists/search", params={"q": "Miles"})
+    assert res.status_code == 200
+    ids = [a["spotify_id"] for a in res.json()["items"]]
+    assert ids == ["art-miles"]

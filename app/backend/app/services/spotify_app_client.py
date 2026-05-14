@@ -23,7 +23,7 @@ import httpx
 
 from app.core.exceptions import SpotifyApiError
 from app.core.settings import Settings
-from app.schemas.spotify import SpotifyAlbumSummary
+from app.schemas.spotify import SpotifyAlbumSummary, SpotifyArtistSummary
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -76,6 +76,51 @@ class SpotifyAppClient:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._cached: _CachedToken | None = None
+
+    def search_artists(
+        self,
+        query: str,
+        limit: int = 10,
+    ) -> list[SpotifyArtistSummary]:
+        """`GET /v1/search?type=artist` を叩いて候補一覧を返す。
+
+        ArtistsPage のフォロー追加モーダル用。`search_albums` と違って
+        artist 名で直接ヒットさせるだけなので field-filter は重ねない。
+        """
+        if not query.strip():
+            return []
+        token = self._get_app_token()
+        q = query.strip()
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                res = client.get(
+                    SPOTIFY_SEARCH_URL,
+                    headers={"Authorization": f"Bearer {token}"},
+                    params={"q": q, "type": "artist", "limit": limit},
+                )
+        except httpx.HTTPError as exc:
+            raise SpotifyApiError("failed to reach Spotify search endpoint") from exc
+        if res.status_code == 429:
+            raise SpotifyApiError("spotify rate limit exceeded", status_code=429)
+        if res.status_code != 200:
+            try:
+                err_body = res.json()
+                err_detail = err_body.get("error")
+            except ValueError:
+                err_detail = None
+            logger.warning(
+                "spotify artist search returned %s q=%r error=%s",
+                res.status_code,
+                q,
+                err_detail,
+            )
+            raise SpotifyApiError(
+                f"spotify artist search returned {res.status_code}",
+                status_code=res.status_code,
+            )
+        payload = res.json()
+        items = (payload.get("artists") or {}).get("items") or []
+        return [_to_artist_summary(item) for item in items if item.get("id") and item.get("name")]
 
     def search_albums(
         self,
@@ -363,6 +408,16 @@ def _parse_ingest(item: dict, artist_id: str) -> SpotifyAlbumIngest | None:
         release_date=release_date,
         image_url=image_url,
         artist_id=artist_id,
+    )
+
+
+def _to_artist_summary(item: dict) -> SpotifyArtistSummary:
+    images = item.get("images") or []
+    image_url = images[0].get("url") if images else None
+    return SpotifyArtistSummary(
+        spotify_id=item["id"],
+        name=item["name"],
+        image_url=image_url,
     )
 
 

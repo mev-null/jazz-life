@@ -1,6 +1,19 @@
 from pydantic import BaseModel
 
 
+class SpotifyArtistSummary(BaseModel):
+    """Spotify artist search 結果の 1 件を表す DTO。
+
+    ArtistsPage の「フォロー追加」モーダルが Spotify から候補を引く時に使う。
+    `upsert_artist` (POST /api/artists) と `follow_artist` (POST /api/user-follows)
+    に渡せるよう、`spotify_id` / `name` / `image_url` を露出する。
+    """
+
+    spotify_id: str
+    name: str
+    image_url: str | None
+
+
 class SpotifyAlbumSummary(BaseModel):
     """Spotify album search 結果の 1 件を表す DTO。
 

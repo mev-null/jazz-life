@@ -163,6 +163,78 @@ def test_list_followed_artists_returns_only_active_follows(
     assert ids == {"art-active"}
 
 
+# ---- POST /api/user-follows ----
+
+
+def test_follow_requires_auth(unauthed_client: TestClient) -> None:
+    res = unauthed_client.post("/api/user-follows", json={"artist_id": "any"})
+    assert res.status_code == 401
+
+
+def test_follow_unknown_artist_returns_404(authed_client: TestClient) -> None:
+    res = authed_client.post("/api/user-follows", json={"artist_id": "ghost"})
+    assert res.status_code == 404
+
+
+def test_follow_creates_new_row(authed_client: TestClient, session: Session) -> None:
+    from sqlmodel import select
+
+    _seed_artist(session, "art-new")
+    user = session.exec(select(User).where(User.spotify_id == "test-owner")).one()
+
+    res = authed_client.post("/api/user-follows", json={"artist_id": "art-new"})
+    assert res.status_code == 201, res.text
+    assert res.json()["spotify_id"] == "art-new"
+
+    session.expire_all()
+    follow_row = session.exec(
+        select(UserFollow)
+        .where(UserFollow.user_id == user.id)
+        .where(UserFollow.artist_id == "art-new")
+    ).one()
+    assert follow_row.archived_flag is False
+
+
+def test_follow_reactivates_archived(authed_client: TestClient, session: Session) -> None:
+    """archived 行があるアーティストを再 follow すると archived_flag=false に戻る。"""
+    from sqlmodel import select
+
+    _seed_artist(session, "art-revive")
+    user = session.exec(select(User).where(User.spotify_id == "test-owner")).one()
+    _seed_follow(session, user.id, "art-revive", archived=True)
+
+    res = authed_client.post("/api/user-follows", json={"artist_id": "art-revive"})
+    assert res.status_code == 201
+
+    session.expire_all()
+    follow_row = session.exec(
+        select(UserFollow)
+        .where(UserFollow.user_id == user.id)
+        .where(UserFollow.artist_id == "art-revive")
+    ).one()
+    assert follow_row.archived_flag is False
+    assert UserFollowRepository(session).list_artist_ids(user.id) == ["art-revive"]
+
+
+def test_follow_already_active_is_idempotent(authed_client: TestClient, session: Session) -> None:
+    from sqlmodel import select
+
+    _seed_artist(session, "art-dup")
+    user = session.exec(select(User).where(User.spotify_id == "test-owner")).one()
+    _seed_follow(session, user.id, "art-dup", archived=False)
+
+    res = authed_client.post("/api/user-follows", json={"artist_id": "art-dup"})
+    assert res.status_code == 201
+
+    rows = session.exec(
+        select(UserFollow)
+        .where(UserFollow.user_id == user.id)
+        .where(UserFollow.artist_id == "art-dup")
+    ).all()
+    assert len(rows) == 1
+    assert rows[0].archived_flag is False
+
+
 # ---- GET /api/user-follows/record-counts ----
 
 

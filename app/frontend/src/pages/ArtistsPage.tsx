@@ -7,6 +7,7 @@ import {
   getRecordCounts,
   getReleases,
 } from "../api/client";
+import { AddArtistModal } from "../components/artists/AddArtistModal";
 import { ArtistDetailModal } from "../components/artists/ArtistDetailModal";
 import {
   FeedDetailModal,
@@ -55,6 +56,7 @@ export function ArtistsPage() {
   const [openRecord, setOpenRecord] = useState<VinylRecord | null>(null);
   const [openFeedItem, setOpenFeedItem] = useState<FeedItem | null>(null);
   const [formMode, setFormMode] = useState<FormMode | null>(null);
+  const [addArtistOpen, setAddArtistOpen] = useState(false);
 
   const { isRead, markRead, markUnread } = useReadState();
 
@@ -149,6 +151,13 @@ export function ArtistsPage() {
         <span className="text-ink-faint tabular-nums">
           {artistsQ.data ? artistsQ.data.items.length : ""}
         </span>
+        <button
+          type="button"
+          onClick={() => setAddArtistOpen(true)}
+          className="ml-auto cursor-pointer text-xs italic text-ink-mute transition-colors hover:text-ink"
+        >
+          + add
+        </button>
       </h1>
 
       <div className="mt-6">
@@ -241,6 +250,11 @@ export function ArtistsPage() {
         onToggleRead={toggleOpenFeedRead}
         onClose={() => setOpenFeedItem(null)}
         onCollectFromRelease={handleCollectFromRelease}
+      />
+
+      <AddArtistModal
+        open={addArtistOpen}
+        onClose={() => setAddArtistOpen(false)}
       />
     </section>
   );

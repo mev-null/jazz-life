@@ -584,6 +584,64 @@
         }
       }
     },
+    "/api/spotify/artists/search": {
+      "get": {
+        "tags": [
+          "spotify"
+        ],
+        "summary": "Search Artists",
+        "description": "ArtistsPage のフォロー追加モーダルから叩く。\n\nUI で選んだ結果を `POST /api/artists` (upsert) → `POST /api/user-follows`\nの 2 段で follow まで進める。",
+        "operationId": "search_artists_api_spotify_artists_search_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "artist name query",
+              "title": "Q"
+            },
+            "description": "artist name query"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResponse_SpotifyArtistSummary_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/spotify/albums/search": {
       "get": {
         "tags": [
@@ -696,6 +754,48 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ListResponse_ArtistRecordCount_"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user-follows": {
+      "post": {
+        "tags": [
+          "user-follows"
+        ],
+        "summary": "Follow Artist",
+        "description": "`artist_id` を current user の follow に追加する。\n\n`UserFollowRepository.upsert` を使うので冪等:\n- 既に active follow なら上書きで no-op、201 + 既存 artist\n- archived 行があれば archived_flag=false に戻して再 follow\n- 行が無ければ新規 INSERT\n\nartist が `artists` テーブルに無い場合は 404。UI 側で先に `POST /api/artists`\nで upsert する想定 (Spotify 検索結果のメタデータをそのまま投入する)。",
+        "operationId": "follow_artist_api_user_follows_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserFollowCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtistRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1038,6 +1138,22 @@
         ],
         "title": "ListResponse[SpotifyAlbumSummary]"
       },
+      "ListResponse_SpotifyArtistSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SpotifyArtistSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "ListResponse[SpotifyArtistSummary]"
+      },
       "ListResponse_VinylRecordRead_": {
         "properties": {
           "items": {
@@ -1199,6 +1315,37 @@
         "title": "SpotifyAlbumSummary",
         "description": "Spotify album search 結果の 1 件を表す DTO。\n\n`vinyl_records` への投入で必要なフィールドだけを露出する:\n`spotify_album_id` (= id) / `title` (= name) / `original_release_date` (= release_date)\n/ `image_url` / 表示用の `artist_names` / artist auto-upsert 用の `primary_artist_id`。\n\n`primary_artist_id` は album.artists[0].id (Spotify artist ID)。RecordFormModal が\nalbum 選択時に artists テーブルへ upsert する際、name 一致ではなく Spotify 正規 ID で\n識別するために用いる。album に artists が無いケース (極めて稀) のみ null。"
       },
+      "SpotifyArtistSummary": {
+        "properties": {
+          "spotify_id": {
+            "type": "string",
+            "title": "Spotify Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "spotify_id",
+          "name",
+          "image_url"
+        ],
+        "title": "SpotifyArtistSummary",
+        "description": "Spotify artist search 結果の 1 件を表す DTO。\n\nArtistsPage の「フォロー追加」モーダルが Spotify から候補を引く時に使う。\n`upsert_artist` (POST /api/artists) と `follow_artist` (POST /api/user-follows)\nに渡せるよう、`spotify_id` / `name` / `image_url` を露出する。"
+      },
       "SyncRunRequest": {
         "properties": {
           "since_date": {
@@ -1317,6 +1464,22 @@
         ],
         "title": "SyncStatusRead",
         "description": "`/api/releases/sync-status` のレスポンス。\n\nフロント Feed 側で「最終同期日時 / エラー状態」を表示するため (ADR-000 §314)。\nRow が無い (一度も sync していない) ケースでは全フィールドが null になる。"
+      },
+      "UserFollowCreate": {
+        "properties": {
+          "artist_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Artist Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artist_id"
+        ],
+        "title": "UserFollowCreate",
+        "description": "`POST /api/user-follows` のリクエスト。\n\nartist は事前に `artists` テーブルに存在している必要がある (FK 制約)。\nUI 側は Spotify artist search → `POST /api/artists` (upsert) →\n本エンドポイント の 3 段で follow まで到達する想定。"
       },
       "ValidationError": {
         "properties": {
