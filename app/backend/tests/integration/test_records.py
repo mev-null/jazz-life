@@ -3,6 +3,7 @@ import datetime as dt
 import uuid
 from collections.abc import Iterator
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -197,6 +198,52 @@ def test_put_requires_auth(unauthed_client: TestClient, session: Session) -> Non
     _seed_artists_for_records(session)
     res = unauthed_client.put(f"/api/records/{uuid.uuid4()}", json={"memo": "no auth"})
     assert res.status_code == 401
+
+
+# ---- purchase_date default / wanted→owned auto-stamp ----
+
+
+def test_create_owned_without_purchase_date_returns_today(
+    authed_records_client: TestClient,
+) -> None:
+    res = authed_records_client.post("/api/records", json=_new_record_payload(status="owned"))
+    assert res.status_code == 201, res.text
+    today = dt.datetime.now(ZoneInfo("Asia/Tokyo")).date()
+    body = res.json()
+    assert body["purchase_date"] is not None
+    returned = dt.date.fromisoformat(body["purchase_date"])
+    assert abs((returned - today).days) <= 1
+
+
+def test_create_wanted_forces_purchase_date_null(
+    authed_records_client: TestClient,
+) -> None:
+    res = authed_records_client.post(
+        "/api/records",
+        json=_new_record_payload(status="wanted", purchase_date="2020-01-01"),
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["purchase_date"] is None
+
+
+def test_update_wanted_to_owned_stamps_today(
+    authed_records_client: TestClient,
+) -> None:
+    created = authed_records_client.post(
+        "/api/records", json=_new_record_payload(status="wanted")
+    ).json()
+    assert created["purchase_date"] is None
+
+    res = authed_records_client.put(
+        f"/api/records/{created['id']}",
+        json={"status": "owned"},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["status"] == "owned"
+    today = dt.datetime.now(ZoneInfo("Asia/Tokyo")).date()
+    returned = dt.date.fromisoformat(body["purchase_date"])
+    assert abs((returned - today).days) <= 1
 
 
 def test_invalid_release_date_returns_422(authed_records_client: TestClient) -> None:

@@ -9,6 +9,7 @@ orchestration 層 (ADR-006)。
 import datetime as dt
 import uuid
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import IntegrityError
 
@@ -61,6 +62,12 @@ _COLLECTION_FIELDS = (
 # 表示はクライアント側で先頭 6 件に切る (UserCollection の order_by が
 # is_pinned DESC, display_order ASC なので先頭 6 件は自動的に pin 優先になる)。
 _PIN_LIMIT = 8
+
+
+def _today_jst() -> dt.date:
+    # purchase_date のデフォルト/wanted→owned 遷移時の自動打刻に使う。
+    # サーバ側で TZ を固定することで、ユーザのブラウザ TZ に依存させない。
+    return dt.datetime.now(ZoneInfo("Asia/Tokyo")).date()
 
 
 class RecordService:
@@ -120,12 +127,18 @@ class RecordService:
         self.collection_repo.lock_for_display_order(user_id)
         next_order = self.collection_repo.max_display_order_for_user(user_id) + 1
         now = dt.datetime.now(dt.UTC)
+        # purchase_date は「登録 = 購入」を既定にする。owned で未指定なら今日 (JST)。
+        # wanted はまだ買っていない状態なので、明示値が来ても None に強制する。
+        if data.status == "wanted":
+            purchase_date: dt.date | None = None
+        else:
+            purchase_date = data.purchase_date if data.purchase_date is not None else _today_jst()
         collection = UserCollection(
             user_id=user_id,
             vinyl_record_id=catalog.id,
             status=data.status,
             pressing_info=data.pressing_info,
-            purchase_date=data.purchase_date,
+            purchase_date=purchase_date,
             purchase_store=data.purchase_store,
             purchase_price=data.purchase_price,
             purchase_currency=data.purchase_currency,
@@ -173,6 +186,15 @@ class RecordService:
 
         patch_data = patch.model_dump(exclude_unset=True)
 
+        # wanted → owned 遷移時に「買った日 = 今日」を自動打刻するための前置判定。
+        # patch に明示的な purchase_date が含まれていればそちらを優先 (ユーザの過去日
+        # 補正を尊重)。既存値が残っていれば preserve (履歴を上書きしない)。
+        was_wanted_to_owned = (
+            "status" in patch_data
+            and patch_data["status"] == "owned"
+            and collection.status == "wanted"
+        )
+
         # is_pinned の False→True 遷移時のみ上限 (_PIN_LIMIT) を enforce。
         # 既に True の collection を再度 True で送るのは no-op。
         # `pinned_at` は True 時に now()、False 時に None を自動セット。
@@ -193,6 +215,15 @@ class RecordService:
         for key in _COLLECTION_FIELDS:
             if key in patch_data:
                 setattr(collection, key, patch_data[key])
+
+        # wanted→owned 遷移で purchase_date が未指定/null のままなら今日 (JST) で埋める。
+        # 明示 patch があれば上の loop で既に反映されているので、ここでは触らない。
+        if (
+            was_wanted_to_owned
+            and "purchase_date" not in patch_data
+            and collection.purchase_date is None
+        ):
+            collection.purchase_date = _today_jst()
 
         # 2) catalog 系フィールド (manual のみ書く、promote 経路を吸収)
         catalog_changes = {k: patch_data[k] for k in _CATALOG_FIELDS if k in patch_data}

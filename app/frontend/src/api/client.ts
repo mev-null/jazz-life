@@ -405,17 +405,26 @@ export async function createVinylRecord(
   if (USE_MOCK) {
     await new Promise((r) => setTimeout(r, 80));
     const now = new Date().toISOString();
+    const status = input.status ?? "owned";
+    // backend と同じルールで purchase_date を決める:
+    // - wanted: 明示値が来ても強制 None
+    // - owned + 未指定: 今日 (ブラウザ TZ。Asia/Tokyo の本番と相互運用するので
+    //   ロケール `sv-SE` で ISO 形式に揃える)
+    const purchaseDate =
+      status === "wanted"
+        ? null
+        : (input.purchase_date ?? new Date().toLocaleDateString("sv-SE"));
     const created: VinylRecord = {
       id: crypto.randomUUID(),
       artist_id: input.artist_id,
       spotify_album_id: input.spotify_album_id ?? null,
       source: input.source ?? "manual",
-      status: input.status ?? "owned",
+      status,
       title: input.title,
       image_url: input.image_url ?? null,
       original_release_date: input.original_release_date ?? null,
       pressing_info: input.pressing_info ?? null,
-      purchase_date: input.purchase_date ?? null,
+      purchase_date: purchaseDate,
       purchase_store: input.purchase_store ?? null,
       purchase_price: input.purchase_price ?? null,
       purchase_currency: input.purchase_currency ?? "JPY",
@@ -468,9 +477,19 @@ export async function updateVinylRecord(
         (patch as Record<string, unknown>)[key] = value;
       }
     }
+    const current = mockRecordsStore[idx];
+    // wanted → owned 遷移時、purchase_date が None なら今日 (ブラウザ TZ) を自動打刻。
+    // patch に明示 purchase_date があればそちらを優先 (backend 側挙動と一致)。
+    if (
+      input.status === "owned" &&
+      current.status === "wanted" &&
+      input.purchase_date === undefined &&
+      current.purchase_date === null
+    ) {
+      patch.purchase_date = new Date().toLocaleDateString("sv-SE");
+    }
     // backend の False→True 遷移 + pin 上限 9 件目で 409 を mock 側でも emulate。
     // 新規 pin は pin_order = max+1 で末尾に。unpin は pin_order = null。
-    const current = mockRecordsStore[idx];
     if (input.is_pinned === true && !current.is_pinned) {
       const pinned = mockRecordsStore.filter((r) => r.is_pinned);
       if (pinned.length >= MOCK_PIN_LIMIT) {
