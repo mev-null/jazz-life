@@ -33,7 +33,7 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center px-8">
       <div className="text-center">
         <h1 className="text-6xl font-medium tracking-tight sm:text-7xl md:text-8xl">
-          Jazz Life
+          Analog Life
         </h1>
         <p className="mt-6 text-base italic text-ink-mute sm:text-lg">
           An almanac of records, releases &amp; concerts.
