@@ -184,7 +184,8 @@ def test_artist_search_returns_items(spotify_client: TestClient, httpx_mock: HTT
                 "name": "Miles Davis",
                 "image_url": "https://i.scdn.co/image/miles.jpg",
             }
-        ]
+        ],
+        "total": 0,
     }
 
 
