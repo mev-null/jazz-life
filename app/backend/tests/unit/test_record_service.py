@@ -1,6 +1,7 @@
 import datetime as dt
 import uuid
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import pytest
 from sqlmodel import Session, select
@@ -346,6 +347,135 @@ def test_update_promote_when_other_user_already_has_spotify_album(
     b_refreshed_collection = UserCollectionRepository(session).get(b_record.id)
     assert a_refreshed_collection is not None and b_refreshed_collection is not None
     assert a_refreshed_collection.vinyl_record_id == b_refreshed_collection.vinyl_record_id
+
+
+# ---- purchase_date default / wanted→owned auto-stamp ----
+
+
+def test_create_owned_without_purchase_date_defaults_to_today(session: Session) -> None:
+    """owned + purchase_date 未指定 → サーバ側で今日 (JST) を打刻。"""
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+
+    record = service.create(
+        VinylRecordCreate(artist_id=artist_id, title="A", status="owned"), user_id
+    )
+
+    today = dt.datetime.now(ZoneInfo("Asia/Tokyo")).date()
+    assert record.purchase_date is not None
+    # TZ 境界の flaky を避けるため ±1 日許容
+    assert abs((record.purchase_date - today).days) <= 1
+
+
+def test_create_owned_preserves_explicit_purchase_date(session: Session) -> None:
+    """owned + 過去日を明示 → そのまま保存 (デフォルトに上書きされない)。"""
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+
+    record = service.create(
+        VinylRecordCreate(
+            artist_id=artist_id,
+            title="A",
+            status="owned",
+            purchase_date=dt.date(2020, 1, 1),
+        ),
+        user_id,
+    )
+
+    assert record.purchase_date == dt.date(2020, 1, 1)
+
+
+def test_create_wanted_forces_purchase_date_none(session: Session) -> None:
+    """wanted は purchase_date を持たない。明示値が来ても None に強制。"""
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+
+    record = service.create(
+        VinylRecordCreate(
+            artist_id=artist_id,
+            title="A",
+            status="wanted",
+            purchase_date=dt.date(2020, 1, 1),
+        ),
+        user_id,
+    )
+
+    assert record.purchase_date is None
+
+
+def test_update_wanted_to_owned_auto_stamps_today(session: Session) -> None:
+    """wanted → owned 遷移時、purchase_date が None なら今日 (JST) を打刻。"""
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+    wanted = service.create(
+        VinylRecordCreate(artist_id=artist_id, title="A", status="wanted"), user_id
+    )
+    assert wanted.purchase_date is None
+
+    updated = service.update_partial(wanted.id, VinylRecordUpdate(status="owned"), user_id)
+
+    today = dt.datetime.now(ZoneInfo("Asia/Tokyo")).date()
+    assert updated.status == "owned"
+    assert updated.purchase_date is not None
+    assert abs((updated.purchase_date - today).days) <= 1
+
+
+def test_update_wanted_to_owned_respects_explicit_purchase_date(session: Session) -> None:
+    """wanted → owned + 明示 purchase_date があれば、自動打刻より明示値を優先。"""
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+    wanted = service.create(
+        VinylRecordCreate(artist_id=artist_id, title="A", status="wanted"), user_id
+    )
+
+    updated = service.update_partial(
+        wanted.id,
+        VinylRecordUpdate(status="owned", purchase_date=dt.date(2010, 1, 1)),
+        user_id,
+    )
+
+    assert updated.purchase_date == dt.date(2010, 1, 1)
+
+
+def test_update_owned_to_owned_does_not_touch_purchase_date(session: Session) -> None:
+    """既に owned の行に status: owned を送っても purchase_date は変えない。"""
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+    owned = service.create(
+        VinylRecordCreate(
+            artist_id=artist_id,
+            title="A",
+            status="owned",
+            purchase_date=dt.date(2015, 6, 1),
+        ),
+        user_id,
+    )
+
+    updated = service.update_partial(owned.id, VinylRecordUpdate(status="owned"), user_id)
+
+    assert updated.purchase_date == dt.date(2015, 6, 1)
+
+
+def test_update_partial_purchase_date_round_trips(session: Session) -> None:
+    """通常の purchase_date 単体 patch (ADR-002 寛容 PUT) はそのまま反映される。"""
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+    record = service.create(
+        VinylRecordCreate(artist_id=artist_id, title="A", status="owned"), user_id
+    )
+
+    updated = service.update_partial(
+        record.id, VinylRecordUpdate(purchase_date=dt.date(1999, 12, 31)), user_id
+    )
+
+    assert updated.purchase_date == dt.date(1999, 12, 31)
 
 
 # ---- delete ----

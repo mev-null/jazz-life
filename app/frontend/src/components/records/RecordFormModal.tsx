@@ -70,6 +70,11 @@ const stringToFavorites = (s: string): FavoriteTrack[] =>
     .filter((line) => line.length > 0)
     .map((line) => ({ spotify_track_id: null, track_name: line, note: null }));
 
+// 「今日」を Add フォームの pre-fill 用にブラウザのローカル TZ で YYYY-MM-DD に。
+// `sv-SE` ロケールが ISO 形式と一致するので Date input の value にそのまま渡せる。
+// 実際の保存値はサーバ (Asia/Tokyo) で確定するので、ここはあくまで視覚的目印。
+const todayLocalISO = (): string => new Date().toLocaleDateString("sv-SE");
+
 export function RecordFormModal({ mode, artists, followedArtists, onClose }: Props) {
   const queryClient = useQueryClient();
   const isEdit = mode?.kind === "edit";
@@ -78,6 +83,11 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
   // or Spotify 検索」誘導が文脈に合わないため)。HomePage の "+" 追加 や
   // edit mode では従来通り typeahead を許可する。
   const artistLocked = mode?.kind === "add" && Boolean(mode.defaults?.artistId);
+  // wanted (Want list 経路) は「まだ買ってない」状態なので purchase_date を編集不能に。
+  // edit モードでは購入日の後追い修正を許す (過去日への補正を残す) ため、ここでは
+  // wanted 新規作成時だけロックする。
+  const purchaseDateLocked =
+    mode?.kind === "add" && mode.defaults?.status === "wanted";
   const { isMobile } = useBreakpoint();
   const mobile = MOBILE_UI_ENABLED && isMobile;
   // Mobile では autoFocus で keyboard が即立ち上がるとモーダル本体が下に押し下げられて
@@ -183,7 +193,10 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
       setReleaseDate(d?.originalReleaseDate ?? "");
       setPressingInfo("");
       setPurchaseStore("");
-      setPurchaseDate("");
+      // owned (status 未指定も含む) は「登録 = 今日購入」を既定とし、ユーザに
+      // 視覚的にも「このまま保存すれば今日扱い」と示す。wanted (Want list) は
+      // まだ買ってない状態なので空のまま (入力欄も後段で disabled にする)。
+      setPurchaseDate(d?.status === "wanted" ? "" : todayLocalISO());
       setMemo("");
       setFavoriteTracks("");
       // Release 由来の image URL は Spotify CDN なので blob revoke 不要。
@@ -386,16 +399,18 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
       // id を受け取り、必要があれば jacket をその id 宛にアップロードする。
       // Spotify から選んだ album があれば source = "spotify" にして image_url も同梱。
       // pendingFile があれば後段の jacket upload で image_url が上書きされる。
+      const status = mode.defaults?.status;
       const createInput: VinylRecordCreate = {
         artist_id: artistId,
         title: title.trim(),
         spotify_album_id: spotifyAlbumId,
         source: spotifyAlbumId ? "spotify" : "manual",
-        status: mode.defaults?.status,
+        status,
         image_url: pendingFile ? null : existingImageUrl,
         original_release_date: releaseDate.trim() || null,
         pressing_info: pressingInfo.trim() || null,
-        purchase_date: purchaseDate || null,
+        // wanted は backend 側で強制 None になるが、frontend からも明示しない。
+        purchase_date: status === "wanted" ? null : purchaseDate || null,
         purchase_store: purchaseStore.trim() || null,
         memo: memo.trim() || null,
         favorite_tracks: stringToFavorites(favoriteTracks),
@@ -642,8 +657,9 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
                   type="date"
                   value={purchaseDate}
                   onChange={(e) => setPurchaseDate(e.target.value)}
+                  disabled={purchaseDateLocked}
                   autoComplete="off"
-                  className={inputClass}
+                  className={`${inputClass} ${purchaseDateLocked ? "cursor-not-allowed text-ink-mute" : ""}`}
                 />
               </label>
             </div>

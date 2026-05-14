@@ -142,7 +142,7 @@ export function RecordDetailModal({
           artistName={artistName}
           footerAction={markOwnedButton}
         />
-        {onEdit && (
+        {onEdit && record.status !== "wanted" && (
           <button
             type="button"
             onClick={(e) => {

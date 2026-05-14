@@ -18,6 +18,9 @@ class PinReorderRequest(BaseModel):
 RecordSource = Literal["spotify", "manual"]
 # ADR-003 §2.1: "owned" は Home マトリクスに表示、"wanted" は want list 専用。
 RecordStatus = Literal["owned", "wanted"]
+# 文字列リテラル直書きを避け、service 層から参照する定数。
+RECORD_STATUS_OWNED: RecordStatus = "owned"
+RECORD_STATUS_WANTED: RecordStatus = "wanted"
 
 _DATE_PATTERN = r"^\d{4}(-\d{2}(-\d{2})?)?$"
 _CURRENCY_PATTERN = r"^[A-Z]{3}$"
