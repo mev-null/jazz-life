@@ -37,8 +37,12 @@ import {
   setReleaseReadStatusApiReleasesSpotifyIdReadPatch,
   triggerSyncApiReleasesSyncPost,
 } from "./generated/releases/releases";
-import { searchAlbumsApiSpotifyAlbumsSearchGet } from "./generated/spotify/spotify";
 import {
+  searchAlbumsApiSpotifyAlbumsSearchGet,
+  searchArtistsApiSpotifyArtistsSearchGet,
+} from "./generated/spotify/spotify";
+import {
+  followArtistApiUserFollowsPost,
   listFollowedArtistsApiUserFollowsArtistsGet,
   listRecordCountsApiUserFollowsRecordCountsGet,
   unfollowArtistApiUserFollowsArtistIdDelete,
@@ -46,6 +50,7 @@ import {
 import type {
   ArtistCreate,
   SpotifyAlbumSummary,
+  SpotifyArtistSummary,
   SyncRunRequest,
   VinylRecordCreate,
   VinylRecordUpdate,
@@ -137,6 +142,43 @@ export async function getFollowedArtists(): Promise<ListResponse<Artist>> {
   if (USE_MOCK) return artistsMock as ListResponse<Artist>;
   const res = await listFollowedArtistsApiUserFollowsArtistsGet();
   return res.data as ListResponse<Artist>;
+}
+
+/**
+ * Spotify artist の名前検索。ArtistsPage の「追加」モーダルで使う。
+ *
+ * 結果を選んで `upsertArtist` (POST /api/artists) → `followArtist`
+ * (POST /api/user-follows) の 2 段でフォロー作成まで進める。USE_MOCK 時は
+ * 実 API を叩かないので空配列を返す (mock では follow 追加 UI を機能させない)。
+ */
+export async function searchSpotifyArtists(
+  q: string,
+): Promise<SpotifyArtistSummary[]> {
+  if (USE_MOCK) return [];
+  if (!q.trim()) return [];
+  const res = await searchArtistsApiSpotifyArtistsSearchGet({ q });
+  if (res.status === 200) {
+    return res.data.items;
+  }
+  return [];
+}
+
+/**
+ * artist_id を current user の follow に追加する。
+ *
+ * artist は事前に DB (`artists` テーブル) に存在している必要がある。
+ * Spotify 検索結果から作る場合は先に `upsertArtist` を呼ぶこと。
+ *
+ * mock 時はネットワークを叩かない (mock store には user_follows 表現を持たない
+ * ので no-op)。auth 必須エンドポイント。
+ */
+export async function followArtist(artistId: string): Promise<Artist | null> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 30));
+    return null;
+  }
+  const res = await followArtistApiUserFollowsPost({ artist_id: artistId });
+  return res.data as Artist;
 }
 
 /**

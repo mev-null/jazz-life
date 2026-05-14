@@ -24,9 +24,11 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ArtistRead,
   HTTPValidationError,
   ListResponseArtistRead,
-  ListResponseArtistRecordCount
+  ListResponseArtistRecordCount,
+  UserFollowCreate
 } from '../model';
 
 import { customFetch } from '../../mutator';
@@ -270,7 +272,105 @@ export function useListRecordCountsApiUserFollowsRecordCountsGet<TData = Awaited
 
 
 
-export type unfollowArtistApiUserFollowsArtistIdDeleteResponse204 = {
+export type followArtistApiUserFollowsPostResponse201 = {
+  data: ArtistRead
+  status: 201
+}
+
+export type followArtistApiUserFollowsPostResponse422 = {
+  data: HTTPValidationError
+  status: 422
+}
+
+export type followArtistApiUserFollowsPostResponseSuccess = (followArtistApiUserFollowsPostResponse201) & {
+  headers: Headers;
+};
+export type followArtistApiUserFollowsPostResponseError = (followArtistApiUserFollowsPostResponse422) & {
+  headers: Headers;
+};
+
+export type followArtistApiUserFollowsPostResponse = (followArtistApiUserFollowsPostResponseSuccess | followArtistApiUserFollowsPostResponseError)
+
+export const getFollowArtistApiUserFollowsPostUrl = () => {
+
+
+
+
+  return `/api/user-follows`
+}
+
+/**
+ * `artist_id` を current user の follow に追加する。
+
+`UserFollowRepository.upsert` を使うので冪等:
+- 既に active follow なら上書きで no-op、201 + 既存 artist
+- archived 行があれば archived_flag=false に戻して再 follow
+- 行が無ければ新規 INSERT
+
+artist が `artists` テーブルに無い場合は 404。UI 側で先に `POST /api/artists`
+で upsert する想定 (Spotify 検索結果のメタデータをそのまま投入する)。
+ * @summary Follow Artist
+ */
+export const followArtistApiUserFollowsPost = async (userFollowCreate: UserFollowCreate, options?: RequestInit): Promise<followArtistApiUserFollowsPostResponse> => {
+
+  return customFetch<followArtistApiUserFollowsPostResponse>(getFollowArtistApiUserFollowsPostUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      userFollowCreate,)
+  }
+);}
+
+
+
+
+export const getFollowArtistApiUserFollowsPostMutationOptions = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof followArtistApiUserFollowsPost>>, TError,{data: UserFollowCreate}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof followArtistApiUserFollowsPost>>, TError,{data: UserFollowCreate}, TContext> => {
+
+const mutationKey = ['followArtistApiUserFollowsPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof followArtistApiUserFollowsPost>>, {data: UserFollowCreate}> = (props) => {
+          const {data} = props ?? {};
+
+          return  followArtistApiUserFollowsPost(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FollowArtistApiUserFollowsPostMutationResult = NonNullable<Awaited<ReturnType<typeof followArtistApiUserFollowsPost>>>
+    export type FollowArtistApiUserFollowsPostMutationBody = UserFollowCreate
+    export type FollowArtistApiUserFollowsPostMutationError = HTTPValidationError
+
+    /**
+ * @summary Follow Artist
+ */
+export const useFollowArtistApiUserFollowsPost = <TError = HTTPValidationError,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof followArtistApiUserFollowsPost>>, TError,{data: UserFollowCreate}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof followArtistApiUserFollowsPost>>,
+        TError,
+        {data: UserFollowCreate},
+        TContext
+      > => {
+      return useMutation(getFollowArtistApiUserFollowsPostMutationOptions(options), queryClient);
+    }
+    export type unfollowArtistApiUserFollowsArtistIdDeleteResponse204 = {
   data: void
   status: 204
 }
