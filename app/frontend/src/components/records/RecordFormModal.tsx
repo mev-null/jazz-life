@@ -426,251 +426,251 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
         }
       >
         <div className={mobile ? "min-h-0 flex-1 overflow-y-auto p-8" : "contents"}>
-        <h2 className="border-b border-ink/15 pb-3 text-lg font-medium">
-          {isEdit
-            ? "Edit Record"
-            : mode.kind === "add" && mode.defaults?.status === "wanted"
-              ? "Add to Want List"
-              : "Add a Record"}
-        </h2>
+          <h2 className="border-b border-ink/15 pb-3 text-lg font-medium">
+            {isEdit
+              ? "Edit Record"
+              : mode.kind === "add" && mode.defaults?.status === "wanted"
+                ? "Add to Want List"
+                : "Add a Record"}
+          </h2>
 
-        <div className="mt-6 space-y-5">
-          <div>
-            <span className={labelClass}>Jacket</span>
-            <div className="flex items-start gap-4">
-              <div className="aspect-square w-24 shrink-0 overflow-hidden bg-ink/5 ring-1 ring-ink/10">
-                {previewUrl ? (
-                  <img
-                    src={previewUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-3xl font-light text-ink-faint">
-                    +
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col gap-2 pt-1 text-sm">
-                <label className="cursor-pointer text-ink transition-opacity hover:opacity-70">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFile}
-                    className="hidden"
-                  />
-                  <span>Choose file…</span>
-                </label>
-                {previewUrl && (
-                  <button
-                    type="button"
-                    onClick={handleClearImage}
-                    className="text-left italic text-ink-mute transition-colors hover:text-ink"
-                  >
-                    remove
-                  </button>
-                )}
+          <div className="mt-6 space-y-5">
+            <div>
+              <span className={labelClass}>Jacket</span>
+              <div className="flex items-start gap-4">
+                <div className="aspect-square w-24 shrink-0 overflow-hidden bg-ink/5 ring-1 ring-ink/10">
+                  {previewUrl ? (
+                    <img
+                      src={previewUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-3xl font-light text-ink-faint">
+                      +
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2 pt-1 text-sm">
+                  <label className="cursor-pointer text-ink transition-opacity hover:opacity-70">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFile}
+                      className="hidden"
+                    />
+                    <span>Choose file…</span>
+                  </label>
+                  {previewUrl && (
+                    <button
+                      type="button"
+                      onClick={handleClearImage}
+                      className="text-left italic text-ink-mute transition-colors hover:text-ink"
+                    >
+                      remove
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div>
-            <div
-              className={
-                mobile ? "space-y-4" : "flex items-end gap-3"
-              }
-            >
-              <div className={mobile ? "" : "flex-1"}>
-                <span className={labelClass}>Title</span>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                  autoFocus={autoFocusTitle}
-                  autoComplete="off"
-                  className={inputClass}
-                />
-              </div>
-              <div className={mobile ? "relative" : "relative flex-1"}>
-                <span className={labelClass}>Artist</span>
-                <input
-                  type="text"
-                  value={artistQuery}
-                  onChange={
-                    artistLocked
-                      ? undefined
-                      : (e) => handleArtistInputChange(e.target.value)
-                  }
-                  onFocus={
-                    artistLocked ? undefined : () => setArtistDropdownOpen(true)
-                  }
-                  onBlur={
-                    artistLocked
-                      ? undefined
-                      : () =>
+            <div>
+              <div
+                className={
+                  mobile ? "space-y-4" : "flex items-end gap-3"
+                }
+              >
+                <div className={mobile ? "" : "flex-1"}>
+                  <span className={labelClass}>Title</span>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                    autoFocus={autoFocusTitle}
+                    autoComplete="off"
+                    className={inputClass}
+                  />
+                </div>
+                <div className={mobile ? "relative" : "relative flex-1"}>
+                  <span className={labelClass}>Artist</span>
+                  <input
+                    type="text"
+                    value={artistQuery}
+                    onChange={
+                      artistLocked
+                        ? undefined
+                        : (e) => handleArtistInputChange(e.target.value)
+                    }
+                    onFocus={
+                      artistLocked ? undefined : () => setArtistDropdownOpen(true)
+                    }
+                    onBlur={
+                      artistLocked
+                        ? undefined
+                        : () =>
                           // クリック反映のため少し遅らせる (dropdown 内の button click が
                           // 走る前に blur で閉じてしまうのを回避)
                           setTimeout(() => setArtistDropdownOpen(false), 150)
+                    }
+                    required
+                    readOnly={artistLocked}
+                    autoComplete="off"
+                    placeholder={artistLocked ? "" : ""}
+                    className={`${inputClass} ${artistLocked ? "cursor-not-allowed text-ink-mute" : ""}`}
+                  />
+                  {!artistLocked && artistDropdownOpen && artistMatches.length > 0 && (
+                    <ul className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-y-auto border border-ink/10 bg-paper">
+                      {artistMatches.map((a) => (
+                        <li key={a.spotify_id}>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => handleSelectArtistFromDropdown(a)}
+                            className="block w-full px-3 py-1.5 text-left text-sm text-ink transition-colors hover:bg-ink/5"
+                          >
+                            {a.name}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSpotifySearch}
+                  disabled={!title.trim() || spotifySearching}
+                  className={
+                    mobile
+                      ? "w-full bg-ink/10 px-4 py-2.5 text-sm text-ink transition-colors hover:bg-ink/20 disabled:cursor-not-allowed disabled:opacity-50"
+                      : "shrink-0 bg-ink/10 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/20 disabled:cursor-not-allowed disabled:opacity-50"
                   }
-                  required
-                  readOnly={artistLocked}
-                  autoComplete="off"
-                  placeholder={artistLocked ? "" : "Artist 名"}
-                  className={`${inputClass} ${artistLocked ? "cursor-not-allowed text-ink-mute" : ""}`}
-                />
-                {!artistLocked && artistDropdownOpen && artistMatches.length > 0 && (
-                  <ul className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-y-auto border border-ink/10 bg-paper">
-                    {artistMatches.map((a) => (
-                      <li key={a.spotify_id}>
-                        <button
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => handleSelectArtistFromDropdown(a)}
-                          className="block w-full px-3 py-1.5 text-left text-sm text-ink transition-colors hover:bg-ink/5"
-                        >
-                          {a.name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                >
+                  {spotifySearching ? "Searching…" : "Search"}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handleSpotifySearch}
-                disabled={!title.trim() || spotifySearching}
-                className={
-                  mobile
-                    ? "w-full bg-ink/10 px-4 py-2.5 text-sm text-ink transition-colors hover:bg-ink/20 disabled:cursor-not-allowed disabled:opacity-50"
-                    : "shrink-0 bg-ink/10 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/20 disabled:cursor-not-allowed disabled:opacity-50"
-                }
-              >
-                {spotifySearching ? "Searching…" : "Search"}
-              </button>
+              {spotifyOpen && (
+                <div className="mt-3 max-h-72 overflow-y-auto border border-ink/10 bg-paper">
+                  {spotifyError ? (
+                    <div className="p-3 text-sm italic text-ink-mute">
+                      {spotifyError}
+                    </div>
+                  ) : !spotifySearching && spotifyResults.length === 0 ? (
+                    <div className="p-3 text-sm italic text-ink-mute">
+                      no results
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-ink/10">
+                      {spotifyResults.map((album) => (
+                        <li key={album.id}>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectSpotifyAlbum(album)}
+                            className="flex w-full items-center gap-3 p-2 text-left transition-colors hover:bg-ink/5"
+                          >
+                            <div className="aspect-square w-12 shrink-0 overflow-hidden bg-ink/5">
+                              {album.image_url ? (
+                                <img
+                                  src={album.image_url}
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : null}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm text-ink">
+                                {album.name}
+                              </div>
+                              <div className="truncate text-xs italic text-ink-mute">
+                                {album.artist_names.join(", ")}
+                                {album.release_date
+                                  ? ` · ${album.release_date}`
+                                  : ""}
+                              </div>
+                            </div>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
-            {spotifyOpen && (
-              <div className="mt-3 max-h-72 overflow-y-auto border border-ink/10 bg-paper">
-                {spotifyError ? (
-                  <div className="p-3 text-sm italic text-ink-mute">
-                    {spotifyError}
-                  </div>
-                ) : !spotifySearching && spotifyResults.length === 0 ? (
-                  <div className="p-3 text-sm italic text-ink-mute">
-                    no results
-                  </div>
-                ) : (
-                  <ul className="divide-y divide-ink/10">
-                    {spotifyResults.map((album) => (
-                      <li key={album.id}>
-                        <button
-                          type="button"
-                          onClick={() => handleSelectSpotifyAlbum(album)}
-                          className="flex w-full items-center gap-3 p-2 text-left transition-colors hover:bg-ink/5"
-                        >
-                          <div className="aspect-square w-12 shrink-0 overflow-hidden bg-ink/5">
-                            {album.image_url ? (
-                              <img
-                                src={album.image_url}
-                                alt=""
-                                className="h-full w-full object-cover"
-                              />
-                            ) : null}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm text-ink">
-                              {album.name}
-                            </div>
-                            <div className="truncate text-xs italic text-ink-mute">
-                              {album.artist_names.join(", ")}
-                              {album.release_date
-                                ? ` · ${album.release_date}`
-                                : ""}
-                            </div>
-                          </div>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-          </div>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <label className="block">
+                <span className={labelClass}>Released</span>
+                <input
+                  type="text"
+                  value={releaseDate}
+                  onChange={(e) => setReleaseDate(e.target.value)}
+                  placeholder="1962-01 or 1962"
+                  autoComplete="off"
+                  className={inputClass}
+                />
+              </label>
+
+              <label className="block">
+                <span className={labelClass}>Pressing</span>
+                <input
+                  type="text"
+                  value={pressingInfo}
+                  onChange={(e) => setPressingInfo(e.target.value)}
+                  placeholder="Riverside RLP-9399"
+                  autoComplete="off"
+                  className={inputClass}
+                />
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <label className="block">
+                <span className={labelClass}>Purchased at</span>
+                <input
+                  type="text"
+                  value={purchaseStore}
+                  onChange={(e) => setPurchaseStore(e.target.value)}
+                  placeholder="ディスクユニオン..."
+                  autoComplete="off"
+                  className={inputClass}
+                />
+              </label>
+
+              <label className="block">
+                <span className={labelClass}>Purchase date</span>
+                <input
+                  type="date"
+                  value={purchaseDate}
+                  onChange={(e) => setPurchaseDate(e.target.value)}
+                  autoComplete="off"
+                  className={inputClass}
+                />
+              </label>
+            </div>
+
             <label className="block">
-              <span className={labelClass}>Released</span>
-              <input
-                type="text"
-                value={releaseDate}
-                onChange={(e) => setReleaseDate(e.target.value)}
-                placeholder="1962-01 or 1962"
+              <span className={labelClass}>Memo</span>
+              <textarea
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                rows={3}
                 autoComplete="off"
-                className={inputClass}
+                className={`${inputClass} resize-none`}
               />
             </label>
 
             <label className="block">
-              <span className={labelClass}>Pressing</span>
+              <span className={labelClass}>Favorites</span>
               <input
                 type="text"
-                value={pressingInfo}
-                onChange={(e) => setPressingInfo(e.target.value)}
-                placeholder="Riverside RLP-9399"
-                autoComplete="off"
-                className={inputClass}
-              />
-            </label>
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <label className="block">
-              <span className={labelClass}>Purchased at</span>
-              <input
-                type="text"
-                value={purchaseStore}
-                onChange={(e) => setPurchaseStore(e.target.value)}
-                placeholder="ディスクユニオン..."
-                autoComplete="off"
-                className={inputClass}
-              />
-            </label>
-
-            <label className="block">
-              <span className={labelClass}>Purchase date</span>
-              <input
-                type="date"
-                value={purchaseDate}
-                onChange={(e) => setPurchaseDate(e.target.value)}
+                value={favoriteTracks}
+                onChange={(e) => setFavoriteTracks(e.target.value)}
+                placeholder="Track 1 · Track 2"
                 autoComplete="off"
                 className={inputClass}
               />
             </label>
           </div>
-
-          <label className="block">
-            <span className={labelClass}>Memo</span>
-            <textarea
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-              rows={3}
-              autoComplete="off"
-              className={`${inputClass} resize-none`}
-            />
-          </label>
-
-          <label className="block">
-            <span className={labelClass}>Favorites</span>
-            <input
-              type="text"
-              value={favoriteTracks}
-              onChange={(e) => setFavoriteTracks(e.target.value)}
-              placeholder="Track 1 · Track 2"
-              autoComplete="off"
-              className={inputClass}
-            />
-          </label>
-        </div>
 
         </div>
 
