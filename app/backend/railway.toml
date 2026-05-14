@@ -12,6 +12,14 @@
 # auto-deploy が走ると、Railway は pyproject.toml を見て Railpack の Python
 # auto-detect に倒れ、Dockerfile が無視されて起動できないという事故が起きた。
 # 再発を防ぐため、build 設定をコードで pin する。
+#
+# watchPatterns: frontend だけの変更（例: index.html 修正）でも watchPatterns
+# が空だと backend service の auto-deploy がキックされ、しかも Railway 側の
+# snapshot 最適化で `app/backend/` がスナップショットから欠落して build が
+# "lstat app/backend: no such file or directory" で即死する事故が再発した
+# (2026-05-14, PR #26 merge 時)。`app/backend/**` 配下の変更時だけ deploy する
+# ように絞る。
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
+watchPatterns = ["app/backend/**"]
