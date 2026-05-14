@@ -41,6 +41,8 @@ _CATALOG_FIELDS = (
     "source",
 )
 # `VinylRecordUpdate` のうち ownership 側 (user_collections) に属するキー。
+# `is_pinned` は寛容 PUT で is_pinned だけ送るパターンを意図しているが、
+# pinned_at は service が自動セットするので `_COLLECTION_FIELDS` には含めない。
 _COLLECTION_FIELDS = (
     "status",
     "pressing_info",
@@ -51,7 +53,14 @@ _COLLECTION_FIELDS = (
     "rating",
     "memo",
     "display_order",
+    "is_pinned",
 )
+
+# Home プレビュー (PC 8 / モバイル 6) に何を見せるか をユーザが選ぶ手段。
+# 上限は PC プレビュー数に合わせる。モバイル側でもこの上限を共有し、
+# 表示はクライアント側で先頭 6 件に切る (UserCollection の order_by が
+# is_pinned DESC, display_order ASC なので先頭 6 件は自動的に pin 優先になる)。
+_PIN_LIMIT = 8
 
 
 class RecordService:
@@ -71,10 +80,22 @@ class RecordService:
 
     # ---- queries ----
 
-    def list_for_user(self, user_id: UUID) -> list[VinylRecordRead]:
-        rows = self.collection_repo.list_for_user_with_catalog(user_id)
+    def list_for_user(
+        self,
+        user_id: UUID,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> tuple[list[VinylRecordRead], int]:
+        """user の record 一覧と total を返す。
+
+        limit を渡すと paginated。`total` は限界値ではなく user の collection
+        全件数なので、フロント側で `Math.ceil(total / limit)` でページ数を出せる。
+        """
+        rows = self.collection_repo.list_for_user_with_catalog(user_id, limit=limit, offset=offset)
         favorites_map = self.favorite_track_repo.list_by_collection_ids([c.id for c, _ in rows])
-        return [self._to_read(c, vr, favorites_map.get(c.id, [])) for c, vr in rows]
+        items = [self._to_read(c, vr, favorites_map.get(c.id, [])) for c, vr in rows]
+        total = self.collection_repo.count_for_user(user_id)
+        return items, total
 
     def count_owned_by_artist_for_user(self, user_id: UUID) -> dict[str, int]:
         return self.collection_repo.count_owned_by_artist_for_user(user_id)
@@ -152,6 +173,22 @@ class RecordService:
 
         patch_data = patch.model_dump(exclude_unset=True)
 
+        # is_pinned の False→True 遷移時のみ上限 (_PIN_LIMIT) を enforce。
+        # 既に True の collection を再度 True で送るのは no-op。
+        # `pinned_at` は True 時に now()、False 時に None を自動セット。
+        # `pin_order` は drag & drop の並び順 (RecordsAllModal で書き換える)。
+        # 新規 pin 時に「末尾 = max(pin_order)+1」で採番する。unpin 時は NULL。
+        if "is_pinned" in patch_data:
+            new_pinned = bool(patch_data["is_pinned"])
+            if new_pinned and not collection.is_pinned:
+                if self.collection_repo.count_pinned_for_user(user_id) >= _PIN_LIMIT:
+                    raise ConflictError(f"pin limit exceeded: max {_PIN_LIMIT}")
+                collection.pinned_at = dt.datetime.now(dt.UTC)
+                collection.pin_order = self.collection_repo.max_pin_order_for_user(user_id) + 1
+            elif not new_pinned and collection.is_pinned:
+                collection.pinned_at = None
+                collection.pin_order = None
+
         # 1) collection 系フィールド
         for key in _COLLECTION_FIELDS:
             if key in patch_data:
@@ -177,6 +214,33 @@ class RecordService:
 
         favs = self.favorite_track_repo.list_for_collection(saved_collection.id)
         return self._to_read(saved_collection, catalog, favs)
+
+    def reorder_pins(self, user_id: UUID, ordered_ids: list[uuid.UUID]) -> None:
+        """drag & drop でユーザが並び替えた pin 一覧を 1..N で再採番する。
+
+        - `ordered_ids` は user のピン済み行 (`is_pinned=True`) の id を「並べたい
+          順序」で並べたリスト。
+        - リクエストが現在のピン済みセットと一致しない (欠け / 多い / 他 user の
+          id が混ざる) 場合は `ConflictError` を返す。 pinning 操作と reorder が
+          競合 (1 件外した直後の reorder 等) して状態がズレた時の安全弁。
+        - 採番は `1..len(ordered_ids)` に書き換える。`pinned_at` は触らない。
+        """
+        current = self.collection_repo.list_pinned_for_user(user_id)
+        current_ids = {c.id for c in current}
+        requested_ids = set(ordered_ids)
+        if current_ids != requested_ids or len(ordered_ids) != len(requested_ids):
+            raise ConflictError(
+                "pin reorder mismatch: request must include exactly the currently pinned ids"
+            )
+
+        by_id = {c.id: c for c in current}
+        now = dt.datetime.now(dt.UTC)
+        for new_order, cid in enumerate(ordered_ids, start=1):
+            row = by_id[cid]
+            if row.pin_order != new_order:
+                row.pin_order = new_order
+                row.updated_at = now
+                self.collection_repo.save(row)
 
     def delete(self, id: uuid.UUID, user_id: UUID) -> None:
         """user_collections を物理削除。`record_favorite_tracks` は CASCADE、
@@ -295,6 +359,8 @@ class RecordService:
                 for f in favs
             ],
             display_order=collection.display_order,
+            is_pinned=collection.is_pinned,
+            pin_order=collection.pin_order,
             created_at=collection.created_at,
             updated_at=collection.updated_at,
         )

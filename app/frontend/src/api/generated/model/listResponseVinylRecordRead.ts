@@ -8,4 +8,5 @@ import type { VinylRecordRead } from './vinylRecordRead';
 
 export interface ListResponseVinylRecordRead {
   items: VinylRecordRead[];
+  total?: number;
 }

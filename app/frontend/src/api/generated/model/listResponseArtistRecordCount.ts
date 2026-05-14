@@ -8,4 +8,5 @@ import type { ArtistRecordCount } from './artistRecordCount';
 
 export interface ListResponseArtistRecordCount {
   items: ArtistRecordCount[];
+  total?: number;
 }

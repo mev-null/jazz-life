@@ -14,6 +14,10 @@ export type {
 
 export type ListResponse<T> = {
   items: T[];
+  // backend の `ListResponse.total` (デフォルト 0)。paginated endpoint
+  // (`getVinylRecords(limit, offset)`) で使うので optional にして既存呼び出しを
+  // 壊さない。フロントは `total ?? items.length` でフォールバックする。
+  total?: number;
 };
 
 // ---------- アーティストエイリアス（backend 未実装）----------

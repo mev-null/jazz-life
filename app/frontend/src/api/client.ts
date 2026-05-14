@@ -29,6 +29,7 @@ import {
   createRecordApiRecordsPost,
   deleteRecordApiRecordsIdDelete,
   listRecordsApiRecordsGet,
+  reorderPinsApiRecordsPinsOrderPut,
   updateRecordApiRecordsIdPut,
 } from "./generated/records/records";
 import {
@@ -74,6 +75,22 @@ async function fetchJson<T>(path: string): Promise<T> {
 const mockRecordsStore: VinylRecord[] = (
   vinylRecordsMock as ListResponse<VinylRecord>
 ).items.slice();
+
+// backend の `is_pinned DESC, pin_order ASC NULLS LAST, display_order ASC`
+// 順を mock 経路でも再現する。HomePage のプレビュー (slice 0..previewLimit) が
+// pinned 優先で、かつ pin の中では drag & drop で確定した順 (pin_order) で
+// 並ぶためには、この順序付けが mock 側にも必要。
+function sortedMockRecords(): VinylRecord[] {
+  return mockRecordsStore.slice().sort((a, b) => {
+    if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+    const ao = a.pin_order ?? Number.POSITIVE_INFINITY;
+    const bo = b.pin_order ?? Number.POSITIVE_INFINITY;
+    if (ao !== bo) return ao - bo;
+    return a.display_order - b.display_order;
+  });
+}
+
+const MOCK_PIN_LIMIT = 8;
 
 export async function getArtists(): Promise<ListResponse<Artist>> {
   if (USE_MOCK) return artistsMock as ListResponse<Artist>;
@@ -222,10 +239,65 @@ export async function upsertArtist(input: ArtistCreate): Promise<Artist> {
   return res.data as Artist;
 }
 
-export async function getVinylRecords(): Promise<ListResponse<VinylRecord>> {
-  if (USE_MOCK) return { items: mockRecordsStore.slice() };
-  const res = await listRecordsApiRecordsGet();
+/**
+ * Records 一覧。`limit` 指定で paginated (RecordsAllModal の view all 用)、
+ * 省略時は全件取得 (HomePage プレビューや ArtistDetailModal が要求する)。
+ *
+ * mock 経路は `is_pinned DESC, display_order ASC` 順 (backend と同じ) で
+ * slice する。`total` は backend が `count_for_user` で出す総件数で、
+ * フロント側で `Math.ceil(total / limit)` でページ数を出すのに使う。
+ */
+export async function getVinylRecords(
+  limit?: number,
+  offset?: number,
+): Promise<ListResponse<VinylRecord>> {
+  if (USE_MOCK) {
+    const sorted = sortedMockRecords();
+    const start = offset ?? 0;
+    const items =
+      limit !== undefined ? sorted.slice(start, start + limit) : sorted;
+    return { items, total: mockRecordsStore.length };
+  }
+  const params: { limit?: number; offset?: number } = {};
+  if (limit !== undefined) params.limit = limit;
+  if (offset !== undefined && offset > 0) params.offset = offset;
+  const res = await listRecordsApiRecordsGet(params);
   return res.data as ListResponse<VinylRecord>;
+}
+
+/**
+ * drag & drop で並び替えた pin 一覧の順序を保存する。
+ *
+ * `ids` は **現在 pin している全行** を、ユーザが望む順序で並べたもの。
+ * backend は受け取った順に `pin_order` を 1..N で振り直す。pin セットと
+ * 一致しない (欠け/重複/未 pin 行混入) なら 409。
+ *
+ * mock 経路では mock store の `pin_order` を直接書き換えるので、再 fetch なし
+ * でも `sortedMockRecords` の並び順が即時反映される。
+ */
+export async function reorderPins(ids: string[]): Promise<void> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 60));
+    const pinned = mockRecordsStore.filter((r) => r.is_pinned);
+    const pinnedIds = new Set(pinned.map((r) => r.id));
+    const requested = new Set(ids);
+    if (
+      pinnedIds.size !== requested.size ||
+      [...pinnedIds].some((id) => !requested.has(id))
+    ) {
+      const err = new Error("pin reorder mismatch") as Error & { status?: number };
+      err.status = 409;
+      throw err;
+    }
+    ids.forEach((id, idx) => {
+      const i = mockRecordsStore.findIndex((r) => r.id === id);
+      if (i >= 0) {
+        mockRecordsStore[i] = { ...mockRecordsStore[i], pin_order: idx + 1 };
+      }
+    });
+    return;
+  }
+  await reorderPinsApiRecordsPinsOrderPut({ ids });
 }
 
 /**
@@ -351,6 +423,8 @@ export async function createVinylRecord(
       memo: input.memo ?? null,
       favorite_tracks: input.favorite_tracks ?? [],
       display_order: mockRecordsStore.length + 1,
+      is_pinned: false,
+      pin_order: null,
       created_at: now,
       updated_at: now,
     };
@@ -394,8 +468,28 @@ export async function updateVinylRecord(
         (patch as Record<string, unknown>)[key] = value;
       }
     }
+    // backend の False→True 遷移 + pin 上限 9 件目で 409 を mock 側でも emulate。
+    // 新規 pin は pin_order = max+1 で末尾に。unpin は pin_order = null。
+    const current = mockRecordsStore[idx];
+    if (input.is_pinned === true && !current.is_pinned) {
+      const pinned = mockRecordsStore.filter((r) => r.is_pinned);
+      if (pinned.length >= MOCK_PIN_LIMIT) {
+        const err = new Error(`pin limit exceeded: max ${MOCK_PIN_LIMIT}`) as Error & {
+          status?: number;
+        };
+        err.status = 409;
+        throw err;
+      }
+      const maxOrder = pinned.reduce(
+        (acc, r) => Math.max(acc, r.pin_order ?? 0),
+        0,
+      );
+      patch.pin_order = maxOrder + 1;
+    } else if (input.is_pinned === false && current.is_pinned) {
+      patch.pin_order = null;
+    }
     const updated: VinylRecord = {
-      ...mockRecordsStore[idx],
+      ...current,
       ...patch,
       updated_at: new Date().toISOString(),
     };

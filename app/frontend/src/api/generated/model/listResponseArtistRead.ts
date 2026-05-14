@@ -8,4 +8,5 @@ import type { ArtistRead } from './artistRead';
 
 export interface ListResponseArtistRead {
   items: ArtistRead[];
+  total?: number;
 }

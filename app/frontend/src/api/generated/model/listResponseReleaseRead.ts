@@ -8,4 +8,5 @@ import type { ReleaseRead } from './releaseRead';
 
 export interface ListResponseReleaseRead {
   items: ReleaseRead[];
+  total?: number;
 }

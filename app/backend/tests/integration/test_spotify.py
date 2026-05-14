@@ -103,7 +103,8 @@ def test_search_returns_items(spotify_client: TestClient, httpx_mock: HTTPXMock)
                 "artist_names": ["Miles Davis"],
                 "primary_artist_id": "art-1",
             }
-        ]
+        ],
+        "total": 0,
     }
 
 

@@ -253,7 +253,7 @@ export function ArtistDetailModal({
   });
   const recordsQ = useQuery({
     queryKey: ["records"],
-    queryFn: getVinylRecords,
+    queryFn: () => getVinylRecords(),
     enabled: artistId !== null,
   });
   const releasesQ = useQuery({

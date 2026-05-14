@@ -22,7 +22,7 @@ const HOME_MOBILE_PREVIEW_LIMIT = 6;
 export function HomePage() {
   const records = useQuery({
     queryKey: ["records"],
-    queryFn: getVinylRecords,
+    queryFn: () => getVinylRecords(),
   });
   // `artists` は global registry (archived 含む)。既存 record の artist_id →
   // name 引きに使うので、unfollow 済みアーティストの過去 record でも名前が
@@ -124,6 +124,8 @@ export function HomePage() {
         <RecordsAllModal
           label="Records"
           records={ownedRecords}
+          paginated
+          pinningEnabled
           onClose={() => setShowAll(false)}
           onRecordClick={(r) => setOpenRecord(r)}
           onAddRecord={() => setFormMode({ kind: "add" })}

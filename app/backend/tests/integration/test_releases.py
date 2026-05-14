@@ -132,7 +132,7 @@ def test_get_releases_requires_auth(unauthed_client: TestClient) -> None:
 def test_get_releases_empty(authed_client: TestClient) -> None:
     res = authed_client.get("/api/releases")
     assert res.status_code == 200
-    assert res.json() == {"items": []}
+    assert res.json() == {"items": [], "total": 0}
 
 
 def test_get_releases_returns_within_window_and_sorts_desc(
@@ -251,7 +251,7 @@ def test_get_releases_excludes_archived_follows(
     session.commit()
 
     res = authed_client.get("/api/releases")
-    assert res.json() == {"items": []}
+    assert res.json() == {"items": [], "total": 0}
 
 
 def test_get_releases_isolated_between_users(session: Session, _test_settings: Settings) -> None:

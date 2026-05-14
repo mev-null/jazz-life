@@ -248,8 +248,39 @@
           "records"
         ],
         "summary": "List Records",
-        "description": "current user の collection を返す (ADR-006 §3.4)。\n\nresponse の `id` は `user_collections.id`、flat shape で catalog + ownership\n+ favorite_tracks を 1 件に詰める。",
+        "description": "current user の collection を返す (ADR-006 §3.4)。\n\n`limit` を渡すと paginated。レスポンス `total` は user の collection 全件数\nなので、フロント側で `Math.ceil(total / limit)` でページ数を出せる。limit\n省略時は全件 + total を返す (従来挙動を維持)。並び順は\n`is_pinned DESC, display_order ASC` 固定。",
         "operationId": "list_records_api_records_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -257,6 +288,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ListResponse_VinylRecordRead_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -271,14 +312,14 @@
         "description": "record を 1 件作成。catalog find-or-create + user_collections INSERT +\nauto-follow を 1 TX で行う。UNIQUE(user_id, vinyl_record_id) 違反は 409。",
         "operationId": "create_record_api_records_post",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/VinylRecordCreate"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -290,6 +331,41 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/records/pins/order": {
+      "put": {
+        "tags": [
+          "records"
+        ],
+        "summary": "Reorder Pins",
+        "description": "ピン済みレコードの並び順を drag & drop 後に保存する。\n\nbody の `ids` は現在 pin しているすべての user_collection.id を、望む順序で\n並べたもの。current pin セットと一致しない場合は 409。",
+        "operationId": "reorder_pins_api_records_pins_order_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinReorderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -1082,6 +1158,11 @@
             },
             "type": "array",
             "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
           }
         },
         "type": "object",
@@ -1098,6 +1179,11 @@
             },
             "type": "array",
             "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
           }
         },
         "type": "object",
@@ -1114,6 +1200,11 @@
             },
             "type": "array",
             "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
           }
         },
         "type": "object",
@@ -1130,6 +1221,11 @@
             },
             "type": "array",
             "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
           }
         },
         "type": "object",
@@ -1162,6 +1258,11 @@
             },
             "type": "array",
             "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
           }
         },
         "type": "object",
@@ -1169,6 +1270,24 @@
           "items"
         ],
         "title": "ListResponse[VinylRecordRead]"
+      },
+      "PinReorderRequest": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "PinReorderRequest",
+        "description": "drag & drop で並び替えた pinned レコードの id 列。\n\n`ids` は user が現在 pin している全行を、ユーザが望む順序で並べたもの。\nbackend は 1..N で `pin_order` を再採番する。欠け/重複/未 pin 行混入は 409。"
       },
       "ReleaseRead": {
         "properties": {
@@ -1826,6 +1945,21 @@
             "type": "integer",
             "title": "Display Order"
           },
+          "is_pinned": {
+            "type": "boolean",
+            "title": "Is Pinned"
+          },
+          "pin_order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pin Order"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -1856,6 +1990,8 @@
           "memo",
           "favorite_tracks",
           "display_order",
+          "is_pinned",
+          "pin_order",
           "created_at",
           "updated_at"
         ],
@@ -2055,6 +2191,17 @@
               }
             ],
             "title": "Display Order"
+          },
+          "is_pinned": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Pinned"
           }
         },
         "type": "object",
