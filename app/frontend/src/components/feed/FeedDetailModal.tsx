@@ -138,7 +138,7 @@ function ReleaseDetail({
             disabled={promoteToOwned.isPending}
             className="flex-1 cursor-pointer bg-ink/10 px-4 py-2 text-sm text-ink transition-colors hover:bg-ink/20 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {promoteToOwned.isPending ? "Moving…" : "On the shelf"}
+            {promoteToOwned.isPending ? "Moving…" : "To the shelf"}
           </button>
         </div>
       )}

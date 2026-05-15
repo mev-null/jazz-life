@@ -83,8 +83,14 @@ function BackFace({
 
       <footer className="flex items-end justify-between gap-4 border-t border-ink/15 pt-4 text-sm leading-relaxed text-ink-mute">
         <div className="min-w-0 flex-1">
-          {record.purchase_store && <div>{record.purchase_store}</div>}
-          {record.purchase_date && <div>{record.purchase_date}</div>}
+          {/* wanted (On the hunt) はまだ買っていない状態なので、購入場所 /
+              購入日は伏せる。owned のみ表示する。 */}
+          {record.status !== "wanted" && record.purchase_store && (
+            <div>{record.purchase_store}</div>
+          )}
+          {record.status !== "wanted" && record.purchase_date && (
+            <div>{record.purchase_date}</div>
+          )}
         </div>
         {footerAction}
       </footer>
@@ -127,10 +133,10 @@ export function RecordDetailModal({
           markOwned.mutate(record.id);
         }}
         disabled={markOwned.isPending}
-        aria-label="On the shelf"
+        aria-label="To the shelf"
         className="shrink-0 cursor-pointer bg-ink/10 px-3 py-1.5 text-sm text-ink transition-colors hover:bg-ink/20 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {markOwned.isPending ? "Moving…" : "On the shelf"}
+        {markOwned.isPending ? "Moving…" : "To the shelf"}
       </button>
     ) : undefined;
 
