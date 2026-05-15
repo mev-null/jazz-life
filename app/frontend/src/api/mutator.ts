@@ -9,6 +9,16 @@
 
 import { API_BASE } from "../lib/env";
 
+// 401 をその他のエラーから区別するためのマーカー型。
+// QueryCache / MutationCache の onError 側で instanceof チェックして
+// `["auth", "me"]` を null に倒すことで `AuthGate` の `/login` 遷移を発動する。
+export class UnauthorizedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
 export const customFetch = async <T>(
   url: string,
   options: RequestInit,
@@ -23,11 +33,13 @@ export const customFetch = async <T>(
 
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new Error(
-      `API ${options.method ?? "GET"} ${url} failed: ${res.status}${
-        detail ? ` — ${detail}` : ""
-      }`,
-    );
+    const message = `API ${options.method ?? "GET"} ${url} failed: ${res.status}${
+      detail ? ` — ${detail}` : ""
+    }`;
+    if (res.status === 401) {
+      throw new UnauthorizedError(message);
+    }
+    throw new Error(message);
   }
 
   const data = res.status === 204 ? undefined : await res.json();
