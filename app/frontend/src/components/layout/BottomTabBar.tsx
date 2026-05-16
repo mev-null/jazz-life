@@ -2,8 +2,8 @@ import { NavLink } from "react-router-dom";
 
 export function BottomTabBar() {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-rule bg-paper pb-[env(safe-area-inset-bottom)]">
-      <ul className="flex h-14 items-stretch justify-around">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-rule bg-paper pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+      <ul className="flex h-12 items-stretch justify-around">
         <BottomTabItem to="/" end label="Home" />
         <BottomTabItem to="/feed" label="Feed" />
         <BottomTabItem to="/artists" label="Artists" />
