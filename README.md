@@ -76,10 +76,9 @@ CI は `.github/workflows/backend.yml` で ruff (format / check) + mypy + pytest
                                    │  Alembic / SQLModel        │
                                    └─────────────┬──────────────┘
                                                  │
-                                  ┌──────────────┼──────────────┐
-                                  ▼              ▼              ▼
-                            PostgreSQL 16   Spotify Web API   APScheduler
-                                                              (新譜 sync)
+                                        ┌────────┴────────┐
+                                        ▼                 ▼
+                                  PostgreSQL 16    Spotify Web API
 ```
 
 詳細は [CLAUDE.md](CLAUDE.md) のディレクトリ構成節。
@@ -88,7 +87,7 @@ CI は `.github/workflows/backend.yml` で ruff (format / check) + mypy + pytest
 
 | Layer | Stack |
 |---|---|
-| Backend | Python 3.11, FastAPI, SQLModel, Alembic, psycopg3, uuid6, APScheduler, httpx, BeautifulSoup4, Fernet (cryptography) |
+| Backend | Python 3.11, FastAPI, SQLModel, Alembic, psycopg3, uuid6, httpx, BeautifulSoup4, Fernet (cryptography) |
 | Frontend | React 19, Vite 5, TypeScript, Tailwind v4 (`@tailwindcss/vite`), TanStack Query, React Router 6, dnd-kit |
 | Tooling | uv (Python), npm, Docker / docker-compose, **orval**（OpenAPI → 型 + react-query hooks） |
 | DB | PostgreSQL 16（`jazz` / `jazz_test` を同インスタンス内で分離） |
