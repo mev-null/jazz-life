@@ -75,20 +75,116 @@ CI は `.github/workflows/backend.yml` で ruff (format / check) + mypy + pytest
 ## アーキテクチャ概要
 
 ```
+# jazz-life
+
+ジャズ・アーティスト ダッシュボード（個人用 MVP）。
+要件定義は [docs/000-pre-adr.md](docs/000-pre-adr.md)。Phase B 開始時の方針再評価（PostgreSQL / クリーンアーキ / orval / UUID v7 / 寛容 PUT 等）は [docs/002-phase-b-decisions.md](docs/002-phase-b-decisions.md) を正とする。アーティスト管理の 3 層構造は [docs/003-artist-management.md](docs/003-artist-management.md)、場所マスタは [docs/010-place.md](docs/010-place.md)。
+> ジャズを軸にした個人ダッシュボード。アナログレコードのコレクション、フォロー中アーティストの新譜・来日公演、Spotify と連動したアーティスト管理を 1 つの画面に集約する。
+
+## クイックスタート
+「好きな本・音楽・場所をコンテキストとして溜めていって、そこから次の体験への提案をもらう」という長期ビジョン（[docs/999-vision.md](docs/999-vision.md)）の第 1 段階。ジャズ × レコード × ライブを最初のドメインに選び、MVP として作っている。
+
+環境変数は [.devcontainer/devcontainer.json](.devcontainer/devcontainer.json) で集約管理する。公開デフォルトは `containerEnv`、Spotify / JWT 等のシークレットは Codespaces user secrets を `secrets` 経由で取り込む（`.env` は使わない）。
+## スクリーンショット
+
+GitHub Codespaces で開く場合:
+> _ここにホーム（レコードマトリクス）／アーティスト管理／フィードのスクリーンショットを配置する。`docs/images/` 配下に置いて参照する想定。_
+
+1. https://github.com/settings/codespaces で `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` / `JWT_SECRET` / `REFRESH_TOKEN_KEY` を登録し、本リポジトリに access 許可
+2. codespace を Stop → Start（secret は shell 起動時に注入される）
+- `docs/images/home.png` — レコードマトリクス（メイン画面）
+- `docs/images/artists.png` — アーティスト管理（Spotify 検索 + フォロー）
+- `docs/images/feed.png` — 新譜フィード
+
+そのうえで:
+## ライブデモについて
+
+```bash
+cd app
+make up                # db (5432) / backend (8000) / frontend (5173) が起動
+```
+Railway に本番デプロイ済み（backend / frontend / Postgres）。ただし**公開デモは提供していない**。
+
+ローカル Docker のみで動かしたい場合は、上記 env を host shell に export してから `make up`。
+理由は Spotify Developer Dashboard の Users and Access による invite 制御をアプリ全体の認可ゲートとして採用しているため（[ADR-005](docs/005-railway-deploy-prep.md)）。アプリ側に独自の allowlist を持たないことで実装をシンプルに保つ代わりに、未登録の Spotify アカウントでは OAuth コールバックが完了しない。
+
+確認:
+評価のために動作確認したい場合は、ローカル起動（[セットアップ](#ローカルセットアップ)）か、選考担当者の Spotify アカウントを Dashboard 側で許可する形で対応できます。
+
+| URL | 内容 |
+|---|---|
+| <http://localhost:8000/healthz> | `{"status":"ok"}` |
+| <http://localhost:8000/api/artists> | seed 投入済みのアーティストが返る |
+| <http://localhost:8000/api/records> | 空または手動投入分 |
+| <http://localhost:8000/api/releases> | フォロー中アーティストの新譜（`POST /api/releases/sync` で Spotify から取り込み） |
+| <http://localhost:8000/openapi.json> | OpenAPI 仕様（`make spec` で `backend/openapi.json` に保存 → `make gen` で型生成） |
+| <http://localhost:8000/docs> | Swagger UI |
+| <http://localhost:5173> | フロントエンド（デフォルトは実 API。モック切替は `VITE_USE_MOCK=true`） |
+## 技術ハイライト
+
+停止:
+ポートフォリオとして見てもらいたい設計判断・実装ポイント。
+
+```bash
+make down                  # コンテナ停止（DB は named volume に残る）
+docker volume rm app_jazz-pgdata   # DB ごと完全リセットしたい時のみ
+```
+### 1. backend の 3 層クリーンアーキテクチャ
+
+`routers → services → core/repositories` の単方向依存を厳格に守り、router は HTTP 変換のみ、ビジネスロジック（採番、部分更新、ドメインバリデーション）はすべて service 層に集約。`DomainError` を HTTPException にマップするのは router の `_handlers.py` だけが知っている。
+
+- `app/backend/app/routers/` — FastAPI 薄い API 層
+- `app/backend/app/services/` — ビジネスロジック（DomainError を投げる）
+- `app/backend/app/core/repositories/` — DB アクセス（SQLModel `col()` スタイル）
+
+判断の背景は [ADR-002 §2](docs/002-phase-b-decisions.md)。
+
+### 2. 契約駆動の frontend（OpenAPI → orval）
+
+backend が `openapi.json` を成果物として出力し（`make spec`）、frontend は orval で **型 + react-query hooks** を生成（`make gen`）。Phase A では `openapi-typescript` で型だけ生成していたが、hooks の手書きが冗長になったため Phase B-2 で orval に移行。
+
+`src/api/client.ts` が `VITE_USE_MOCK` で実 API / モックを分岐する設計を維持しており、backend が止まっていてもフロントだけ開発できる。
+
+### 3. Spotify OAuth + refresh token を Fernet で暗号化保存
+
+OAuth 認可コードフローを backend で完結させ、refresh token は `REFRESH_TOKEN_KEY`（Fernet key）で対称鍵暗号化したうえで Postgres に永続化。access token はメモリのみ、ブラウザには httpOnly cookie で短命 JWT を発行する。
+
+OAuth state は単一 process の in-memory で持っており、これに気づかず Railway を multi-replica で動かすと callback がランダムに別 process へ振られて state 検証が必ず失敗する — このトレードオフは [ADR-005](docs/005-railway-deploy-prep.md) と `railway.toml` のコメントに明示している。
+
+### 4. ADR 駆動の意思決定記録
+
+## ディレクトリ構成
+11 本の ADR が「いつ何を決めたか」を残している。特に:
+
+- **000 → 002 の supersede 関係**: SQLite から PostgreSQL へ、フラットから 3 層クリーンアーキへ、UUID v4 から v7 へ、厳格 PUT から寛容 PUT へ、と Phase A 終了時に何を方針変更したかが追える
+- **003**: artist を `artist_registry` / `user_follows` / `records` の 3 層に分離した理由
+- **006**: 現在 `vinyl_records` が user_id でスコープされておらず multi-user 化できない自覚と、刷新計画
+- **010**: Phase C の場所マスタを見越したスキーマ設計
+
+「動くものを作る」と「設計上の負債を自覚して残す」の両方を意識した記録になっている。
+
+### 5. Railway 本番運用で踏んだ罠とその固定化
+
+Railway 移行中に踏んだ事故（Railpack auto-detect が Dockerfile を無視、snapshot 最適化で `app/backend/` が消えて build 即死、frontend 変更で backend が無駄に redeploy など）を `app/backend/railway.toml` / `app/frontend/railway.toml` の長いコメントとして残し、`builder` / `dockerfilePath` / `watchPatterns` をコードで pin することで再発を防いでいる。
+
+CI は `.github/workflows/backend.yml` で ruff (format / check) + mypy + pytest（unit / integration マトリクス）が走る。
+
+## アーキテクチャ概要
+
+```
 ┌─────────────────────────┐        ┌────────────────────────────┐
 │  React 19 + Vite        │        │  FastAPI                   │
 │  TanStack Query         │        │  ┌──────────────────────┐  │
-│  orval-generated hooks  │  ───►  │  │ routers (薄)        │  │
-│  (VITE_USE_MOCK で      │   HTTP │  │  → services         │  │
-│   モック / 実 API 切替) │        │  │    → repositories   │  │
+│  orval-generated hooks  │  ───►  │  │ routers (薄)         │  │
+│  (VITE_USE_MOCK で      │   HTTP │  │  → services          │  │
+│   モック / 実 API 切替) 　│        │  │    → repositories    │  │
 └─────────────────────────┘        │  └──────────────────────┘  │
                                    │  Alembic / SQLModel        │
                                    └─────────────┬──────────────┘
                                                  │
-                                  ┌──────────────┼──────────────┐
-                                  ▼              ▼              ▼
-                            PostgreSQL 16   Spotify Web API   APScheduler
-                                                              (新譜 sync)
+                                        ┌────────┴────────┐
+                                        ▼                 ▼
+                                  PostgreSQL 16    Spotify Web API
 ```
 
 詳細は [CLAUDE.md](CLAUDE.md) のディレクトリ構成節。
