@@ -18,6 +18,8 @@
 - 新譜フィード
 <img width="1470" height="835" alt="Screenshot 2026-05-21 at 13 47 20" src="https://github.com/user-attachments/assets/c5240787-23a6-45d8-afe9-98d938d681c6" />
 
+<img width="424" height="334" alt="Screenshot 2026-05-21 at 13 53 50" src="https://github.com/user-attachments/assets/14aae45a-d555-44e2-97af-547471c05bb0" />
+
 ## ライブデモについて
 
 Railway に本番デプロイ済み（backend / frontend / Postgres）。ただし**公開デモは提供していない**。
