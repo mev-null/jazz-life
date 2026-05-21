@@ -15,6 +15,10 @@ https://github.com/user-attachments/assets/c30f642d-b4ac-4f40-9923-3a624b55e9de
 - レコードマトリクス（メイン画面）
 <img width="1470" height="835" alt="Screenshot 2026-05-21 at 13 45 41" src="https://github.com/user-attachments/assets/f75368a6-d6dc-44e9-ac40-ec780e0771e0" />
 
+https://github.com/user-attachments/assets/b9fd3458-8a22-4d2e-911f-c37fa0ce205c
+
+
+
 アーティスト管理（Spotify 検索 + フォロー）
 <img width="1470" height="835" alt="Screenshot 2026-05-21 at 13 46 02" src="https://github.com/user-attachments/assets/2dd03788-3092-4561-bb95-1c7f7de444bf" />
 
