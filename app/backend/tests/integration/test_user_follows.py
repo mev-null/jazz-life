@@ -144,6 +144,29 @@ def test_list_followed_artists_requires_auth(unauthed_client: TestClient) -> Non
     assert res.status_code == 401
 
 
+def test_list_followed_artists_sorted_by_name_asc(
+    authed_client: TestClient, session: Session
+) -> None:
+    """followed artists が name 昇順（アルファベット順）で返る。"""
+    from sqlmodel import select
+
+    user = session.exec(select(User).where(User.spotify_id == "test-owner")).one()
+    _seed_artist(session, "art-miles")
+    _seed_artist(session, "art-bill")
+    _seed_artist(session, "art-john")
+    session.get(Artist, "art-miles").name = "Miles Davis"
+    session.get(Artist, "art-bill").name = "Bill Evans"
+    session.get(Artist, "art-john").name = "John Coltrane"
+    session.commit()
+    _seed_follow(session, user.id, "art-miles")
+    _seed_follow(session, user.id, "art-bill")
+    _seed_follow(session, user.id, "art-john")
+
+    res = authed_client.get("/api/user-follows/artists")
+    names = [item["name"] for item in res.json()["items"]]
+    assert names == ["Bill Evans", "John Coltrane", "Miles Davis"]
+
+
 def test_list_followed_artists_returns_only_active_follows(
     authed_client: TestClient, session: Session
 ) -> None:
