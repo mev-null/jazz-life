@@ -37,25 +37,20 @@ def test_artists_empty(authed_client: TestClient) -> None:
     assert res.json() == {"items": [], "total": 0}
 
 
-def test_artists_sorted_by_added_at_desc(authed_client: TestClient, session: Session) -> None:
-    """artists が複数件あれば added_at desc で返る。
-
-    seed が空になったので、ソート検証用に fixture artist を直接 2 件投入する。
-    """
-    from datetime import UTC, datetime, timedelta
-
-    now = datetime.now(UTC)
+def test_artists_sorted_by_name_asc(authed_client: TestClient, session: Session) -> None:
+    """artists が複数件あれば name の昇順（アルファベット順）で返る。"""
     session.add_all(
         [
-            Artist(spotify_id="a-old", name="Old", added_at=now - timedelta(days=10)),
-            Artist(spotify_id="a-new", name="New", added_at=now),
+            Artist(spotify_id="a-miles", name="Miles Davis"),
+            Artist(spotify_id="a-bill", name="Bill Evans"),
+            Artist(spotify_id="a-john", name="John Coltrane"),
         ]
     )
     session.commit()
 
     res = authed_client.get("/api/artists")
     items = res.json()["items"]
-    assert [a["spotify_id"] for a in items] == ["a-new", "a-old"]
+    assert [a["name"] for a in items] == ["Bill Evans", "John Coltrane", "Miles Davis"]
 
 
 # ---- POST /api/artists (upsert) ----

@@ -11,7 +11,7 @@ class ArtistRepository:
         self.session = session
 
     def list_all(self) -> list[Artist]:
-        stmt = select(Artist).order_by(col(Artist.added_at).desc())
+        stmt = select(Artist).order_by(col(Artist.name).asc())
         return list(self.session.exec(stmt).all())
 
     def list_followed_by(self, user_id: UUID) -> list[Artist]:
