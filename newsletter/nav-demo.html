@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Where to find Listen — nav demo (GIF source)</title>
+<!--
+  導線 GIF の収録元。本物のナビ (AppLayout の下タブ / DiggingPage のタブ) を
+  vanilla HTML/CSS で再現し、Home → Digging → Listen タブ → 盤タップ→回転 を
+  指タップ付きで再生する。?capture=1 で自動ループを止め Node から駆動。
+  キャプチャ枠 = #screen (300x600 のスマホ画面)。
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,500;1,400&family=Noto+Serif+JP:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4efe3; --ink:#1a1714;
+    --ink-mute:#1a171499; --ink-faint:#1a17144d; --rule:#1a17141f;
+    --serif:"Source Serif 4","Noto Serif JP","Times New Roman",Georgia,serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:#ece5d6;font-family:var(--serif);display:flex;align-items:center;justify-content:center;}
+
+  /* === スマホ画面 (キャプチャ枠) === */
+  #screen{
+    position:relative;width:300px;height:600px;background:var(--paper);color:var(--ink);
+    overflow:hidden;border-radius:26px;box-shadow:0 20px 50px -16px rgba(26,23,20,.45);
+    display:flex;flex-direction:column;
+  }
+  .statusbar{height:26px;display:flex;align-items:center;justify-content:center;
+    font-size:11px;letter-spacing:2px;color:var(--ink-faint);text-transform:uppercase;}
+  .content{flex:1;padding:8px 20px 0 20px;overflow:hidden;}
+
+  /* === 下タブ === */
+  .tabbar{border-top:1px solid var(--rule);height:56px;display:flex;}
+  .tabbar a{flex:1;display:flex;align-items:center;justify-content:center;
+    font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-mute);
+    text-decoration:none;transition:color 200ms;}
+  .tabbar a.active{color:var(--ink);}
+
+  /* === Home === */
+  .shelf-header{display:flex;align-items:baseline;gap:12px;font-size:16px;margin:6px 0 16px;}
+  .shelf-header .t{font-weight:500;}
+  .shelf-header .c{color:var(--ink-faint);font-variant-numeric:tabular-nums;}
+  .shelf-header .va{margin-left:auto;font-size:14px;font-style:italic;color:var(--ink-mute);}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;}
+  .jacket{aspect-ratio:1;border-radius:3px;box-shadow:0 4px 10px -4px rgba(26,23,20,.4);}
+
+  /* === Digging タブ === */
+  .dtabs{margin-top:14px;display:flex;align-items:baseline;gap:20px;font-size:16px;}
+  .dtabs .tab{cursor:pointer;color:var(--ink-mute);font-style:italic;transition:color 200ms;}
+  .dtabs .tab.active{color:var(--ink);font-style:normal;font-weight:500;}
+
+  /* hunt list */
+  .hunt{margin-top:18px;}
+  .row{display:flex;align-items:baseline;justify-content:space-between;
+    padding:11px 0;border-bottom:1px solid var(--rule);}
+  .row .a{font-size:15px;}
+  .row .al{font-size:13px;font-style:italic;color:var(--ink-mute);}
+  .row .d{font-size:12px;color:var(--ink-faint);font-variant-numeric:tabular-nums;}
+
+  /* === Listen 盤 (listen-demo の縮小版) === */
+  .player{position:relative;width:200px;height:200px;margin:26px auto 0;}
+  .disc{position:absolute;inset:0;border-radius:50%;box-shadow:0 14px 30px -10px rgba(26,23,20,.55);
+    background:
+      radial-gradient(circle at center,#14110f 0%,#14110f 30%,#1c1815 30.2%,#14110f 100%),
+      repeating-radial-gradient(circle at center,rgba(255,255,255,.045) 0px,rgba(255,255,255,.045) 1px,rgba(0,0,0,0) 1.5px,rgba(0,0,0,0) 3px),
+      conic-gradient(from 210deg at 50% 50%,rgba(255,255,255,0) 0deg,rgba(255,255,255,.10) 35deg,rgba(255,255,255,0) 80deg,rgba(255,255,255,0) 200deg,rgba(255,255,255,.06) 235deg,rgba(255,255,255,0) 280deg);}
+  .disc.spin{animation:spin 3s linear infinite;}
+  .label{position:absolute;left:50%;top:50%;width:38%;height:38%;transform:translate(-50%,-50%);
+    border-radius:50%;background:#b8442e;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25);
+    display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .label .rings{position:absolute;inset:0;border-radius:50%;pointer-events:none;
+    background:repeating-radial-gradient(circle at center,rgba(0,0,0,.06) 0px,rgba(0,0,0,.06) 1px,transparent 2px,transparent 5px);}
+  .label .rec{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--paper);}
+  .label .rec .dot{width:9px;height:9px;border-radius:50%;background:#c0392b;animation:rec 1.4s ease-in-out infinite;}
+  .label .rec .time{font-family:ui-monospace,Menlo,monospace;font-size:10px;font-variant-numeric:tabular-nums;}
+  .spindle{position:absolute;left:50%;top:50%;width:7px;height:7px;transform:translate(-50%,-50%);
+    border-radius:50%;background:#14110f;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);}
+  .listen-cap{margin-top:24px;text-align:center;min-height:48px;}
+  .listen-cap .idle{font-size:14px;font-style:italic;color:var(--ink-mute);}
+  .listen-cap .status{font-size:12px;text-transform:uppercase;letter-spacing:.32em;color:var(--ink-mute);}
+
+  /* === 指カーソル + タップ波紋 === */
+  #cursor{position:absolute;width:26px;height:26px;border-radius:50%;
+    background:rgba(26,23,20,.28);box-shadow:0 2px 6px rgba(0,0,0,.25);
+    transform:translate(-50%,-50%) scale(1);left:150px;top:560px;opacity:0;
+    transition:left .55s cubic-bezier(.4,0,.2,1),top .55s cubic-bezier(.4,0,.2,1),
+               opacity .25s,transform .15s;z-index:50;pointer-events:none;}
+  #cursor.tap{transform:translate(-50%,-50%) scale(.78);}
+  #ripple{position:absolute;width:10px;height:10px;border-radius:50%;
+    border:2px solid rgba(26,23,20,.5);transform:translate(-50%,-50%) scale(1);
+    opacity:0;z-index:49;pointer-events:none;}
+  #ripple.go{animation:ripple .5s ease-out;}
+
+  .hidden{display:none !important;}
+
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @keyframes rec{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.35;transform:scale(.82);}}
+  @keyframes ripple{0%{opacity:.7;transform:translate(-50%,-50%) scale(1);}100%{opacity:0;transform:translate(-50%,-50%) scale(4.5);}}
+</style>
+</head>
+<body>
+  <div id="screen">
+    <div class="statusbar">Analog&nbsp;Life</div>
+
+    <div class="content">
+      <!-- HOME -->
+      <section id="home">
+        <div class="shelf-header"><span class="t">Records</span><span class="c">6</span><span class="va">view all</span></div>
+        <div class="grid" id="grid"></div>
+      </section>
+
+      <!-- DIGGING (hunt) -->
+      <section id="digging" class="hidden">
+        <div class="dtabs">
+          <span class="tab active">On the hunt</span>
+          <span class="tab" id="tab-listen-d">Listen</span>
+          <span class="tab">Releases</span>
+        </div>
+        <div class="hunt">
+          <div class="row"><span><span class="a">Bill Evans</span> <span class="al">· Waltz for Debby</span></span><span class="d">05/28</span></div>
+          <div class="row"><span><span class="a">Grant Green</span> <span class="al">· Idle Moments</span></span><span class="d">05/24</span></div>
+          <div class="row"><span><span class="a">Lee Morgan</span> <span class="al">· The Sidewinder</span></span><span class="d">05/20</span></div>
+          <div class="row"><span><span class="a">Wayne Shorter</span> <span class="al">· Speak No Evil</span></span><span class="d">05/17</span></div>
+        </div>
+      </section>
+
+      <!-- LISTEN -->
+      <section id="listen" class="hidden">
+        <div class="dtabs">
+          <span class="tab">On the hunt</span>
+          <span class="tab active">Listen</span>
+          <span class="tab">Releases</span>
+        </div>
+        <div class="player">
+          <div class="disc" id="disc">
+            <div class="label"><div class="rings"></div><div class="inner" id="label"></div></div>
+            <div class="spindle" id="spindle"></div>
+          </div>
+        </div>
+        <div class="listen-cap" id="lcap"></div>
+      </section>
+    </div>
+
+    <!-- 下タブ -->
+    <nav class="tabbar">
+      <a class="active" id="nav-home">Home</a>
+      <a id="nav-digging">Digging</a>
+      <a>Artists</a>
+    </nav>
+
+    <div id="ripple"></div>
+    <div id="cursor"></div>
+  </div>
+
+<script>
+  const $ = (id)=>document.getElementById(id);
+  const screenEl=$('screen'), cursor=$('cursor'), ripple=$('ripple');
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+
+  // フェイクジャケット (Home グリッド用)
+  const COVERS=[
+    'linear-gradient(135deg,#1d3a4a,#2f6b6b)',
+    'linear-gradient(135deg,#7a3b2e,#c2683f)',
+    'linear-gradient(135deg,#3a3550,#6b5a8a)',
+    'linear-gradient(135deg,#264d3b,#5a8a5f)',
+    'linear-gradient(135deg,#5a4632,#b08a4a)',
+    'linear-gradient(135deg,#3a2f3a,#8a5a6b)',
+  ];
+  $('grid').innerHTML = COVERS.map(c=>`<div class="jacket" style="background:${c}"></div>`).join('');
+
+  function show(id){ for(const s of ['home','digging','listen']) $(s).classList.toggle('hidden', s!==id); }
+  function navActive(id){ $('nav-home').classList.toggle('active', id==='home'); $('nav-digging').classList.toggle('active', id==='digging'||id==='listen'); }
+
+  // カーソルを要素の中心へ
+  function cursorTo(el){
+    const s=screenEl.getBoundingClientRect(), r=el.getBoundingClientRect();
+    cursor.style.opacity=1;
+    cursor.style.left=(r.left-s.left+r.width/2)+'px';
+    cursor.style.top=(r.top-s.top+r.height/2)+'px';
+  }
+  async function tapAt(el){
+    cursor.classList.add('tap');
+    const s=screenEl.getBoundingClientRect(), r=el.getBoundingClientRect();
+    ripple.style.left=(r.left-s.left+r.width/2)+'px';
+    ripple.style.top=(r.top-s.top+r.height/2)+'px';
+    ripple.classList.remove('go'); void ripple.offsetWidth; ripple.classList.add('go');
+    await sleep(150); cursor.classList.remove('tap');
+  }
+
+  // 盤の状態
+  let timer=null;
+  function discIdle(){ $('disc').classList.remove('spin'); $('spindle').style.opacity=1; $('label').innerHTML=''; $('lcap').innerHTML='<p class="idle">Tap Vinyle !</p>'; }
+  function discRecording(){
+    $('disc').classList.add('spin'); $('spindle').style.opacity=1;
+    let t=0; const render=()=>{$('label').innerHTML=`<div class="rec"><span class="dot"></span><span class="time">0:${String(t).padStart(2,'0')}</span></div>`;};
+    render(); if(timer)clearInterval(timer); timer=setInterval(()=>{t++;render();},1000);
+    $('lcap').innerHTML='<p class="status">Listening</p>';
+  }
+
+  // 初期状態 = Home
+  function reset(){
+    if(timer){clearInterval(timer);timer=null;}
+    show('home'); navActive('home'); discIdle();
+    cursor.style.transition='none'; cursor.style.opacity=0; cursor.style.left='150px'; cursor.style.top='560px';
+    void cursor.offsetWidth; cursor.style.transition='';
+  }
+
+  // === 1サイクルのシナリオ ===
+  async function scene(){
+    reset();                       await sleep(700);
+    cursorTo($('nav-digging'));     await sleep(650);
+    await tapAt($('nav-digging'));
+    show('digging'); navActive('digging'); await sleep(950);
+    cursorTo($('tab-listen-d'));     await sleep(650);
+    await tapAt($('tab-listen-d'));
+    show('listen'); navActive('listen'); discIdle(); await sleep(850);
+    cursorTo($('disc'));             await sleep(600);
+    await tapAt($('disc'));
+    discRecording();                 await sleep(1600);
+    cursor.style.opacity=0;          await sleep(350);
+  }
+
+  async function loop(){ /* eslint-disable no-constant-condition */ while(true){ await scene(); } }
+
+  // 駆動: 通常は自動ループ、?capture=1 では Node から scene() を1回ずつ呼ぶ
+  const qp=new URLSearchParams(location.search);
+  if(qp.get('capture')==='1'){ window.__nav={scene,reset}; reset(); }
+  else { loop(); }
+</script>
+</body>
+</html>
