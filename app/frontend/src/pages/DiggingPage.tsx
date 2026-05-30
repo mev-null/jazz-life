@@ -176,7 +176,7 @@ export function DiggingPage() {
         ) : (
           <div>
             <h1 className="flex items-baseline gap-3 text-base">
-              <span className="font-medium">Releases</span>
+              <span className="font-medium">Records</span>
               {releases.data && (
                 <span className="text-ink-faint tabular-nums">
                   {releaseParts.upcoming.length} upcoming ·{" "}
