@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   createVinylRecord,
   deleteVinylRecord,
+  getVinylRecords,
   searchSpotifyAlbums,
   updateVinylRecord,
   uploadJacket,
   upsertArtist,
 } from "../../api/client";
+import { PIN_LIMIT } from "../../lib/pins";
 import type { Artist, VinylRecord } from "../../types/api";
 import type {
   FavoriteTrack,
@@ -90,6 +92,20 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
     mode?.kind === "add" && mode.defaults?.status === "wanted";
   const { isMobile } = useBreakpoint();
   const mobile = MOBILE_UI_ENABLED && isMobile;
+
+  // 「ピン枠が満杯か」の判定用に現在のピン数を取得する。HomePage と同じ
+  // ["records"] キャッシュを共有するので通常は追加 fetch されない。
+  const recordsQ = useQuery({
+    queryKey: ["records"],
+    queryFn: () => getVinylRecords(),
+    enabled: mode?.kind === "add",
+  });
+  const pinnedCount =
+    recordsQ.data?.items.filter((r) => r.is_pinned).length ?? 0;
+  // add で owned (status 未指定も owned 扱い) かつピン枠が満杯のとき、
+  // auto-pin されず Home に出ないことを保存前に知らせる (ADR-015 §2.4)。
+  const willBeOwned = mode?.kind === "add" && mode.defaults?.status !== "wanted";
+  const showPinFullHint = willBeOwned && pinnedCount >= PIN_LIMIT;
   // Mobile では autoFocus で keyboard が即立ち上がるとモーダル本体が下に押し下げられて
   // 操作しづらいので、初回フォーカスを抑止する。タップで明示的に focus する運用に倒す。
   const autoFocusTitle = !mobile;
@@ -119,6 +135,9 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
   const [spotifyOpen, setSpotifyOpen] = useState(false);
   const [spotifySearching, setSpotifySearching] = useState(false);
   const [spotifyError, setSpotifyError] = useState<string | null>(null);
+  // Remove の確認 (InlineConfirm) 中はフォームの Cancel/Update を隠して
+  // 「Remove this record? Cancel Confirm」だけにするためのフラグ。
+  const [removeConfirming, setRemoveConfirming] = useState(false);
 
   const create = useMutation({
     mutationFn: createVinylRecord,
@@ -690,6 +709,19 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
 
         </div>
 
+        {showPinFullHint && (
+          <p
+            className={
+              mobile
+                ? "bg-paper px-8 pt-4 text-xs italic text-ink-mute"
+                : "mt-6 text-xs italic text-ink-mute"
+            }
+          >
+            Home のピンは上限 {PIN_LIMIT} 枚です。これ以上は自動で Home に
+            出ないので、view all から ★ を入れ替えてください。
+          </p>
+        )}
+
         <div
           className={
             mobile
@@ -708,6 +740,7 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
               pendingLabel="Removing…"
               isPending={remove.isPending}
               disabled={submitting}
+              onConfirmingChange={setRemoveConfirming}
               onConfirm={() =>
                 remove.mutate(mode.record.id, {
                   onSuccess: () => {
@@ -718,21 +751,26 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
               }
             />
           )}
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            className="text-ink-mute transition-colors hover:text-ink disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="font-medium text-ink transition-opacity hover:opacity-70 disabled:opacity-50"
-          >
-            {submitting ? "Saving…" : isEdit ? "Update" : "Save"}
-          </button>
+          {/* Remove 確認中は Cancel/Update を隠し、確認 UI だけにする。 */}
+          {!removeConfirming && (
+            <>
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={submitting}
+                className="text-ink-mute transition-colors hover:text-ink disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="font-medium text-ink transition-opacity hover:opacity-70 disabled:opacity-50"
+              >
+                {submitting ? "Saving…" : isEdit ? "Update" : "Save"}
+              </button>
+            </>
+          )}
         </div>
       </form>
     </ModalShell>

@@ -23,6 +23,11 @@ type Props = {
    * 矢印 UI を有効化する。false (デフォルト) は ArtistDetailModal 互換の全件描画。
    */
   paginated?: boolean;
+  /**
+   * paginated query の status 絞り込み。Home の view all は "owned" 固定で、
+   * wanted を混在させない (count / ページ数も owned のみで算出)。
+   */
+  statusFilter?: VinylRecord["status"];
 };
 
 export function RecordsAllModal({
@@ -33,11 +38,13 @@ export function RecordsAllModal({
   onRecordClick,
   onAddRecord,
   paginated = false,
+  statusFilter,
 }: Props) {
   return paginated ? (
     <PaginatedBody
       label={label}
       prefix={prefix}
+      statusFilter={statusFilter}
       onClose={onClose}
       onRecordClick={onRecordClick}
       onAddRecord={onAddRecord}
@@ -93,6 +100,7 @@ function StaticBody({
 type PaginatedBodyProps = {
   label: string;
   prefix?: string;
+  statusFilter?: VinylRecord["status"];
   onClose: () => void;
   onRecordClick: (record: VinylRecord) => void;
   onAddRecord: () => void;
@@ -101,6 +109,7 @@ type PaginatedBodyProps = {
 function PaginatedBody({
   label,
   prefix,
+  statusFilter,
   onClose,
   onRecordClick,
   onAddRecord,
@@ -113,8 +122,11 @@ function PaginatedBody({
   const [page, setPage] = useState(0);
 
   const query = useQuery({
-    queryKey: ["records", { limit: pageSize, offset: page * pageSize }],
-    queryFn: () => getVinylRecords(pageSize, page * pageSize),
+    queryKey: [
+      "records",
+      { limit: pageSize, offset: page * pageSize, status: statusFilter },
+    ],
+    queryFn: () => getVinylRecords(pageSize, page * pageSize, statusFilter),
     placeholderData: keepPreviousData,
   });
 

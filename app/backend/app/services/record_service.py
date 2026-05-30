@@ -59,11 +59,10 @@ _COLLECTION_FIELDS = (
     "is_pinned",
 )
 
-# Home プレビュー (PC 8 / モバイル 6) に何を見せるか をユーザが選ぶ手段。
-# 上限は PC プレビュー数に合わせる。モバイル側でもこの上限を共有し、
-# 表示はクライアント側で先頭 6 件に切る (UserCollection の order_by が
-# is_pinned DESC, display_order ASC なので先頭 6 件は自動的に pin 優先になる)。
-_PIN_LIMIT = 8
+# Home プレビューに pin したレコードを並べる枠の上限。モバイル UX に最適化し、
+# モバイルのプレビュー枚数 (6) に合わせる。手動 pin の上限 enforce と、
+# auto-pin (owned 化の瞬間に自動 pin) の両方でこの値を使う。
+_PIN_LIMIT = 6
 
 
 def _today_jst() -> dt.date:
@@ -155,6 +154,10 @@ class RecordService:
             created_at=now,
             updated_at=now,
         )
+        # owned で新規作成かつ pin 枠に空きがあれば自動 pin (モバイルの手動 pin
+        # 省力化)。add の前に呼ぶことで count は新規行を含まない現在値を見る。
+        self._auto_pin_if_room(collection, user_id)
+
         try:
             saved_collection = self.collection_repo.add(collection)
         except IntegrityError as exc:
@@ -231,6 +234,12 @@ class RecordService:
             and collection.purchase_date is None
         ):
             collection.purchase_date = _today_jst()
+
+        # wanted→owned 遷移で owned になった瞬間、pin 枠に空きがあれば自動 pin。
+        # 明示的に is_pinned を送っている場合 (上の is_pinned ブロックで処理済み)
+        # はユーザ意図を尊重して発動しない。
+        if was_wanted_to_owned and "is_pinned" not in patch_data:
+            self._auto_pin_if_room(collection, user_id)
 
         # 2) catalog 系フィールド (manual のみ書く、promote 経路を吸収)
         catalog_changes = {k: patch_data[k] for k in _CATALOG_FIELDS if k in patch_data}
@@ -361,6 +370,21 @@ class RecordService:
         except IntegrityError as exc:
             self.favorite_track_repo.session.rollback()
             raise ConflictError("duplicate spotify_track_id in favorite_tracks") from exc
+
+    def _auto_pin_if_room(self, collection: UserCollection, user_id: UUID) -> None:
+        """owned になった瞬間、pin 枠 (_PIN_LIMIT) に空きがあれば末尾に自動 pin。
+
+        - owned 以外 / 既に pin 済みの collection は触らない
+        - 上限到達済みなら何もしない (手動 pin と同じ上限を共有)
+        - `pin_order` は既存の最大値 +1 で末尾に置く (手動 pin と同じ採番)
+        """
+        if collection.status != RECORD_STATUS_OWNED or collection.is_pinned:
+            return
+        if self.collection_repo.count_pinned_for_user(user_id) >= _PIN_LIMIT:
+            return
+        collection.is_pinned = True
+        collection.pinned_at = dt.datetime.now(dt.UTC)
+        collection.pin_order = self.collection_repo.max_pin_order_for_user(user_id) + 1
 
     def _ensure_artist_exists(self, artist_id: str) -> None:
         if self.artist_repo.get(artist_id) is None:

@@ -8,6 +8,7 @@
 // ====================================================================
 
 import { API_BASE, USE_MOCK } from "../lib/env";
+import { PIN_LIMIT } from "../lib/pins";
 import type {
   Artist,
   ArtistRecordCount,
@@ -79,7 +80,7 @@ function sortedMockRecords(): VinylRecord[] {
   });
 }
 
-const MOCK_PIN_LIMIT = 8;
+const MOCK_PIN_LIMIT = PIN_LIMIT;
 
 export async function getArtists(): Promise<ListResponse<Artist>> {
   if (USE_MOCK) return artistsMock as ListResponse<Artist>;
@@ -239,17 +240,27 @@ export async function upsertArtist(input: ArtistCreate): Promise<Artist> {
 export async function getVinylRecords(
   limit?: number,
   offset?: number,
+  status?: VinylRecord["status"],
 ): Promise<ListResponse<VinylRecord>> {
   if (USE_MOCK) {
-    const sorted = sortedMockRecords();
+    // status 指定時はその絞り込み後の集合を slice し、total も絞り込み後の
+    // 件数にする (ページ数計算を owned のみで合わせる)。
+    const pool = status
+      ? sortedMockRecords().filter((r) => r.status === status)
+      : sortedMockRecords();
     const start = offset ?? 0;
     const items =
-      limit !== undefined ? sorted.slice(start, start + limit) : sorted;
-    return { items, total: mockRecordsStore.length };
+      limit !== undefined ? pool.slice(start, start + limit) : pool;
+    return { items, total: pool.length };
   }
-  const params: { limit?: number; offset?: number } = {};
+  const params: {
+    limit?: number;
+    offset?: number;
+    status?: VinylRecord["status"];
+  } = {};
   if (limit !== undefined) params.limit = limit;
   if (offset !== undefined && offset > 0) params.offset = offset;
+  if (status !== undefined) params.status = status;
   const res = await listRecordsApiRecordsGet(params);
   return res.data as ListResponse<VinylRecord>;
 }
@@ -426,6 +437,13 @@ export async function createVinylRecord(
       status === "wanted"
         ? null
         : (input.purchase_date ?? new Date().toLocaleDateString("sv-SE"));
+    // owned で新規作成かつ pin 枠に空きがあれば auto-pin (backend の
+    // _auto_pin_if_room と一致)。末尾 = max(pin_order)+1 で採番。
+    const pinnedNow = mockRecordsStore.filter((r) => r.is_pinned);
+    const autoPin = status === "owned" && pinnedNow.length < MOCK_PIN_LIMIT;
+    const autoPinOrder = autoPin
+      ? pinnedNow.reduce((acc, r) => Math.max(acc, r.pin_order ?? 0), 0) + 1
+      : null;
     const created: VinylRecord = {
       id: crypto.randomUUID(),
       artist_id: input.artist_id,
@@ -444,8 +462,8 @@ export async function createVinylRecord(
       memo: input.memo ?? null,
       favorite_tracks: input.favorite_tracks ?? [],
       display_order: mockRecordsStore.length + 1,
-      is_pinned: false,
-      pin_order: null,
+      is_pinned: autoPin,
+      pin_order: autoPinOrder,
       created_at: now,
       updated_at: now,
     };
@@ -500,7 +518,22 @@ export async function updateVinylRecord(
     ) {
       patch.purchase_date = new Date().toLocaleDateString("sv-SE");
     }
-    // backend の False→True 遷移 + pin 上限 9 件目で 409 を mock 側でも emulate。
+    // wanted→owned 遷移で owned になった瞬間、is_pinned の明示が無く pin 枠に
+    // 空きがあれば auto-pin (backend の _auto_pin_if_room と一致)。
+    if (
+      input.status === "owned" &&
+      current.status === "wanted" &&
+      input.is_pinned === undefined &&
+      !current.is_pinned
+    ) {
+      const pinned = mockRecordsStore.filter((r) => r.is_pinned);
+      if (pinned.length < MOCK_PIN_LIMIT) {
+        patch.is_pinned = true;
+        patch.pin_order =
+          pinned.reduce((acc, r) => Math.max(acc, r.pin_order ?? 0), 0) + 1;
+      }
+    }
+    // backend の False→True 遷移 + pin 上限到達で 409 を mock 側でも emulate。
     // 新規 pin は pin_order = max+1 で末尾に。unpin は pin_order = null。
     if (input.is_pinned === true && !current.is_pinned) {
       const pinned = mockRecordsStore.filter((r) => r.is_pinned);
