@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     # invite 制御は Spotify Developer Dashboard の Users and Access に集約する
     # (ADR-005)。アプリ側で重ねて allowlist を持たない。
 
+    # ---- AudD (音声認識 / ADR-016) ----
+    # 未設定 ("") の場合は recognize エンドポイントが 503 を返す (RecognitionService 側で判定)。
+    audd_api_token: str = ""
+
     # ---- Auth ----
     jwt_secret: str
     refresh_token_key: str

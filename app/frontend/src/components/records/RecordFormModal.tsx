@@ -35,11 +35,21 @@ export type FormMode =
     //   そのまま保存してもよし、編集してもよし)
     defaults?: {
       artistId?: string;
+      // artists レジストリに居ない (認識直後で upsert 反映前 / mock) ケースでも
+      // 名前欄を埋めるための表示名フォールバック。レジストリ優先、無ければこれ。
+      artistName?: string;
       status?: VinylRecordCreateStatus;
       title?: string;
       imageUrl?: string | null;
       spotifyAlbumId?: string | null;
       originalReleaseDate?: string | null;
+      // 音声認識 (ADR-016) の prefill 用:
+      // - favoriteTrackNames: 認識した曲名を favorite_tracks 欄に流し込む
+      // - autoSearchSpotify: マウント直後に title をクエリとして Spotify album 検索を
+      //   1 回自動発火し、候補を即提示する (認識結果に spotify_album_id が無く、
+      //   曲 → アルバム / artist_id を確定させたいフォールバック時に true)
+      favoriteTrackNames?: string[];
+      autoSearchSpotify?: boolean;
     };
   }
   | { kind: "edit"; record: VinylRecord };
@@ -135,6 +145,10 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
   const [spotifyOpen, setSpotifyOpen] = useState(false);
   const [spotifySearching, setSpotifySearching] = useState(false);
   const [spotifyError, setSpotifyError] = useState<string | null>(null);
+  // 音声認識 (ADR-016) のフォールバック: マウント直後に title で Spotify album
+  // 検索を 1 回だけ自動発火させたい時に true。下のトリガー effect が title 確定後に
+  // handleSpotifySearch を呼び、false に戻して 1 回限りにする。
+  const [autoSearchPending, setAutoSearchPending] = useState(false);
   // Remove の確認 (InlineConfirm) 中はフォームの Cancel/Update を隠して
   // 「Remove this record? Cancel Confirm」だけにするためのフラグ。
   const [removeConfirming, setRemoveConfirming] = useState(false);
@@ -197,17 +211,22 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
       setExistingImageUrl(r.image_url);
       setPreviewUrl(r.image_url);
       setSpotifyAlbumId(r.spotify_album_id);
+      setAutoSearchPending(false);
     } else {
       const d = mode.defaults;
       setTitle(d?.title ?? "");
       // add mode: defaults.artistId が渡されていればその場で artists を引いて
-      // name も埋める。artists 未到着のケースは下の追い焚き effect が補完する。
+      // name も埋める。レジストリ未在籍 (認識直後で upsert 反映前 / mock) の場合は
+      // defaults.artistName をフォールバックに使う。artists 未到着ケースは下の
+      // 追い焚き effect が後から補完する。
       const defaultArtistId = d?.artistId ?? "";
       setArtistId(defaultArtistId);
       setArtistQuery(
-        defaultArtistId
-          ? artists.find((a) => a.spotify_id === defaultArtistId)?.name ?? ""
-          : "",
+        (defaultArtistId
+          ? artists.find((a) => a.spotify_id === defaultArtistId)?.name
+          : undefined) ??
+          d?.artistName ??
+          "",
       );
       setReleaseDate(d?.originalReleaseDate ?? "");
       setPressingInfo("");
@@ -217,7 +236,11 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
       // まだ買ってない状態なので空のまま (入力欄も後段で disabled にする)。
       setPurchaseDate(d?.status === "wanted" ? "" : todayLocalISO());
       setMemo("");
-      setFavoriteTracks("");
+      // 音声認識 (ADR-016) 経由なら認識した曲名を favorite_tracks に prefill。
+      setFavoriteTracks((d?.favoriteTrackNames ?? []).join("\n"));
+      // spotify_album_id を持たない認識結果のフォールバックとして、title で
+      // Spotify album 検索を自動発火させる (下のトリガー effect が実行)。
+      setAutoSearchPending(Boolean(d?.autoSearchSpotify));
       // Release 由来の image URL は Spotify CDN なので blob revoke 不要。
       // existingImageUrl / previewUrl の両方にセットして form 上にプレビュー表示する。
       const defaultImage = d?.imageUrl ?? null;
@@ -258,6 +281,19 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
     const name = artists.find((a) => a.spotify_id === defaultArtistId)?.name;
     if (name) setArtistQuery(name);
   }, [mode, artists, artistQuery]);
+
+  // 音声認識 (ADR-016) のフォールバック自動検索。マウント effect で立てた
+  // autoSearchPending を、title が確定したタイミングで 1 回だけ実行する。
+  // handleSpotifySearch は関数宣言で hoist されるのでここから呼べる。
+  useEffect(() => {
+    if (!autoSearchPending) return;
+    if (!title.trim()) return;
+    setAutoSearchPending(false);
+    void handleSpotifySearch();
+    // title / autoSearchPending のみに依存。handleSpotifySearch は安定参照でなくても
+    // 1 回限りの発火なので deps から除外する。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSearchPending, title]);
 
   if (!mode) return null;
 
