@@ -27,7 +27,7 @@ class ArtistRepository:
             .join(UserFollow, col(Artist.spotify_id) == col(UserFollow.artist_id))
             .where(col(UserFollow.user_id) == user_id)
             .where(col(UserFollow.archived_flag).is_(False))
-            .order_by(col(Artist.added_at).desc())
+            .order_by(col(Artist.name).asc())
         )
         return list(self.session.exec(stmt).all())
 
