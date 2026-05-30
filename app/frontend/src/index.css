@@ -11,6 +11,8 @@
     "Source Serif 4", "Noto Serif JP", "Times New Roman", Georgia, serif;
 
   --animate-toast-in: toast-in 150ms ease-out;
+  /* 上部トースト用 (棚入れの祝福)。下から上ではなく上から降りてくる向き。 */
+  --animate-toast-in-top: toast-in-top 150ms ease-out;
 
   /* 録音中のレコード回転 (33⅓ RPM ≒ 1.8s/rev、視覚的にやや遅めの 3s に) */
   --animate-vinyl-spin: vinyl-spin 3s linear infinite;
@@ -22,6 +24,17 @@
   from {
     opacity: 0;
     transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-in-top {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
   }
   to {
     opacity: 1;

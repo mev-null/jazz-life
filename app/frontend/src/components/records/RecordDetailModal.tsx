@@ -5,6 +5,7 @@ import { getVinylRecords, updateVinylRecord } from "../../api/client";
 import { formatReleaseDate } from "../../lib/dates";
 import { PIN_LIMIT } from "../../lib/pins";
 import type { ListResponse, VinylRecord } from "../../types/api";
+import { useShelfWelcome } from "../../hooks/useShelfWelcome";
 import { ModalShell } from "../ModalShell";
 import { useToast } from "../ToastProvider";
 import { JacketArt } from "./JacketCard";
@@ -212,6 +213,7 @@ export function RecordDetailModal({
   onEdit,
 }: Props) {
   const queryClient = useQueryClient();
+  const celebrateShelf = useShelfWelcome();
   // wanted → owned 昇格用 mutation。Want list (ArtistDetailModal の拡大表示)
   // で詳細を開いた時にだけボタンが見える前提。Home は owned のみ表示なので
   // status === "wanted" の判定で自然に出ない。
@@ -219,6 +221,7 @@ export function RecordDetailModal({
     mutationFn: (id: string) => updateVinylRecord(id, { status: "owned" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["records"] });
+      void celebrateShelf(); // 棚入れの祝福 (ADR-017)
       onClose();
     },
   });

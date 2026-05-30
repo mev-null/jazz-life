@@ -21,6 +21,7 @@ import type {
   VinylRecordUpdate,
 } from "../../api/generated/model";
 import { useBreakpoint } from "../../hooks/useBreakpoint";
+import { useShelfWelcome } from "../../hooks/useShelfWelcome";
 import { MOBILE_UI_ENABLED } from "../../lib/featureFlags";
 import { InlineConfirm } from "../InlineConfirm";
 import { ModalShell } from "../ModalShell";
@@ -89,6 +90,7 @@ const todayLocalISO = (): string => new Date().toLocaleDateString("sv-SE");
 
 export function RecordFormModal({ mode, artists, followedArtists, onClose }: Props) {
   const queryClient = useQueryClient();
+  const celebrateShelf = useShelfWelcome();
   const isEdit = mode?.kind === "edit";
   // ArtistsPage / ArtistDetailModal / ReleaseDetailModal 起点で artist が事前に
   // 決まっている場合は Artist 入力欄をロックする (placeholder の「既存から選ぶ
@@ -476,6 +478,11 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
           recordId: created.id,
           file: pendingFile,
         });
+      }
+      // owned として迎え入れた瞬間だけ祝福する (wanted 追加では出さない)。
+      // status === undefined は backend 既定 owned なので祝福対象。ADR-017。
+      if (status !== "wanted") {
+        void celebrateShelf();
       }
     }
 
