@@ -6,6 +6,14 @@
 
 ## スクリーンショット
 > スクリーンショット内のアーティスト画像・アルバムアートは Spotify Web API 経由で取得したものです。
+
+- Listen（音声から探す・最新機能）— 流れている曲を録音 → 認識 → ワンタップで On the hunt（欲しいリスト）に追加。右は導線（Home → Digging → Listen）
+<p>
+  <img alt="Listen: search a record by sound" src="newsletter/listen.gif" height="380" />
+  &nbsp;&nbsp;
+  <img alt="Where to find Listen: Home then Digging then Listen" src="newsletter/nav.gif" height="380" />
+</p>
+
 - ログイン画面
 
 
