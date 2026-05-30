@@ -49,12 +49,13 @@ export function HomePage() {
     };
   }, [mobile]);
 
-  // Home は所有レコードのコレクション。wanted は ArtistDetailModal の want list でだけ表示。
+  // Home は「ピンした owned だけ」を showcase する (ADR-014)。所有はしているが
+  // 未ピンのレコードは view all (RecordsAllModal) でのみ参照する。wanted は Digging。
   const ownedRecords = records.data?.items.filter((r) => r.status === "owned") ?? [];
-  const exceedsPreview = ownedRecords.length >= previewLimit;
-  const visibleRecords = exceedsPreview
-    ? ownedRecords.slice(0, previewLimit)
-    : ownedRecords;
+  // backend が pin_order 昇順で返すので、filter してもピン順は維持される。
+  // ピン上限は 8 枚なので previewLimit (PC 8) には収まる。
+  const pinnedRecords = ownedRecords.filter((r) => r.is_pinned);
+  const hasRoomForAdd = pinnedRecords.length < previewLimit;
 
   const [openRecord, setOpenRecord] = useState<VinylRecord | null>(null);
   const [formMode, setFormMode] = useState<FormMode | null>(null);
@@ -76,7 +77,7 @@ export function HomePage() {
         <span className="text-ink-faint tabular-nums">
           {records.data ? ownedRecords.length : ""}
         </span>
-        {exceedsPreview && (
+        {ownedRecords.length > 0 && (
           <button
             type="button"
             onClick={() => setShowAll(true)}
@@ -94,30 +95,43 @@ export function HomePage() {
         {records.isError && (
           <p className="text-sm text-ink-mute">読み込みに失敗しました</p>
         )}
-        {records.data && (
-          <>
+        {records.data &&
+          (pinnedRecords.length > 0 ? (
+            // ピン済みの showcase。room があれば末尾に追加タイルも出す。
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {visibleRecords.map((r) => (
+              {pinnedRecords.map((r) => (
                 <JacketCard
                   key={r.id}
                   record={r}
                   onClick={() => setOpenRecord(r)}
                 />
               ))}
-              {!exceedsPreview && (
-                <AddRecordTile
-                  onClick={() => setFormMode({ kind: "add" })}
-                  prominent={ownedRecords.length === 0}
-                />
+              {hasRoomForAdd && (
+                <AddRecordTile onClick={() => setFormMode({ kind: "add" })} />
               )}
             </div>
-            {ownedRecords.length === 0 && (
+          ) : ownedRecords.length > 0 ? (
+            // owned はあるが Home に固定されたものが無い状態。view all から
+            // レコードを開いて ★ で固定するよう促す。
+            <p className="mt-6 text-center text-sm italic text-ink-mute">
+              Home に固定されたレコードがありません。
+              <br />
+              view all からレコードを開き ★ で固定してください。
+            </p>
+          ) : (
+            // まだ 1 枚も owned が無い。最初の追加導線を目立たせる。
+            <>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                <AddRecordTile
+                  onClick={() => setFormMode({ kind: "add" })}
+                  prominent
+                />
+              </div>
               <p className="mt-6 text-center text-sm italic text-ink-mute">
                 まだレコードがありません。最初の 1 枚を追加してください。
               </p>
-            )}
-          </>
-        )}
+            </>
+          ))}
       </div>
 
       {showAll && (
@@ -125,7 +139,6 @@ export function HomePage() {
           label="Records"
           records={ownedRecords}
           paginated
-          pinningEnabled
           onClose={() => setShowAll(false)}
           onRecordClick={(r) => setOpenRecord(r)}
           onAddRecord={() => setFormMode({ kind: "add" })}

@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { type ReactNode, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { updateVinylRecord } from "../../api/client";
+import { getVinylRecords, updateVinylRecord } from "../../api/client";
 import { formatReleaseDate } from "../../lib/dates";
-import type { VinylRecord } from "../../types/api";
+import type { ListResponse, VinylRecord } from "../../types/api";
 import { ModalShell } from "../ModalShell";
 import { JacketArt } from "./JacketCard";
 
@@ -30,12 +30,16 @@ function BackFace({
   record,
   artistName,
   footerAction,
+  pinToggle,
 }: {
   record: VinylRecord;
   artistName?: string;
   // wanted record の「買った」ボタンを footer 内に流す用のスロット。
   // absolute 配置だと footer の border-t と重なるのでここに渡す。
   footerAction?: ReactNode;
+  // ピントグル (★) を流すスロット。ジャケ写真には重ねず、ヘッダー下の
+  // メタ情報セクション右上に absolute で出す。
+  pinToggle?: ReactNode;
 }) {
   return (
     <div className="flex h-full flex-col bg-paper p-8 text-left text-ink shadow-xl ring-1 ring-ink/10">
@@ -53,7 +57,10 @@ function BackFace({
         </div>
       </header>
 
-      <div className="flex-1 space-y-3 py-5 text-[15px] leading-relaxed">
+      <div className="relative flex-1 space-y-3 py-5 pr-8 text-[15px] leading-relaxed">
+        {pinToggle && (
+          <div className="absolute right-0 top-3">{pinToggle}</div>
+        )}
         {(() => {
           const released = formatReleaseDate(record.original_release_date);
           const pressing = record.pressing_info ?? "";
@@ -98,6 +105,82 @@ function BackFace({
   );
 }
 
+type PinToggleButtonProps = {
+  record: VinylRecord;
+  onPinError: (message: string) => void;
+};
+
+/**
+ * 詳細モーダル内のピントグル。`["records"]` 全クエリを楽観更新し、Home プレビュー
+ * (最初の 8 枚) にも即座に反映する。最大 8 枚 (pin limit) 超過は 409 で弾かれる。
+ */
+function PinToggleButton({ record, onPinError }: PinToggleButtonProps) {
+  const queryClient = useQueryClient();
+  // 親から渡る `record` はモーダルを開いた時点のスナップショットなので、
+  // is_pinned はライブの `["records"]` キャッシュから引き直す。これにより
+  // 楽観更新 (onMutate) 後に ★ の表示とトグル対象が即座に追従する
+  // (スナップショット参照だと開いたまま操作しても反映されない)。
+  const { data } = useQuery({
+    queryKey: ["records"],
+    queryFn: () => getVinylRecords(),
+  });
+  const live = data?.items.find((r) => r.id === record.id);
+  const pinned = live?.is_pinned ?? record.is_pinned;
+
+  const togglePin = useMutation({
+    mutationFn: () => updateVinylRecord(record.id, { is_pinned: !pinned }),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["records"] });
+      const snapshots = queryClient.getQueriesData<ListResponse<VinylRecord>>({
+        queryKey: ["records"],
+      });
+      for (const [key, data] of snapshots) {
+        if (!data) continue;
+        queryClient.setQueryData<ListResponse<VinylRecord>>(key, {
+          ...data,
+          items: data.items.map((r) =>
+            r.id === record.id ? { ...r, is_pinned: !r.is_pinned } : r,
+          ),
+        });
+      }
+      return { snapshots };
+    },
+    onError: (err, _vars, ctx) => {
+      for (const [key, data] of ctx?.snapshots ?? []) {
+        queryClient.setQueryData(key, data);
+      }
+      const msg =
+        err instanceof Error && /pin limit/i.test(err.message)
+          ? "ピンは最大 8 枚までです。"
+          : "ピンの更新に失敗しました。";
+      onPinError(msg);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["records"] });
+    },
+  });
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        togglePin.mutate();
+      }}
+      disabled={togglePin.isPending}
+      aria-label={pinned ? "Unpin" : "Pin"}
+      aria-pressed={pinned}
+      className={`flex size-6 cursor-pointer items-center justify-center rounded-full text-[11px] leading-none shadow transition-colors ${
+        pinned
+          ? "bg-ink text-paper"
+          : "bg-paper/85 text-ink/70 ring-1 ring-ink/15 hover:bg-paper hover:text-ink"
+      } disabled:cursor-wait disabled:opacity-60`}
+    >
+      ★
+    </button>
+  );
+}
+
 type Props = {
   record: VinylRecord | null;
   artistName?: string;
@@ -112,6 +195,7 @@ export function RecordDetailModal({
   onEdit,
 }: Props) {
   const queryClient = useQueryClient();
+  const [pinError, setPinError] = useState<string | null>(null);
   // wanted → owned 昇格用 mutation。Want list (ArtistDetailModal の拡大表示)
   // で詳細を開いた時にだけボタンが見える前提。Home は owned のみ表示なので
   // status === "wanted" の判定で自然に出ない。
@@ -140,6 +224,19 @@ export function RecordDetailModal({
       </button>
     ) : undefined;
 
+  // ピンは Home (owned) のコレクション概念。wanted には出さない (編集鉛筆と同条件)。
+  const pinToggle =
+    record.status !== "wanted" ? (
+      <div className="flex flex-col items-end gap-1">
+        <PinToggleButton record={record} onPinError={setPinError} />
+        {pinError && (
+          <span className="whitespace-nowrap text-xs text-ink-mute">
+            {pinError}
+          </span>
+        )}
+      </div>
+    ) : undefined;
+
   return (
     <ModalShell onClose={onClose}>
       <div className="relative aspect-square w-[min(72vh,90vw,440px)]">
@@ -147,6 +244,7 @@ export function RecordDetailModal({
           record={record}
           artistName={artistName}
           footerAction={markOwnedButton}
+          pinToggle={pinToggle}
         />
         {onEdit && record.status !== "wanted" && (
           <button
