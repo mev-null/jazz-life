@@ -69,3 +69,21 @@ class SpotifyApiError(DomainError):
 
     def __str__(self) -> str:
         return self.safe_message
+
+
+class RecognitionError(DomainError):
+    """音声認識 (AudD) 呼び出しで発生したエラー (ADR-016)。
+
+    `status_code` には router がそのまま返す HTTP status を格納する。
+    - トークン未設定 → 503 (Service Unavailable)
+    - 上流 AudD のエラー / 通信失敗 → 502 (Bad Gateway)
+    `__str__` は `safe_message` のみ (auth / spotify 系と同方針)。
+    """
+
+    def __init__(self, safe_message: str, *, status_code: int = 502) -> None:
+        super().__init__(safe_message)
+        self.safe_message = safe_message
+        self.status_code = status_code
+
+    def __str__(self) -> str:
+        return self.safe_message

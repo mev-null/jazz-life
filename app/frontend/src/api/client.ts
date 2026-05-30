@@ -49,6 +49,7 @@ import {
 } from "./generated/user-follows/user-follows";
 import type {
   ArtistCreate,
+  RecognitionResult,
   SpotifyAlbumSummary,
   SpotifyArtistSummary,
   SyncRunRequest,
@@ -620,4 +621,46 @@ export async function uploadJacket(
   if (!res.ok)
     throw new Error(`PUT jacket ${recordId} failed: ${res.status}`);
   return (await res.json()) as { image_url: string };
+}
+
+/**
+ * 録音した短いクリップ (blob) を AudD で認識し、artist + title + アルバム情報を返す
+ * (ADR-016)。Digging の Listen タブから呼ぶ。
+ *
+ * orval fetch mode は multipart UploadFile body を素直に生成しないので、jacket
+ * upload と同じく生 fetch + FormData で送る (credentials は auth cookie 同梱)。
+ *
+ * USE_MOCK 時はネットワーク / マイクを使わず固定のダミー認識結果を返す。実 API
+ * 接続 + マイク許可が無くても、Listen タブ → 追加フォームの導線を UI 検証できる。
+ */
+export async function recognizeAudio(blob: Blob): Promise<RecognitionResult> {
+  if (USE_MOCK) {
+    await new Promise((r) => setTimeout(r, 600));
+    // UI 確認用ダミー。ジャケット表示を見せるため実在のカバー画像を持たせる。
+    return {
+      matched: true,
+      title: "So What",
+      artist_name: "Miles Davis",
+      album: "Kind of Blue",
+      spotify_album_id: "1weenld61qoidwYuZ1GjTr",
+      spotify_artist_id: "0kbYTNQb4Pb1rPbbaF0pT4",
+      artist_image_url: null,
+      image_url:
+        "https://i.scdn.co/image/ab67616d0000b2730ebc17239b6b18ba88cfb8ca",
+      original_release_date: "1959-08-17",
+    };
+  }
+  const fd = new FormData();
+  // backend は UploadFile.file.read() でバイト列だけ使うので filename は任意。
+  fd.append("file", blob, "clip");
+  const res = await fetch(`${API_BASE}/api/recognize`, {
+    method: "POST",
+    body: fd,
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`POST recognize failed: ${res.status}${detail ? ` — ${detail}` : ""}`);
+  }
+  return (await res.json()) as RecognitionResult;
 }

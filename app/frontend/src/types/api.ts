@@ -5,6 +5,7 @@
 export type {
   ArtistRead as Artist,
   ArtistRecordCount,
+  RecognitionResult,
   ReleaseRead as Release,
   ReleaseReadAlbumType as AlbumType,
   SyncRunResult,

@@ -20,6 +20,7 @@ from app.core.settings import Settings, get_settings
 from app.models.user import User
 from app.services.artist_service import ArtistService
 from app.services.auth_service import AuthService
+from app.services.recognition_service import RecognitionService
 from app.services.record_service import RecordService
 from app.services.release_service import ReleaseService
 from app.services.spotify_app_client import SpotifyAppClient
@@ -120,6 +121,12 @@ def get_spotify_app_client(settings: Settings = Depends(get_settings)) -> Spotif
     if _spotify_app_client is None:
         _spotify_app_client = SpotifyAppClient(settings)
     return _spotify_app_client
+
+
+def get_recognition_service(
+    settings: Settings = Depends(get_settings),
+) -> RecognitionService:
+    return RecognitionService(api_token=settings.audd_api_token)
 
 
 def get_auth_service(

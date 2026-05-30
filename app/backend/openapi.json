@@ -509,6 +509,48 @@
         }
       }
     },
+    "/api/recognize": {
+      "post": {
+        "tags": [
+          "recognize"
+        ],
+        "summary": "Recognize",
+        "description": "録音クリップ (multipart `file`) を AudD で認識して 1 件のマッチを返す。\n\nマッチしなければ `matched=False`。トークン未設定は 503、上流失敗は 502。",
+        "operationId": "recognize_api_recognize_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_recognize_api_recognize_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecognitionResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/releases": {
       "get": {
         "tags": [
@@ -1141,6 +1183,20 @@
         ],
         "title": "AuthUserRead"
       },
+      "Body_recognize_api_recognize_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_recognize_api_recognize_post"
+      },
       "FavoriteTrack": {
         "properties": {
           "spotify_track_id": {
@@ -1333,6 +1389,105 @@
         ],
         "title": "PinReorderRequest",
         "description": "drag & drop で並び替えた pinned レコードの id 列。\n\n`ids` は user が現在 pin している全行を、ユーザが望む順序で並べたもの。\nbackend は 1..N で `pin_order` を再採番する。欠け/重複/未 pin 行混入は 409。"
+      },
+      "RecognitionResult": {
+        "properties": {
+          "matched": {
+            "type": "boolean",
+            "title": "Matched",
+            "default": false
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "artist_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artist Name"
+          },
+          "album": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Album"
+          },
+          "spotify_album_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spotify Album Id"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Url"
+          },
+          "original_release_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Release Date"
+          },
+          "spotify_artist_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spotify Artist Id"
+          },
+          "artist_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artist Image Url"
+          }
+        },
+        "type": "object",
+        "title": "RecognitionResult"
       },
       "ReleaseRead": {
         "properties": {

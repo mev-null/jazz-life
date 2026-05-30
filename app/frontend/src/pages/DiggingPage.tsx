@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -9,11 +10,13 @@ import {
   getWantedRecords,
   setReleaseRead,
   triggerReleaseSync,
+  upsertArtist,
 } from "../api/client";
 import {
   HuntListPanel,
   type HuntSort,
 } from "../components/feed/HuntListPanel";
+import { ListenPanel } from "../components/feed/ListenPanel";
 import { ReleaseRow } from "../components/feed/ReleaseRow";
 import {
   ReleaseDetailModal,
@@ -26,22 +29,35 @@ import {
   type FormMode,
 } from "../components/records/RecordFormModal";
 import { formatLongDate, formatShortDate, partitionByToday } from "../lib/dates";
-import type { Release, VinylRecord } from "../types/api";
+import type { RecognitionResult, Release, VinylRecord } from "../types/api";
 
-type Tab = "hunt" | "releases";
+type Tab = "hunt" | "listen" | "releases";
+
+const TABS: Tab[] = ["hunt", "listen", "releases"];
 
 export function DiggingPage() {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<Tab>("hunt");
+  const navigate = useNavigate();
+  // タブは URL (/digging/:tab) を真実の出所にする。無印 /digging や未知の値は
+  // hunt に正規化する。setTab 相当は navigate でパスを切り替える。
+  const { tab: tabParam } = useParams<{ tab: string }>();
+  const tab: Tab = TABS.includes(tabParam as Tab) ? (tabParam as Tab) : "hunt";
+  const setTab = (t: Tab) => navigate(`/digging/${t}`);
   const [huntSort, setHuntSort] = useState<HuntSort>("artist");
 
+  // タブ別 lazy fetch。開いているタブに必要な query だけ走らせて API を節約する。
+  // 一度取得した分は TanStack Query のキャッシュに残るので、タブを往復しても
+  // staleTime 内なら再フェッチは走らない。
   const releases = useQuery({
     queryKey: ["releases"],
     queryFn: () => getReleases(),
+    enabled: tab === "releases",
   });
-  // global registry (archived 含む)。release 行や Hunt list の artist 名表示で、
-  // 現在 unfollow しているアーティストでも名前が消えないよう全件持つ。
+  // global registry (archived 含む)。release 行 / Hunt list の artist 名表示、
+  // 認識フォールバックの在籍判定、フォームの typeahead で全タブから必要なので常時。
   const artists = useQuery({ queryKey: ["artists"], queryFn: getArtists });
+  // RecordFormModal の typeahead 候補。フォームは全タブから開きうる (hunt → 詳細 →
+  // edit / listen → 認識追加 / releases → collect) ので常時取得しておく。
   const followedArtists = useQuery({
     queryKey: ["followed-artists"],
     queryFn: getFollowedArtists,
@@ -51,10 +67,12 @@ export function DiggingPage() {
   const wanted = useQuery({
     queryKey: ["records", "wanted", huntSort],
     queryFn: () => getWantedRecords(huntSort),
+    enabled: tab === "hunt",
   });
   const syncStatusQ = useQuery({
     queryKey: ["release-sync-status"],
     queryFn: getReleaseSyncStatus,
+    enabled: tab === "releases",
   });
 
   const syncMutation = useMutation({
@@ -124,6 +142,55 @@ export function DiggingPage() {
     });
   }
 
+  /**
+   * Listen タブの音声認識結果を「On the hunt に追加」する (ADR-016)。
+   *
+   * 1. 認識した Spotify アーティストが artists レジストリ未在籍なら upsertArtist で
+   *    先に DB へ追加する (backend の artist_id 必須を満たすフォールバック)。
+   * 2. RecordFormModal を status=wanted で開き、認識メタを prefill する。
+   *    spotify_album_id が無ければ autoSearchSpotify で title 検索を自動発火させ、
+   *    ユーザがアルバムを選んで artist_id / album を確定できるようにする。
+   */
+  async function handleRecognizedAdd(r: RecognitionResult) {
+    let artistId: string | undefined;
+    if (r.spotify_artist_id) {
+      artistId = r.spotify_artist_id;
+      const known = artists.data?.items.some(
+        (a) => a.spotify_id === r.spotify_artist_id,
+      );
+      if (!known) {
+        try {
+          await upsertArtist({
+            spotify_id: r.spotify_artist_id,
+            name: r.artist_name ?? r.spotify_artist_id,
+            image_url: r.artist_image_url ?? null,
+            source: "spotify_dynamic",
+          });
+          queryClient.invalidateQueries({ queryKey: ["artists"] });
+        } catch {
+          // upsert 失敗時は artistId を諦めてフォーム内 Spotify 検索に委ねる。
+          artistId = undefined;
+        }
+      }
+    }
+    setFormMode({
+      kind: "add",
+      defaults: {
+        status: "wanted",
+        artistId,
+        // artists レジストリ未反映でも名前欄が空にならないよう認識名を渡す。
+        artistName: r.artist_name ?? undefined,
+        title: r.album ?? r.title ?? "",
+        imageUrl: r.image_url,
+        spotifyAlbumId: r.spotify_album_id,
+        originalReleaseDate: r.original_release_date,
+        favoriteTrackNames: r.title ? [r.title] : [],
+        // Spotify album が未解決なら title 検索を自動発火してアルバム候補を提示。
+        autoSearchSpotify: !r.spotify_album_id,
+      },
+    });
+  }
+
   function handleEditOpenRecord() {
     if (!openRecord) return;
     setFormMode({ kind: "edit", record: openRecord });
@@ -159,6 +226,9 @@ export function DiggingPage() {
         <TabButton active={tab === "hunt"} onClick={() => setTab("hunt")}>
           On the hunt
         </TabButton>
+        <TabButton active={tab === "listen"} onClick={() => setTab("listen")}>
+          Listen
+        </TabButton>
         <TabButton active={tab === "releases"} onClick={() => setTab("releases")}>
           Releases
         </TabButton>
@@ -173,6 +243,8 @@ export function DiggingPage() {
             onSortChange={setHuntSort}
             onRecordClick={(r) => setOpenRecord(r)}
           />
+        ) : tab === "listen" ? (
+          <ListenPanel onAdd={handleRecognizedAdd} />
         ) : (
           <div>
             <h1 className="flex items-baseline gap-3 text-base">

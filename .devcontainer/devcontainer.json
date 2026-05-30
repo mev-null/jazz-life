@@ -56,6 +56,9 @@
     "SPOTIFY_CLIENT_SECRET": {
       "description": "Spotify app Client Secret"
     },
+    "AUDD_API_TOKEN": {
+      "description": "AudD music recognition API token (https://dashboard.audd.io/)"
+    },
     "JWT_SECRET": {
       "description": "JWT signing key"
     },

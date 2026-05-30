@@ -8,7 +8,15 @@ from sqlmodel import Session
 
 from app.core.db import get_engine
 from app.core.repositories.artist_repository import ArtistRepository
-from app.routers import artists, auth, records, releases, spotify, user_follows
+from app.routers import (
+    artists,
+    auth,
+    recognize,
+    records,
+    releases,
+    spotify,
+    user_follows,
+)
 from app.seed import seed_artists_if_empty
 
 _DEFAULT_CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
@@ -72,6 +80,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(artists.router)
 app.include_router(records.router)
+app.include_router(recognize.router)
 app.include_router(releases.router)
 app.include_router(spotify.router)
 app.include_router(user_follows.router)
