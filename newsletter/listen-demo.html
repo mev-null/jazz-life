@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Listen — demo (GIF capture source)</title>
+<!--
+  本物の ListenPanel.tsx の Disc / Tonearm / Waveform を vanilla HTML/CSS に移植し、
+  index.css の keyframes (vinyl-spin / rec-pulse / wave-bar) をそのまま使用。
+  idle→recording→recognizing→result→「To the hunt」タップ→追加トースト を
+  指タップ付きで自動再生（マイク/バックエンド不要）。?capture=1 で Node から駆動。
+  キャプチャ枠 = #stage。
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,500;1,400&family=Noto+Serif+JP:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --color-paper:#f4efe3; --color-ink:#1a1714;
+    --color-ink-mute:#1a171499; --color-ink-faint:#1a17144d;
+    --font-serif:"Source Serif 4","Noto Serif JP","Times New Roman",Georgia,serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--color-paper);color:var(--color-ink);font-family:var(--font-serif);
+    -webkit-font-smoothing:antialiased;display:flex;align-items:center;justify-content:center;}
+
+  /* === キャプチャ枠 === */
+  #stage{position:relative;width:360px;height:440px;display:flex;flex-direction:column;align-items:center;padding-top:14px;}
+
+  .player{position:relative;width:288px;height:288px;display:flex;align-items:center;justify-content:center;margin-top:6px;}
+
+  /* === レコード盤 === */
+  .disc-btn{position:absolute;inset:16px;width:256px;height:256px;border:0;background:transparent;padding:0;}
+  .vinyl-disc{position:absolute;inset:0;border-radius:50%;box-shadow:0 18px 40px -12px rgba(26,23,20,0.55);
+    background:
+      radial-gradient(circle at center,#14110f 0%,#14110f 30%,#1c1815 30.2%,#14110f 100%),
+      repeating-radial-gradient(circle at center,rgba(255,255,255,0.045) 0px,rgba(255,255,255,0.045) 1px,rgba(0,0,0,0) 1.5px,rgba(0,0,0,0) 3px),
+      conic-gradient(from 210deg at 50% 50%,rgba(255,255,255,0) 0deg,rgba(255,255,255,0.10) 35deg,rgba(255,255,255,0) 80deg,rgba(255,255,255,0) 200deg,rgba(255,255,255,0.06) 235deg,rgba(255,255,255,0) 280deg);}
+  .vinyl-disc.spinning{animation:vinyl-spin 3s linear infinite;}
+  .rim{position:absolute;inset:0;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.10);}
+  .label{position:absolute;left:50%;top:50%;width:38%;height:38%;transform:translate(-50%,-50%);
+    border-radius:50%;overflow:hidden;background:#b8442e;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.25);
+    display:flex;align-items:center;justify-content:center;}
+  .label .paper-rings{position:absolute;inset:0;border-radius:50%;pointer-events:none;
+    background:repeating-radial-gradient(circle at center,rgba(0,0,0,0.06) 0px,rgba(0,0,0,0.06) 1px,transparent 2px,transparent 5px);}
+  .label .inner{position:relative;z-index:10;width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
+  .label img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+  .spindle{position:absolute;left:50%;top:50%;width:8px;height:8px;transform:translate(-50%,-50%);
+    border-radius:50%;background:#14110f;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.15);}
+
+  .rec{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--color-paper);}
+  .rec .dot{width:10px;height:10px;border-radius:50%;background:#c0392b;animation:rec-pulse 1.4s ease-in-out infinite;}
+  .rec .time{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;font-variant-numeric:tabular-nums;letter-spacing:-0.01em;}
+
+  /* === トーンアーム === */
+  .tonearm{position:absolute;right:-4px;top:-4px;z-index:20;width:112px;height:112px;pointer-events:none;}
+  .tonearm .pivot{position:absolute;right:4px;top:4px;width:24px;height:24px;border-radius:50%;background:var(--color-ink);box-shadow:0 2px 6px rgba(0,0,0,0.4);}
+  .tonearm .pivot::after{content:"";position:absolute;left:50%;top:50%;width:8px;height:8px;transform:translate(-50%,-50%);border-radius:50%;background:rgba(244,239,227,0.7);}
+  .tonearm .arm{position:absolute;right:14px;top:14px;transform-origin:top right;transition:transform 700ms ease-out;transform:rotate(-6deg);}
+  .tonearm .arm.engaged{transform:rotate(30deg);}
+  .tonearm .arm .rod{width:3px;height:92px;border-radius:9999px;background:linear-gradient(to bottom,var(--color-ink),rgba(26,23,20,0.7));}
+  .tonearm .arm .head{position:absolute;bottom:-8px;left:-5px;width:13px;height:16px;transform:rotate(-12deg);border-radius:2px;background:var(--color-ink);box-shadow:0 2px 4px rgba(0,0,0,0.35);}
+
+  /* === キャプション / アクション === */
+  .caption{margin-top:30px;min-height:6.5rem;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;}
+  .idle-text{max-width:20rem;font-size:14px;font-style:italic;line-height:1.6;color:var(--color-ink-mute);}
+  .status{font-size:13px;text-transform:uppercase;letter-spacing:0.32em;color:var(--color-ink-mute);}
+  .result-title{font-size:18px;font-weight:500;line-height:1.3;color:var(--color-ink);}
+  .result-artist{margin-top:2px;font-size:14px;font-style:italic;color:var(--color-ink-mute);}
+  .cta{margin-top:4px;background:var(--color-ink);color:var(--color-paper);font-size:14px;letter-spacing:0.025em;padding:9px 22px;border:0;transition:opacity .15s;}
+
+  .wave{height:28px;display:flex;align-items:center;justify-content:center;gap:3px;}
+  .wave span{width:2px;border-radius:9999px;background:rgba(26,23,20,0.7);transform-origin:center;}
+
+  /* === 指カーソル + 波紋 === */
+  #cursor{position:absolute;width:26px;height:26px;border-radius:50%;background:rgba(26,23,20,.28);
+    box-shadow:0 2px 6px rgba(0,0,0,.25);transform:translate(-50%,-50%) scale(1);left:180px;top:300px;opacity:0;
+    transition:left .5s cubic-bezier(.4,0,.2,1),top .5s cubic-bezier(.4,0,.2,1),opacity .25s,transform .15s;z-index:50;pointer-events:none;}
+  #cursor.tap{transform:translate(-50%,-50%) scale(.78);}
+  #ripple{position:absolute;width:10px;height:10px;border-radius:50%;border:2px solid rgba(244,239,227,.7);
+    transform:translate(-50%,-50%) scale(1);opacity:0;z-index:49;pointer-events:none;}
+  #ripple.go{animation:ripple .5s ease-out;}
+
+  /* === トースト（app: rounded-full paper ピル / ink文字 / ring / 上から） === */
+  #toast{position:absolute;top:8px;left:50%;z-index:60;
+    background:var(--color-paper);color:var(--color-ink);font-size:14px;
+    padding:8px 16px;border-radius:9999px;box-shadow:0 10px 25px -8px rgba(26,23,20,.45);
+    box-shadow:0 10px 25px -8px rgba(26,23,20,.45),0 0 0 1px rgba(26,23,20,.15);
+    opacity:0;transform:translate(-50%,-8px);transition:opacity .2s ease-out,transform .2s ease-out;pointer-events:none;white-space:nowrap;}
+  #toast.show{opacity:1;transform:translate(-50%,0);}
+
+  @keyframes vinyl-spin{to{transform:rotate(360deg);}}
+  @keyframes rec-pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.35;transform:scale(0.82);}}
+  @keyframes wave-bar{0%,100%{transform:scaleY(0.3);}50%{transform:scaleY(1);}}
+  @keyframes ripple{0%{opacity:.7;transform:translate(-50%,-50%) scale(1);}100%{opacity:0;transform:translate(-50%,-50%) scale(4.5);}}
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="toast"></div>
+
+    <div class="player">
+      <div class="tonearm">
+        <div class="pivot"></div>
+        <div class="arm" id="arm"><div class="rod"></div><div class="head"></div></div>
+      </div>
+      <div class="disc-btn">
+        <div class="vinyl-disc" id="disc">
+          <div class="rim"></div>
+          <div class="label"><div class="paper-rings"></div><div class="inner" id="label"></div></div>
+          <div class="spindle" id="spindle"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="caption" id="caption"></div>
+
+    <div id="ripple"></div>
+    <div id="cursor"></div>
+  </div>
+
+<script>
+  const $=(id)=>document.getElementById(id);
+  const stageEl=$('stage'), disc=$('disc'), arm=$('arm'), label=$('label'),
+        spindle=$('spindle'), caption=$('caption'), cursor=$('cursor'), ripple=$('ripple'), toast=$('toast');
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+
+  const JACKET = "data:image/svg+xml;utf8," + encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>
+       <rect width='200' height='200' fill='#1d3a4a'/>
+       <rect x='0' y='130' width='200' height='70' fill='#e8c14a'/>
+       <circle cx='150' cy='52' r='30' fill='#e8c14a'/>
+       <text x='16' y='52' font-family='Georgia,serif' font-size='22' fill='#f4efe3' font-style='italic'>Blue</text>
+       <text x='16' y='170' font-family='Georgia,serif' font-size='18' fill='#1d3a4a'>Mode</text>
+     </svg>`);
+
+  const WAVE_H=[0.45,0.7,1,0.6,0.9,0.5,0.75,1,0.55,0.8,0.4];
+  function waveformHTML(){
+    return '<div class="wave" aria-hidden="true">'+WAVE_H.map((h,i)=>{
+      const dur=(0.7+(i%3)*0.18).toFixed(2), delay=(i*0.08).toFixed(2);
+      return `<span style="height:${h*100}%;animation:wave-bar ${dur}s ease-in-out ${delay}s infinite;"></span>`;
+    }).join('')+'</div>';
+  }
+
+  // === カーソル / 波紋 / トースト ===
+  function cursorTo(el){
+    const s=stageEl.getBoundingClientRect(), r=el.getBoundingClientRect();
+    cursor.style.opacity=1;
+    cursor.style.left=(r.left-s.left+r.width/2)+'px';
+    cursor.style.top=(r.top-s.top+r.height/2)+'px';
+  }
+  async function tapAt(el){
+    cursor.classList.add('tap');
+    const s=stageEl.getBoundingClientRect(), r=el.getBoundingClientRect();
+    ripple.style.left=(r.left-s.left+r.width/2)+'px';
+    ripple.style.top=(r.top-s.top+r.height/2)+'px';
+    ripple.classList.remove('go'); void ripple.offsetWidth; ripple.classList.add('go');
+    await sleep(150); cursor.classList.remove('tap');
+  }
+  function showToast(msg){ toast.textContent=msg; toast.classList.add('show'); }
+  function hideToast(){ toast.classList.remove('show'); }
+
+  // === 盤の状態 ===
+  let timer=null;
+  function setIdle(){
+    // 針はループ先頭でだけ rest に戻す（トランジション無し＝一瞬で／継ぎ目に隠す）。
+    arm.style.transition='none'; arm.classList.remove('engaged'); void arm.offsetWidth; arm.style.transition='';
+    if(timer){clearInterval(timer);timer=null;}
+    disc.classList.remove('spinning'); spindle.style.opacity=1; label.innerHTML='';
+    caption.innerHTML='<p class="idle-text">Tap Vinyle !</p>';
+    hideToast();
+    cursor.style.transition='none'; cursor.style.opacity=0; cursor.style.left='180px'; cursor.style.top='300px';
+    void cursor.offsetWidth; cursor.style.transition='';
+  }
+  function setRecording(){
+    disc.classList.add('spinning'); arm.classList.add('engaged'); spindle.style.opacity=1;
+    let t=0; const render=()=>{label.innerHTML=`<div class="rec"><span class="dot"></span><span class="time">0:${String(t).padStart(2,'0')}</span></div>`;};
+    render(); if(timer)clearInterval(timer); timer=setInterval(()=>{t++;render();},1000);
+    caption.innerHTML=waveformHTML()+'<p class="status">Listening</p>';
+  }
+  function setRecognizing(){
+    if(timer){clearInterval(timer);timer=null;}
+    disc.classList.add('spinning'); arm.classList.add('engaged'); label.innerHTML='';
+    caption.innerHTML=waveformHTML()+'<p class="status">Reading the groove</p>';
+  }
+  function setResult(){
+    disc.classList.remove('spinning'); arm.classList.add('engaged'); spindle.style.opacity=0;
+    label.innerHTML=`<img src="${JACKET}" alt="">`;
+    caption.innerHTML=
+      '<div><div class="result-title">Blue Mode</div><div class="result-artist">The Quartet</div></div>'+
+      '<button class="cta" id="cta">To the hunt</button>';
+  }
+  function pressCta(){ const b=$('cta'); if(b) b.style.opacity='0.85'; }
+  function setAdded(){ showToast('On the hunt に追加'); }
+
+  // === 1サイクル ===
+  async function scene(){
+    setIdle();        await sleep(700);
+    setRecording();   await sleep(1900);
+    setRecognizing(); await sleep(900);
+    setResult();      await sleep(900);
+    cursorTo($('cta')); await sleep(550);
+    await tapAt($('cta')); pressCta();
+    setAdded();       await sleep(1700);
+    cursor.style.opacity=0; hideToast(); await sleep(350);
+  }
+  async function loop(){ /* eslint-disable no-constant-condition */ while(true){ await scene(); } }
+
+  const qp=new URLSearchParams(location.search);
+  if(qp.get('capture')==='1'){ window.__listen={scene,setIdle}; setIdle(); }
+  else { loop(); }
+</script>
+</body>
+</html>
