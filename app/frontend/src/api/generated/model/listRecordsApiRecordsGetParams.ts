@@ -11,4 +11,6 @@ limit?: number | null;
  * @minimum 0
  */
 offset?: number;
+status?: 'owned' | 'wanted' | null;
+sort?: 'artist' | 'added' | null;
 };

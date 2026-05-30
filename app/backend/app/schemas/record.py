@@ -21,6 +21,10 @@ RecordStatus = Literal["owned", "wanted"]
 # 文字列リテラル直書きを避け、service 層から参照する定数。
 RECORD_STATUS_OWNED: RecordStatus = "owned"
 RECORD_STATUS_WANTED: RecordStatus = "wanted"
+# ADR-013: Digging の Hunt list 用の並び替え軸。
+# "artist" = アーティスト名昇順(→title)、"added" = on the hunt 登録日 (created_at) 降順。
+# 未指定時は従来の is_pinned/display_order 順 (Home マトリクス用)。
+RecordSort = Literal["artist", "added"]
 
 _DATE_PATTERN = r"^\d{4}(-\d{2}(-\d{2})?)?$"
 _CURRENCY_PATTERN = r"^[A-Z]{3}$"

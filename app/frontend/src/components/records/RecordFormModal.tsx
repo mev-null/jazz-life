@@ -26,9 +26,9 @@ import { ModalShell } from "../ModalShell";
 export type FormMode =
   | {
     kind: "add";
-    // ArtistDetailModal / FeedDetailModal から呼ぶ際の事前デフォルト。
+    // ArtistDetailModal / ReleaseDetailModal から呼ぶ際の事前デフォルト。
     // - artistId / status: 必須に近い (どこから呼ぶかで決まる)
-    // - title / imageUrl / spotifyAlbumId / originalReleaseDate: FeedDetailModal の
+    // - title / imageUrl / spotifyAlbumId / originalReleaseDate: ReleaseDetailModal の
     //   「買った/ほしい」経路で Release のメタデータを流し込む用 (ユーザが
     //   そのまま保存してもよし、編集してもよし)
     defaults?: {
@@ -78,7 +78,7 @@ const todayLocalISO = (): string => new Date().toLocaleDateString("sv-SE");
 export function RecordFormModal({ mode, artists, followedArtists, onClose }: Props) {
   const queryClient = useQueryClient();
   const isEdit = mode?.kind === "edit";
-  // ArtistsPage / ArtistDetailModal / FeedDetailModal 起点で artist が事前に
+  // ArtistsPage / ArtistDetailModal / ReleaseDetailModal 起点で artist が事前に
   // 決まっている場合は Artist 入力欄をロックする (placeholder の「既存から選ぶ
   // or Spotify 検索」誘導が文脈に合わないため)。HomePage の "+" 追加 や
   // edit mode では従来通り typeahead を許可する。

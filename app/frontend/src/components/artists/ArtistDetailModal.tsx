@@ -1,28 +1,16 @@
 import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   getArtist,
-  getConcerts,
   getReleases,
   getVinylRecords,
   unfollowArtist,
 } from "../../api/client";
-import {
-  formatShortDate,
-  partitionByToday,
-} from "../../lib/dates";
+import { partitionByToday } from "../../lib/dates";
 import { useBreakpoint } from "../../hooks/useBreakpoint";
 import { MOBILE_UI_ENABLED } from "../../lib/featureFlags";
-import { formatVenue } from "../../lib/formatVenue";
-import { concertMatchesArtist } from "../../lib/matchArtist";
-import type {
-  Artist,
-  Concert,
-  Release,
-  VinylRecord,
-} from "../../types/api";
+import type { Artist, Release, VinylRecord } from "../../types/api";
 import { InlineConfirm } from "../InlineConfirm";
 import { ModalShell } from "../ModalShell";
 import { ReleaseRow } from "../feed/ReleaseRow";
@@ -38,105 +26,6 @@ import { ArtistAvatar } from "./ArtistAvatar";
 // プレビュー 2 件に抑えて "view all" 経由で全件閲覧へ。
 const SECTION_PREVIEW_LIMIT = 8;
 const SECTION_MOBILE_PREVIEW_LIMIT = 2;
-
-type TimelineItem =
-  | { kind: "release"; data: Release; date: string }
-  | { kind: "concert"; data: Concert; date: string };
-
-function timelineSub(item: TimelineItem): ReactNode {
-  if (item.kind === "release") return null;
-  return formatVenue(item.data.venue_id);
-}
-
-function timelineTag(item: TimelineItem): string {
-  return item.kind === "release" ? "release" : "concert";
-}
-
-function timelineKey(item: TimelineItem): string {
-  return item.kind === "release"
-    ? `release:${item.data.spotify_id}`
-    : `concert:${item.data.id}`;
-}
-
-function TimelineRow({
-  index,
-  title,
-  sub,
-  date,
-  tag,
-  isPast,
-  onClick,
-}: {
-  index: number;
-  title: string;
-  sub: ReactNode;
-  date: string;
-  tag: string;
-  isPast: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full cursor-pointer items-start gap-3 py-3 text-left text-sm transition-opacity hover:opacity-70 ${isPast ? "text-ink-mute" : ""}`}
-    >
-      <span className="w-6 shrink-0 text-ink-faint tabular-nums">
-        {String(index).padStart(2, "0")}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="truncate font-medium">{title}</div>
-        {sub && <div className="mt-0.5 truncate text-ink-mute">{sub}</div>}
-      </div>
-      <div className="shrink-0 text-right">
-        <div className="text-ink-mute tabular-nums">
-          {formatShortDate(date)}
-        </div>
-        <div className="mt-0.5 text-xs italic text-ink-faint">{tag}</div>
-      </div>
-    </button>
-  );
-}
-
-function ActivityRow({
-  item,
-  index,
-  isPast,
-  artist,
-  onClick,
-}: {
-  item: TimelineItem;
-  index: number;
-  isPast: boolean;
-  artist: Artist;
-  onClick: () => void;
-}) {
-  // release は backend (is_read) を真として表示。concert は読了状態を
-  // この行レベルで表現していない (TimelineRow に isRead プロパティ無し)。
-  // 必要になったら useReadState 由来の bool をここに足す。
-  if (item.kind === "release") {
-    return (
-      <ReleaseRow
-        release={item.data}
-        artist={artist}
-        isPast={isPast}
-        isRead={item.data.is_read}
-        onClick={onClick}
-      />
-    );
-  }
-  return (
-    <TimelineRow
-      index={index}
-      title={item.data.title}
-      sub={timelineSub(item)}
-      date={item.date}
-      tag={timelineTag(item)}
-      isPast={isPast}
-      onClick={onClick}
-    />
-  );
-}
 
 function RecordsSection({
   label,
@@ -198,9 +87,6 @@ type Props = {
   onClose: () => void;
   onRecordClick: (record: VinylRecord) => void;
   onReleaseClick: (release: Release) => void;
-  // matchedArtist は ArtistDetailModal 文脈では自明 (props の artist と一致) だが、
-  // FeedPage と signature を揃えるため明示的に渡す。
-  onConcertClick: (concert: Concert, matchedArtist?: Artist) => void;
   // セクションのグリッド末尾に出る「＋」タイル（hover 表示）からの追加導線。
   // 呼び出し側で RecordFormModal を defaults 付きで開く責務を持つ。
   onAddRecord: (artist: Artist, status: "owned" | "wanted") => void;
@@ -211,7 +97,6 @@ export function ArtistDetailModal({
   onClose,
   onRecordClick,
   onReleaseClick,
-  onConcertClick,
   onAddRecord,
 }: Props) {
   const { isMobile } = useBreakpoint();
@@ -244,7 +129,7 @@ export function ArtistDetailModal({
   // enabled=false で発火しない。
   // - artistQ: backend が image_url を Spotify から hydrate して返す
   // - recordsQ: own/want セクションの絞り込み元 (artist_id でフィルタ)
-  // - releasesQ / concertsQ: activity timeline の元 (mock のまま frontend filter)
+  // - releasesQ: activity timeline の元 (mock のまま frontend filter)
   const artistId = artist?.spotify_id ?? null;
   const artistQ = useQuery({
     queryKey: ["artist", artistId],
@@ -261,11 +146,6 @@ export function ArtistDetailModal({
     queryFn: () => getReleases(),
     enabled: artistId !== null,
   });
-  const concertsQ = useQuery({
-    queryKey: ["concerts"],
-    queryFn: getConcerts,
-    enabled: artistId !== null,
-  });
 
   if (!artist) return null;
 
@@ -274,32 +154,15 @@ export function ArtistDetailModal({
   const displayArtist = artistQ.data ?? artist;
 
   // ADR-003: own → want → activity の 3 セクション構造。
+  // Activity は ADR-013 で concert を撤去し releases のみになった。
   const records = recordsQ.data?.items ?? [];
   const releases = releasesQ.data?.items ?? [];
-  const concerts = concertsQ.data?.items ?? [];
   const artistRecords = records.filter((r) => r.artist_id === artist.spotify_id);
   const ownedRecords = artistRecords.filter((r) => r.status === "owned");
   const wantedRecords = artistRecords.filter((r) => r.status === "wanted");
 
-  const timeline: TimelineItem[] = [
-    ...releases
-      .filter((r) => r.artist_id === artist.spotify_id)
-      .map((r) => ({
-        kind: "release" as const,
-        data: r,
-        date: r.release_date,
-      })),
-    ...concerts
-      .filter((c) => concertMatchesArtist(c, artist))
-      .map((c) => ({ kind: "concert" as const, data: c, date: c.date })),
-  ];
-
-  const tp = partitionByToday(timeline, (t) => t.date);
-
-  function handleClick(item: TimelineItem) {
-    if (item.kind === "release") onReleaseClick(item.data);
-    else onConcertClick(item.data, artist ?? undefined);
-  }
+  const artistReleases = releases.filter((r) => r.artist_id === artist.spotify_id);
+  const tp = partitionByToday(artistReleases, (r) => r.release_date);
 
   return (
     <ModalShell onClose={onClose}>
@@ -333,7 +196,7 @@ export function ArtistDetailModal({
           onViewAll={() => setExpandedSection("wanted")}
         />
 
-        {/* Activity (releases + concerts unified timeline) */}
+        {/* Activity (releases timeline。concert は ADR-013 で撤去) */}
         <section className="mt-10">
           <h3 className="flex items-baseline gap-3 text-base">
             <span className="font-medium">Activity</span>
@@ -344,14 +207,14 @@ export function ArtistDetailModal({
           <div className="mt-4">
             {tp.upcoming.length > 0 && (
               <div className="divide-y divide-ink-faint/30">
-                {tp.upcoming.map((item, i) => (
-                  <ActivityRow
-                    key={timelineKey(item)}
-                    item={item}
-                    index={i + 1}
-                    isPast={false}
+                {tp.upcoming.map((r) => (
+                  <ReleaseRow
+                    key={r.spotify_id}
+                    release={r}
                     artist={artist}
-                    onClick={() => handleClick(item)}
+                    isPast={false}
+                    isRead={r.is_read}
+                    onClick={() => onReleaseClick(r)}
                   />
                 ))}
               </div>
@@ -361,14 +224,14 @@ export function ArtistDetailModal({
             )}
             {tp.past.length > 0 && (
               <div className="divide-y divide-ink-faint/30">
-                {tp.past.map((item, i) => (
-                  <ActivityRow
-                    key={timelineKey(item)}
-                    item={item}
-                    index={tp.upcoming.length + i + 1}
-                    isPast={true}
+                {tp.past.map((r) => (
+                  <ReleaseRow
+                    key={r.spotify_id}
+                    release={r}
                     artist={artist}
-                    onClick={() => handleClick(item)}
+                    isPast={true}
+                    isRead={r.is_read}
+                    onClick={() => onReleaseClick(r)}
                   />
                 ))}
               </div>

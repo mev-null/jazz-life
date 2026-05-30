@@ -5,7 +5,7 @@ export function BottomTabBar() {
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-rule bg-paper pb-[env(safe-area-inset-bottom)]">
       <ul className="flex h-14 items-stretch justify-around">
         <BottomTabItem to="/" end label="Home" />
-        <BottomTabItem to="/feed" label="Feed" />
+        <BottomTabItem to="/digging" label="Digging" />
         <BottomTabItem to="/artists" label="Artists" />
       </ul>
     </nav>

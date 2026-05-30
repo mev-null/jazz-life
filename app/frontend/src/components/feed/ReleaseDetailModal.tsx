@@ -2,41 +2,25 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { getVinylRecords, updateVinylRecord } from "../../api/client";
 import { formatLongDate } from "../../lib/dates";
-import { formatVenue } from "../../lib/formatVenue";
-import type { Artist, Concert, Release } from "../../types/api";
+import type { Artist, Release } from "../../types/api";
 import { ModalShell } from "../ModalShell";
 import { ReleaseJacket } from "./ReleaseJacket";
 
-export type FeedItem =
-  | { kind: "release"; data: Release; artist?: Artist }
-  | { kind: "concert"; data: Concert; artist?: Artist };
+// Digging の Releases タブ / ArtistDetailModal の Activity から開く release 詳細。
+// concert は ADR-013 で撤去したので release 専用。
+export type ReleaseItem = { release: Release; artist?: Artist };
 
 type Props = {
-  item: FeedItem | null;
+  item: ReleaseItem | null;
   isRead?: boolean;
   onToggleRead?: () => void;
   onClose: () => void;
-  // Release 詳細時に表示する「買った/ほしい」ボタンの押下ハンドラ。
-  // FeedPage 側で modal を閉じてから RecordFormModal を defaults 付きで開く責務を持つ。
-  // 省略可 (Concert detail でも同 modal を使うため)。
-  onCollectFromRelease?: (release: Release, status: "owned" | "wanted") => void;
+  // 「On the hunt / On the shelf」ボタン押下ハンドラ。呼び出し側で modal を閉じてから
+  // RecordFormModal を defaults 付きで開く責務を持つ。
+  onCollect?: (release: Release, status: "owned" | "wanted") => void;
 };
 
-function safeHostname(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-}
-
-function Field({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex gap-6 text-[15px] leading-relaxed">
       <span className="w-24 shrink-0 italic text-ink-mute">{label}</span>
@@ -93,12 +77,8 @@ function ReleaseDetail({
     <>
       <header className="flex items-start gap-4 border-b border-ink/15 pb-4">
         <div className="min-w-0 flex-1">
-          <div className="text-2xl font-medium leading-tight">
-            {release.title}
-          </div>
-          <div className="mt-1 text-base text-ink-mute">
-            {artist?.name ?? "—"}
-          </div>
+          <div className="text-2xl font-medium leading-tight">{release.title}</div>
+          <div className="mt-1 text-base text-ink-mute">{artist?.name ?? "—"}</div>
         </div>
         <div className="aspect-square w-20 shrink-0 overflow-hidden ring-1 ring-ink/10">
           <ReleaseJacket release={release} />
@@ -153,82 +133,26 @@ function ReleaseDetail({
   );
 }
 
-function ConcertDetail({
-  concert,
-  artist,
-}: {
-  concert: Concert;
-  artist?: Artist;
-}) {
-  const venue = formatVenue(concert.venue_id);
-  return (
-    <>
-      <header className="border-b border-ink/15 pb-4">
-        <div className="text-2xl font-medium leading-tight">
-          {concert.title}
-        </div>
-        <div className="mt-1 text-base text-ink-mute capitalize">
-          {venue}
-          {artist && (
-            <span className="text-ink-faint normal-case"> · {artist.name}</span>
-          )}
-        </div>
-      </header>
-
-      <div className="space-y-2 py-5">
-        <Field label="Date" value={formatLongDate(concert.date)} />
-        {concert.stage_times && (
-          <Field label="Stages" value={concert.stage_times} />
-        )}
-        {concert.status !== "scheduled" && (
-          <Field
-            label="Status"
-            value={<span className="text-ink">{concert.status}</span>}
-          />
-        )}
-      </div>
-
-      <footer className="border-t border-ink/15 pt-4">
-        <div className="mb-1 italic text-sm text-ink-mute">Source</div>
-        {concert.url ? (
-          <ExternalLink
-            href={concert.url}
-            label={safeHostname(concert.url)}
-          />
-        ) : (
-          <span className="text-sm text-ink-faint">unknown</span>
-        )}
-      </footer>
-    </>
-  );
-}
-
-export function FeedDetailModal({
+export function ReleaseDetailModal({
   item,
   isRead,
   onToggleRead,
   onClose,
-  onCollectFromRelease,
+  onCollect,
 }: Props) {
   if (!item) return null;
 
   return (
     <ModalShell onClose={onClose}>
       <div className="max-h-[85vh] w-[min(90vw,480px)] overflow-y-auto bg-paper p-8 text-left text-ink shadow-xl ring-1 ring-ink/10">
-        {item.kind === "release" ? (
-          <ReleaseDetail
-            release={item.data}
-            artist={item.artist}
-            onClose={onClose}
-            onCollect={
-              onCollectFromRelease
-                ? (status) => onCollectFromRelease(item.data, status)
-                : undefined
-            }
-          />
-        ) : (
-          <ConcertDetail concert={item.data} artist={item.artist} />
-        )}
+        <ReleaseDetail
+          release={item.release}
+          artist={item.artist}
+          onClose={onClose}
+          onCollect={
+            onCollect ? (status) => onCollect(item.release, status) : undefined
+          }
+        />
         {onToggleRead && (
           <div className="mt-4 flex justify-end">
             <button

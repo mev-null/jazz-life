@@ -335,6 +335,89 @@ def test_list_invalid_limit_returns_422(authed_records_client: TestClient) -> No
     assert res.status_code == 422
 
 
+# ---- status filter / sort (ADR-013) ----
+
+
+def test_list_status_wanted_filters_and_counts(authed_records_client: TestClient) -> None:
+    """`?status=wanted` は wanted のみ返し、total も絞り込み後の件数。"""
+    authed_records_client.post(
+        "/api/records", json=_new_record_payload(title="Owned", status="owned")
+    )
+    authed_records_client.post(
+        "/api/records", json=_new_record_payload(title="Want1", status="wanted")
+    )
+    authed_records_client.post(
+        "/api/records", json=_new_record_payload(title="Want2", status="wanted")
+    )
+
+    body = authed_records_client.get("/api/records?status=wanted").json()
+    assert body["total"] == 2
+    assert {r["title"] for r in body["items"]} == {"Want1", "Want2"}
+    assert all(r["status"] == "wanted" for r in body["items"])
+
+
+def test_list_sort_artist_orders_by_name_then_title(authed_records_client: TestClient) -> None:
+    """`?sort=artist` は artist 名昇順 → 同一 artist 内は title 昇順。
+
+    seed: Avishai Cohen (A) < Bill Evans (B)。
+    """
+    authed_records_client.post(
+        "/api/records", json=_new_record_payload(artist_id=BILL_EVANS_ID, title="Zoo")
+    )
+    authed_records_client.post(
+        "/api/records", json=_new_record_payload(artist_id=BILL_EVANS_ID, title="Aaa")
+    )
+    authed_records_client.post(
+        "/api/records", json=_new_record_payload(artist_id=AVISHAI_COHEN_ID, title="Seven Seas")
+    )
+
+    titles = [
+        r["title"] for r in authed_records_client.get("/api/records?sort=artist").json()["items"]
+    ]
+    # Avishai Cohen の Seven Seas が先頭、続いて Bill Evans の Aaa → Zoo
+    assert titles == ["Seven Seas", "Aaa", "Zoo"]
+
+
+def test_list_sort_added_orders_by_created_at_desc(authed_records_client: TestClient) -> None:
+    """`?sort=added` は created_at 降順 (追加が新しい順)。"""
+    for i in range(3):
+        authed_records_client.post("/api/records", json=_new_record_payload(title=f"R{i}"))
+    titles = [
+        r["title"] for r in authed_records_client.get("/api/records?sort=added").json()["items"]
+    ]
+    assert titles == ["R2", "R1", "R0"]
+
+
+def test_list_status_and_sort_combined(authed_records_client: TestClient) -> None:
+    """`?status=wanted&sort=artist` は wanted のみを artist 名昇順で返す。"""
+    authed_records_client.post(
+        "/api/records",
+        json=_new_record_payload(artist_id=BILL_EVANS_ID, title="Owned B", status="owned"),
+    )
+    authed_records_client.post(
+        "/api/records",
+        json=_new_record_payload(artist_id=BILL_EVANS_ID, title="Want B", status="wanted"),
+    )
+    authed_records_client.post(
+        "/api/records",
+        json=_new_record_payload(artist_id=AVISHAI_COHEN_ID, title="Want A", status="wanted"),
+    )
+
+    body = authed_records_client.get("/api/records?status=wanted&sort=artist").json()
+    titles = [r["title"] for r in body["items"]]
+    assert titles == ["Want A", "Want B"]
+
+
+def test_list_invalid_status_returns_422(authed_records_client: TestClient) -> None:
+    res = authed_records_client.get("/api/records?status=bogus")
+    assert res.status_code == 422
+
+
+def test_list_invalid_sort_returns_422(authed_records_client: TestClient) -> None:
+    res = authed_records_client.get("/api/records?sort=bogus")
+    assert res.status_code == 422
+
+
 # ---- pin via permissive PUT ----
 
 

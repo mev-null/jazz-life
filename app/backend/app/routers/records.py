@@ -8,6 +8,8 @@ from app.routers.deps import get_current_user, get_record_service
 from app.schemas.common import ListResponse
 from app.schemas.record import (
     PinReorderRequest,
+    RecordSort,
+    RecordStatus,
     VinylRecordCreate,
     VinylRecordRead,
     VinylRecordUpdate,
@@ -21,17 +23,23 @@ router = APIRouter(prefix="/api/records", tags=["records"])
 def list_records(
     limit: int | None = Query(None, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    status: RecordStatus | None = Query(None),
+    sort: RecordSort | None = Query(None),
     service: RecordService = Depends(get_record_service),
     current_user: User = Depends(get_current_user),
 ) -> ListResponse[VinylRecordRead]:
     """current user の collection を返す (ADR-006 §3.4)。
 
-    `limit` を渡すと paginated。レスポンス `total` は user の collection 全件数
-    なので、フロント側で `Math.ceil(total / limit)` でページ数を出せる。limit
-    省略時は全件 + total を返す (従来挙動を維持)。並び順は
-    `is_pinned DESC, display_order ASC` 固定。
+    `limit` を渡すと paginated。レスポンス `total` は (status 絞り込み後の) user の
+    collection 件数なので、フロント側で `Math.ceil(total / limit)` でページ数を出せる。
+
+    - `status`: owned / wanted で絞り込み (ADR-013 の Hunt list は `wanted`)。
+    - `sort`: `artist` (アーティスト名→title 昇順) / `added` (created_at 降順)。
+      省略時は `is_pinned DESC, pin_order ASC, display_order ASC` (Home マトリクス用)。
     """
-    items, total = service.list_for_user(current_user.id, limit=limit, offset=offset)
+    items, total = service.list_for_user(
+        current_user.id, limit=limit, offset=offset, status=status, sort=sort
+    )
     return ListResponse(items=items, total=total)
 
 
