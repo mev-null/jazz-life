@@ -115,14 +115,14 @@ export function HuntListPanel({
   return (
     <div>
       <h1 className="flex items-baseline gap-3 text-base">
-        <span className="font-medium">On the hunt</span>
+        <span className="font-medium">Records</span>
         <span className="text-ink-faint tabular-nums">{records.length}</span>
         <button
           type="button"
           onClick={() => onSortChange(sort === "artist" ? "added" : "artist")}
           className="ml-auto cursor-pointer text-xs italic text-ink-mute transition-colors hover:text-ink"
         >
-          {sort === "artist" ? "by artist" : "by added"}
+          {sort === "artist" ? "Sort: by artist" : "Sort: by added"}
         </button>
       </h1>
 
@@ -141,7 +141,7 @@ export function HuntListPanel({
         </div>
       ) : (
         <div className="mt-4 flex gap-2">
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 pr-6">
             {groups.map((g, i) => (
               <section key={g.artistId}>
                 <h2
@@ -170,7 +170,7 @@ export function HuntListPanel({
           {/* A–Z インデックスレール (旧 iOS Contacts 風)。artist モード時のみ。 */}
           <nav
             aria-label="alphabet index"
-            className="sticky top-24 flex h-fit shrink-0 flex-col items-center gap-0.5 self-start py-1 text-[10px] leading-none tabular-nums"
+            className="fixed right-1 top-1/2 z-10 flex -translate-y-1/2 flex-col items-center gap-0.5 py-1 text-[10px] leading-none tabular-nums"
           >
             {railLetters.map((letter) =>
               presentLetters.has(letter) ? (
