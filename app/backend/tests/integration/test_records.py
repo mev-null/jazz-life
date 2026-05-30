@@ -422,7 +422,11 @@ def test_list_invalid_sort_returns_422(authed_records_client: TestClient) -> Non
 
 
 def test_put_is_pinned_sets_pin(authed_records_client: TestClient) -> None:
-    created = authed_records_client.post("/api/records", json=_new_record_payload()).json()
+    # owned は作成時に auto-pin されるため、PUT による手動 pin を検証する
+    # ここでは wanted で作って未 pin 状態から始める。
+    created = authed_records_client.post(
+        "/api/records", json=_new_record_payload(status="wanted")
+    ).json()
     res = authed_records_client.put(f"/api/records/{created['id']}", json={"is_pinned": True})
     assert res.status_code == 200
     assert res.json()["is_pinned"] is True
@@ -431,26 +435,28 @@ def test_put_is_pinned_sets_pin(authed_records_client: TestClient) -> None:
 def test_put_is_pinned_over_limit_returns_409(
     authed_records_client: TestClient,
 ) -> None:
-    """8 件 pin 済の状態で 9 件目を pin しようとすると 409。"""
+    """6 件 pin 済の状態で 7 件目を pin しようとすると 409。"""
     created_ids = [
-        authed_records_client.post("/api/records", json=_new_record_payload(title=f"R{i}")).json()[
-            "id"
-        ]
-        for i in range(9)
+        authed_records_client.post(
+            "/api/records", json=_new_record_payload(title=f"R{i}", status="wanted")
+        ).json()["id"]
+        for i in range(7)
     ]
-    for cid in created_ids[:8]:
+    for cid in created_ids[:6]:
         res = authed_records_client.put(f"/api/records/{cid}", json={"is_pinned": True})
         assert res.status_code == 200, res.text
 
-    res = authed_records_client.put(f"/api/records/{created_ids[8]}", json={"is_pinned": True})
+    res = authed_records_client.put(f"/api/records/{created_ids[6]}", json={"is_pinned": True})
     assert res.status_code == 409
 
 
 def test_list_orders_pinned_first(authed_records_client: TestClient) -> None:
     """pinned レコードが先頭に並ぶ (`is_pinned DESC, display_order ASC`)。"""
-    authed_records_client.post("/api/records", json=_new_record_payload(title="A"))
-    b = authed_records_client.post("/api/records", json=_new_record_payload(title="B")).json()
-    authed_records_client.post("/api/records", json=_new_record_payload(title="C"))
+    authed_records_client.post("/api/records", json=_new_record_payload(title="A", status="wanted"))
+    b = authed_records_client.post(
+        "/api/records", json=_new_record_payload(title="B", status="wanted")
+    ).json()
+    authed_records_client.post("/api/records", json=_new_record_payload(title="C", status="wanted"))
 
     authed_records_client.put(f"/api/records/{b['id']}", json={"is_pinned": True})
 
@@ -465,9 +471,9 @@ def test_list_orders_pinned_first(authed_records_client: TestClient) -> None:
 
 def test_reorder_pins_changes_list_order(authed_records_client: TestClient) -> None:
     ids = [
-        authed_records_client.post("/api/records", json=_new_record_payload(title=f"R{i}")).json()[
-            "id"
-        ]
+        authed_records_client.post(
+            "/api/records", json=_new_record_payload(title=f"R{i}", status="wanted")
+        ).json()["id"]
         for i in range(3)
     ]
     for rid in ids:
@@ -486,8 +492,12 @@ def test_reorder_pins_changes_list_order(authed_records_client: TestClient) -> N
 def test_reorder_pins_mismatched_returns_409(
     authed_records_client: TestClient,
 ) -> None:
-    a = authed_records_client.post("/api/records", json=_new_record_payload(title="A")).json()
-    b = authed_records_client.post("/api/records", json=_new_record_payload(title="B")).json()
+    a = authed_records_client.post(
+        "/api/records", json=_new_record_payload(title="A", status="wanted")
+    ).json()
+    b = authed_records_client.post(
+        "/api/records", json=_new_record_payload(title="B", status="wanted")
+    ).json()
     authed_records_client.put(f"/api/records/{a['id']}", json={"is_pinned": True})
     authed_records_client.put(f"/api/records/{b['id']}", json={"is_pinned": True})
 

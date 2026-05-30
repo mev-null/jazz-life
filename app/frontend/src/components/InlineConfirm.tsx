@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 type Props = {
@@ -20,6 +20,12 @@ type Props = {
   disabledHint?: ReactNode;
   /** 外側 div 用クラス。flex の方向や位置寄せは呼び出し側で指定する。 */
   className?: string;
+  /**
+   * 確認 (confirming) 状態が変わるたびに呼ばれる。呼び出し側が確認中だけ
+   * 他のボタン (フォームの Cancel/Update 等) を隠すために使う。remount 時も
+   * mount effect で false が通知される。
+   */
+  onConfirmingChange?: (confirming: boolean) => void;
 };
 
 /**
@@ -41,8 +47,15 @@ export function InlineConfirm({
   disabled = false,
   disabledHint,
   className,
+  onConfirmingChange,
 }: Props) {
   const [confirming, setConfirming] = useState(false);
+  // confirming の変化 (remount 含む) を親に通知。setState 関数は安定なので
+  // deps は confirming のみで十分。
+  useEffect(() => {
+    onConfirmingChange?.(confirming);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirming]);
   // disabled 状態のトリガー (記録があるアーティストの Remove 等) は確認 UI に
   // 入れないようにする。disabled が真なら強制的に trigger 表示に戻す。
   const showTrigger = !confirming || disabled;

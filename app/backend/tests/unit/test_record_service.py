@@ -730,9 +730,11 @@ def test_list_for_user_orders_pinned_first(session: Session) -> None:
     artist_id = _seed_artist(session)
     user_id = _seed_user(session)
     service = _service(session)
-    service.create(VinylRecordCreate(artist_id=artist_id, title="A"), user_id)
-    b = service.create(VinylRecordCreate(artist_id=artist_id, title="B"), user_id)
-    service.create(VinylRecordCreate(artist_id=artist_id, title="C"), user_id)
+    # owned は作成時に auto-pin されるため、手動 pin の並び替えを検証するこの
+    # テストでは wanted で作って初期状態を未 pin に固定する。
+    service.create(VinylRecordCreate(artist_id=artist_id, title="A", status="wanted"), user_id)
+    b = service.create(VinylRecordCreate(artist_id=artist_id, title="B", status="wanted"), user_id)
+    service.create(VinylRecordCreate(artist_id=artist_id, title="C", status="wanted"), user_id)
 
     # B を pin する → 先頭に上がる
     service.update_partial(b.id, VinylRecordUpdate(is_pinned=True), user_id)
@@ -762,7 +764,10 @@ def test_pin_sets_pinned_at_and_unpin_clears_it(session: Session) -> None:
     artist_id = _seed_artist(session)
     user_id = _seed_user(session)
     service = _service(session)
-    record = service.create(VinylRecordCreate(artist_id=artist_id, title="A"), user_id)
+    # wanted で作って未 pin から手動 pin する遷移を検証する。
+    record = service.create(
+        VinylRecordCreate(artist_id=artist_id, title="A", status="wanted"), user_id
+    )
 
     pinned = service.update_partial(record.id, VinylRecordUpdate(is_pinned=True), user_id)
     assert pinned.is_pinned is True
@@ -778,38 +783,43 @@ def test_pin_sets_pinned_at_and_unpin_clears_it(session: Session) -> None:
 
 
 def test_pin_limit_exceeded_raises_conflict(session: Session) -> None:
-    """9 件目の pin で `ConflictError` (`pin limit exceeded: max 8`)。"""
+    """7 件目の pin で `ConflictError` (`pin limit exceeded: max 6`)。"""
     artist_id = _seed_artist(session)
     user_id = _seed_user(session)
     service = _service(session)
+    # wanted で作って auto-pin を回避し、手動 pin の上限 enforce を検証する。
     records = [
-        service.create(VinylRecordCreate(artist_id=artist_id, title=f"R{i}"), user_id)
-        for i in range(9)
+        service.create(
+            VinylRecordCreate(artist_id=artist_id, title=f"R{i}", status="wanted"), user_id
+        )
+        for i in range(7)
     ]
 
-    for r in records[:8]:
+    for r in records[:6]:
         service.update_partial(r.id, VinylRecordUpdate(is_pinned=True), user_id)
 
     with pytest.raises(ConflictError, match="pin limit exceeded"):
-        service.update_partial(records[8].id, VinylRecordUpdate(is_pinned=True), user_id)
+        service.update_partial(records[6].id, VinylRecordUpdate(is_pinned=True), user_id)
 
 
 def test_unpinning_frees_a_slot(session: Session) -> None:
-    """8 件 pin → 1 件外す → 9 件目を新たに pin できる。"""
+    """6 件 pin → 1 件外す → 7 件目を新たに pin できる。"""
     artist_id = _seed_artist(session)
     user_id = _seed_user(session)
     service = _service(session)
     records = [
-        service.create(VinylRecordCreate(artist_id=artist_id, title=f"R{i}"), user_id)
-        for i in range(9)
+        service.create(
+            VinylRecordCreate(artist_id=artist_id, title=f"R{i}", status="wanted"), user_id
+        )
+        for i in range(7)
     ]
-    for r in records[:8]:
+    for r in records[:6]:
         service.update_partial(r.id, VinylRecordUpdate(is_pinned=True), user_id)
 
     service.update_partial(records[0].id, VinylRecordUpdate(is_pinned=False), user_id)
-    pinned9 = service.update_partial(records[8].id, VinylRecordUpdate(is_pinned=True), user_id)
+    pinned7 = service.update_partial(records[6].id, VinylRecordUpdate(is_pinned=True), user_id)
 
-    assert pinned9.is_pinned is True
+    assert pinned7.is_pinned is True
 
 
 def test_pin_assigns_incrementing_pin_order(session: Session) -> None:
@@ -818,7 +828,9 @@ def test_pin_assigns_incrementing_pin_order(session: Session) -> None:
     user_id = _seed_user(session)
     service = _service(session)
     records = [
-        service.create(VinylRecordCreate(artist_id=artist_id, title=f"R{i}"), user_id)
+        service.create(
+            VinylRecordCreate(artist_id=artist_id, title=f"R{i}", status="wanted"), user_id
+        )
         for i in range(3)
     ]
 
@@ -837,7 +849,9 @@ def test_unpin_clears_pin_order(session: Session) -> None:
     artist_id = _seed_artist(session)
     user_id = _seed_user(session)
     service = _service(session)
-    record = service.create(VinylRecordCreate(artist_id=artist_id, title="A"), user_id)
+    record = service.create(
+        VinylRecordCreate(artist_id=artist_id, title="A", status="wanted"), user_id
+    )
 
     service.update_partial(record.id, VinylRecordUpdate(is_pinned=True), user_id)
     service.update_partial(record.id, VinylRecordUpdate(is_pinned=False), user_id)
@@ -854,7 +868,9 @@ def test_reorder_pins_renumbers_1_to_n(session: Session) -> None:
     user_id = _seed_user(session)
     service = _service(session)
     records = [
-        service.create(VinylRecordCreate(artist_id=artist_id, title=f"R{i}"), user_id)
+        service.create(
+            VinylRecordCreate(artist_id=artist_id, title=f"R{i}", status="wanted"), user_id
+        )
         for i in range(3)
     ]
     for r in records:
@@ -879,8 +895,12 @@ def test_reorder_pins_mismatched_ids_raises(session: Session) -> None:
     artist_id = _seed_artist(session)
     user_id = _seed_user(session)
     service = _service(session)
-    r0 = service.create(VinylRecordCreate(artist_id=artist_id, title="R0"), user_id)
-    r1 = service.create(VinylRecordCreate(artist_id=artist_id, title="R1"), user_id)
+    r0 = service.create(
+        VinylRecordCreate(artist_id=artist_id, title="R0", status="wanted"), user_id
+    )
+    r1 = service.create(
+        VinylRecordCreate(artist_id=artist_id, title="R1", status="wanted"), user_id
+    )
     service.update_partial(r0.id, VinylRecordUpdate(is_pinned=True), user_id)
     service.update_partial(r1.id, VinylRecordUpdate(is_pinned=True), user_id)
 
@@ -897,10 +917,12 @@ def test_pin_already_pinned_is_noop(session: Session) -> None:
     artist_id = _seed_artist(session)
     user_id = _seed_user(session)
     service = _service(session)
-    # 8 件 pin して上限まで
+    # 6 件 pin して上限まで
     records = [
-        service.create(VinylRecordCreate(artist_id=artist_id, title=f"R{i}"), user_id)
-        for i in range(8)
+        service.create(
+            VinylRecordCreate(artist_id=artist_id, title=f"R{i}", status="wanted"), user_id
+        )
+        for i in range(6)
     ]
     for r in records:
         service.update_partial(r.id, VinylRecordUpdate(is_pinned=True), user_id)
@@ -908,6 +930,104 @@ def test_pin_already_pinned_is_noop(session: Session) -> None:
     # 既に pin 済みを再度 True で送る → 上限チェックを通過すべき
     again = service.update_partial(records[0].id, VinylRecordUpdate(is_pinned=True), user_id)
     assert again.is_pinned is True
+
+
+# ---- auto-pin (owned 化の瞬間) ----
+
+
+def test_create_owned_auto_pins_when_under_limit(session: Session) -> None:
+    """owned で新規作成し pin 枠に空きがあれば auto-pin される。"""
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+
+    record = service.create(
+        VinylRecordCreate(artist_id=artist_id, title="A", status="owned"), user_id
+    )
+
+    assert record.is_pinned is True
+    raw = UserCollectionRepository(session).get(record.id)
+    assert raw is not None and raw.pin_order == 1 and raw.pinned_at is not None
+
+
+def test_create_wanted_does_not_auto_pin(session: Session) -> None:
+    """wanted での作成は auto-pin されない (Home showcase は owned 用)。"""
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+
+    record = service.create(
+        VinylRecordCreate(artist_id=artist_id, title="A", status="wanted"), user_id
+    )
+
+    assert record.is_pinned is False
+
+
+def test_create_owned_does_not_pin_when_limit_reached(session: Session) -> None:
+    """pin 枠 (6) が埋まっている状態の owned 新規作成は auto-pin されない。"""
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+    # 先に 6 件 owned を作って枠を埋める (全て auto-pin される)
+    for i in range(6):
+        service.create(
+            VinylRecordCreate(artist_id=artist_id, title=f"R{i}", status="owned"), user_id
+        )
+
+    overflow = service.create(
+        VinylRecordCreate(artist_id=artist_id, title="overflow", status="owned"), user_id
+    )
+
+    assert overflow.is_pinned is False
+
+
+def test_update_wanted_to_owned_auto_pins_when_room(session: Session) -> None:
+    """wanted→owned 遷移で枠に空きがあれば auto-pin される。"""
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+    wanted = service.create(
+        VinylRecordCreate(artist_id=artist_id, title="A", status="wanted"), user_id
+    )
+    assert wanted.is_pinned is False
+
+    updated = service.update_partial(wanted.id, VinylRecordUpdate(status="owned"), user_id)
+
+    assert updated.is_pinned is True
+
+
+def test_update_wanted_to_owned_does_not_pin_when_full(session: Session) -> None:
+    """枠が埋まっている時の wanted→owned 遷移は auto-pin されない。"""
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+    for i in range(6):
+        service.create(
+            VinylRecordCreate(artist_id=artist_id, title=f"R{i}", status="owned"), user_id
+        )
+    wanted = service.create(
+        VinylRecordCreate(artist_id=artist_id, title="W", status="wanted"), user_id
+    )
+
+    updated = service.update_partial(wanted.id, VinylRecordUpdate(status="owned"), user_id)
+
+    assert updated.is_pinned is False
+
+
+def test_update_wanted_to_owned_respects_explicit_is_pinned_false(session: Session) -> None:
+    """同一リクエストで is_pinned=False を明示したら auto-pin は発動しない。"""
+    artist_id = _seed_artist(session)
+    user_id = _seed_user(session)
+    service = _service(session)
+    wanted = service.create(
+        VinylRecordCreate(artist_id=artist_id, title="A", status="wanted"), user_id
+    )
+
+    updated = service.update_partial(
+        wanted.id, VinylRecordUpdate(status="owned", is_pinned=False), user_id
+    )
+
+    assert updated.is_pinned is False
 
 
 # ---- catalog dedup / orphan ----

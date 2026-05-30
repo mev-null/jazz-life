@@ -1,10 +1,12 @@
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { getVinylRecords, updateVinylRecord } from "../../api/client";
 import { formatReleaseDate } from "../../lib/dates";
+import { PIN_LIMIT } from "../../lib/pins";
 import type { ListResponse, VinylRecord } from "../../types/api";
 import { ModalShell } from "../ModalShell";
+import { useToast } from "../ToastProvider";
 import { JacketArt } from "./JacketCard";
 
 function PencilIcon() {
@@ -107,15 +109,16 @@ function BackFace({
 
 type PinToggleButtonProps = {
   record: VinylRecord;
-  onPinError: (message: string) => void;
 };
 
 /**
  * 詳細モーダル内のピントグル。`["records"]` 全クエリを楽観更新し、Home プレビュー
- * (最初の 8 枚) にも即座に反映する。最大 8 枚 (pin limit) 超過は 409 で弾かれる。
+ * にも即座に反映する。上限 (PIN_LIMIT) 到達時は未 pin の ★ を「非活性」見た目に
+ * し、タップでトースト通知して mutate しない (ADR-015)。
  */
-function PinToggleButton({ record, onPinError }: PinToggleButtonProps) {
+function PinToggleButton({ record }: PinToggleButtonProps) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   // 親から渡る `record` はモーダルを開いた時点のスナップショットなので、
   // is_pinned はライブの `["records"]` キャッシュから引き直す。これにより
   // 楽観更新 (onMutate) 後に ★ の表示とトグル対象が即座に追従する
@@ -126,6 +129,9 @@ function PinToggleButton({ record, onPinError }: PinToggleButtonProps) {
   });
   const live = data?.items.find((r) => r.id === record.id);
   const pinned = live?.is_pinned ?? record.is_pinned;
+  // 未 pin かつ枠が満杯なら「これ以上 pin できない」状態。
+  const pinnedCount = data?.items.filter((r) => r.is_pinned).length ?? 0;
+  const atLimit = !pinned && pinnedCount >= PIN_LIMIT;
 
   const togglePin = useMutation({
     mutationFn: () => updateVinylRecord(record.id, { is_pinned: !pinned }),
@@ -151,9 +157,9 @@ function PinToggleButton({ record, onPinError }: PinToggleButtonProps) {
       }
       const msg =
         err instanceof Error && /pin limit/i.test(err.message)
-          ? "ピンは最大 8 枚までです。"
+          ? `ピンは最大 ${PIN_LIMIT} 枚までです。`
           : "ピンの更新に失敗しました。";
-      onPinError(msg);
+      showToast(msg);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["records"] });
@@ -165,16 +171,27 @@ function PinToggleButton({ record, onPinError }: PinToggleButtonProps) {
       type="button"
       onClick={(e) => {
         e.stopPropagation();
+        if (togglePin.isPending) return;
+        // 上限到達時は mutate せず、理由をトーストで知らせる。HTML disabled に
+        // すると onClick が発火せずモバイルで理由を出せないため、見た目だけ
+        // 非活性にして onClick は生かす。
+        if (atLimit) {
+          showToast(`ピンは最大 ${PIN_LIMIT} 枚までです。`);
+          return;
+        }
         togglePin.mutate();
       }}
-      disabled={togglePin.isPending}
       aria-label={pinned ? "Unpin" : "Pin"}
       aria-pressed={pinned}
+      aria-disabled={atLimit}
+      title={atLimit ? `ピンは最大 ${PIN_LIMIT} 枚までです` : undefined}
       className={`flex size-6 cursor-pointer items-center justify-center rounded-full text-[11px] leading-none shadow transition-colors ${
         pinned
           ? "bg-ink text-paper"
           : "bg-paper/85 text-ink/70 ring-1 ring-ink/15 hover:bg-paper hover:text-ink"
-      } disabled:cursor-wait disabled:opacity-60`}
+      } ${atLimit ? "cursor-not-allowed opacity-40 hover:bg-paper/85 hover:text-ink/70" : ""} ${
+        togglePin.isPending ? "cursor-wait opacity-60" : ""
+      }`}
     >
       ★
     </button>
@@ -195,7 +212,6 @@ export function RecordDetailModal({
   onEdit,
 }: Props) {
   const queryClient = useQueryClient();
-  const [pinError, setPinError] = useState<string | null>(null);
   // wanted → owned 昇格用 mutation。Want list (ArtistDetailModal の拡大表示)
   // で詳細を開いた時にだけボタンが見える前提。Home は owned のみ表示なので
   // status === "wanted" の判定で自然に出ない。
@@ -226,16 +242,7 @@ export function RecordDetailModal({
 
   // ピンは Home (owned) のコレクション概念。wanted には出さない (編集鉛筆と同条件)。
   const pinToggle =
-    record.status !== "wanted" ? (
-      <div className="flex flex-col items-end gap-1">
-        <PinToggleButton record={record} onPinError={setPinError} />
-        {pinError && (
-          <span className="whitespace-nowrap text-xs text-ink-mute">
-            {pinError}
-          </span>
-        )}
-      </div>
-    ) : undefined;
+    record.status !== "wanted" ? <PinToggleButton record={record} /> : undefined;
 
   return (
     <ModalShell onClose={onClose}>

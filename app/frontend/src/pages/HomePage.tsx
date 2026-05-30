@@ -139,6 +139,7 @@ export function HomePage() {
           label="Records"
           records={ownedRecords}
           paginated
+          statusFilter="owned"
           onClose={() => setShowAll(false)}
           onRecordClick={(r) => setOpenRecord(r)}
           onAddRecord={() => setFormMode({ kind: "add" })}
