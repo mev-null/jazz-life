@@ -28,31 +28,9 @@ export type ArtistAlias = {
   created_at: string;
 };
 
-// ---------- 公演（backend 未実装）----------
-export type Venue = {
-  id: string;
-  name: string;
-  city: string;
-};
-
-export type ConcertStatus = "scheduled" | "cancelled" | "postponed";
-
-export type Concert = {
-  id: string;
-  venue_id: string;
-  date: string;
-  title: string;
-  url: string | null;
-  stage_times: string | null; // カンマ区切り
-  status: ConcertStatus;
-  first_seen_at: string;
-  last_seen_at: string;
-};
-
-export type ConcertArtist = {
-  concert_id: string;
-  artist_id: string;
-};
+// 公演 (Concert) は ADR-013 で UI から撤去した。backend モデルは温存しているが
+// frontend では型・参照を持たない。将来再導入する場合は ADR-007 の方針
+// (catalog を backend に降ろす) に沿って generated 由来で復活させる。
 
 // ---------- 認証（backend 未実装）----------
 // 注: アクセストークン / リフレッシュトークンはサーバ側のみで保持し、

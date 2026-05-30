@@ -77,10 +77,12 @@ export const getListRecordsApiRecordsGetUrl = (params?: ListRecordsApiRecordsGet
 /**
  * current user の collection を返す (ADR-006 §3.4)。
 
-`limit` を渡すと paginated。レスポンス `total` は user の collection 全件数
-なので、フロント側で `Math.ceil(total / limit)` でページ数を出せる。limit
-省略時は全件 + total を返す (従来挙動を維持)。並び順は
-`is_pinned DESC, display_order ASC` 固定。
+`limit` を渡すと paginated。レスポンス `total` は (status 絞り込み後の) user の
+collection 件数なので、フロント側で `Math.ceil(total / limit)` でページ数を出せる。
+
+- `status`: owned / wanted で絞り込み (ADR-013 の Hunt list は `wanted`)。
+- `sort`: `artist` (アーティスト名→title 昇順) / `added` (created_at 降順)。
+  省略時は `is_pinned DESC, pin_order ASC, display_order ASC` (Home マトリクス用)。
  * @summary List Records
  */
 export const listRecordsApiRecordsGet = async (params?: ListRecordsApiRecordsGetParams, options?: RequestInit): Promise<listRecordsApiRecordsGetResponse> => {

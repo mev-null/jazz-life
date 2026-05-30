@@ -19,7 +19,7 @@ export function TopNav() {
         <TabLink to="/" end>
           Home
         </TabLink>
-        <TabLink to="/feed">Feed</TabLink>
+        <TabLink to="/digging">Digging</TabLink>
         <TabLink to="/artists">Artists</TabLink>
       </nav>
     </header>

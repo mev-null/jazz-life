@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import text
 from sqlmodel import Session, col, func, select
 
+from app.models.artist import Artist
 from app.models.record import VinylRecord
 from app.models.user_collection import UserCollection
 
@@ -53,42 +54,58 @@ class UserCollectionRepository:
         user_id: uuid.UUID,
         limit: int | None = None,
         offset: int = 0,
+        status: str | None = None,
+        sort: str | None = None,
     ) -> list[tuple[UserCollection, VinylRecord]]:
         """user_id の collection と catalog を JOIN して flat row を返す。
 
-        Home マトリクスの一覧用。並び順は次の通り (pinned > 非 pinned、
-        pinned 内は drag & drop で決まる `pin_order` 昇順):
+        `status` 指定で owned/wanted に絞り込む (ADR-013 の Hunt list 用)。
 
-            is_pinned DESC, pin_order ASC NULLS LAST, display_order ASC
+        並び順 (`sort`):
+        - "artist": artists を join して name 昇順 → title 昇順 (Hunt list の棚順)
+        - "added" : created_at 降順 (on the hunt 登録が新しい順)
+        - 未指定  : is_pinned DESC, pin_order ASC NULLS LAST, display_order ASC
+          (Home マトリクス用。フロントはプレビューを slice するだけで
+          「ピン順 → display_order 補完」が成立する)
 
-        フロント側は Home プレビューを slice するだけで「ピン順 → display_order
-        で補完」が成立する。
-
-        `limit=None` で全件、`limit` が指定された時のみページネーション。
+        `limit=None` で全件、`limit` 指定時のみページネーション。
         """
-        stmt = (
-            select(UserCollection, VinylRecord)
-            .join(VinylRecord, col(VinylRecord.id) == col(UserCollection.vinyl_record_id))
-            .where(col(UserCollection.user_id) == user_id)
-            .order_by(
+        stmt = select(UserCollection, VinylRecord).join(
+            VinylRecord, col(VinylRecord.id) == col(UserCollection.vinyl_record_id)
+        )
+        if sort == "artist":
+            stmt = stmt.join(Artist, col(Artist.spotify_id) == col(VinylRecord.artist_id))
+        stmt = stmt.where(col(UserCollection.user_id) == user_id)
+        if status is not None:
+            stmt = stmt.where(col(UserCollection.status) == status)
+        if sort == "artist":
+            stmt = stmt.order_by(col(Artist.name).asc(), col(VinylRecord.title).asc())
+        elif sort == "added":
+            stmt = stmt.order_by(col(UserCollection.created_at).desc())
+        else:
+            stmt = stmt.order_by(
                 col(UserCollection.is_pinned).desc(),
                 col(UserCollection.pin_order).asc().nulls_last(),
                 col(UserCollection.display_order).asc(),
             )
-        )
         if offset:
             stmt = stmt.offset(offset)
         if limit is not None:
             stmt = stmt.limit(limit)
         return list(self.session.exec(stmt).all())
 
-    def count_for_user(self, user_id: uuid.UUID) -> int:
-        """user の collection 総件数 (paginated レスポンスの `total` 用)。"""
+    def count_for_user(self, user_id: uuid.UUID, status: str | None = None) -> int:
+        """user の collection 総件数 (paginated レスポンスの `total` 用)。
+
+        `status` 指定時はその絞り込み後の件数を返し、一覧と total を整合させる。
+        """
         stmt = (
             select(func.count())
             .select_from(UserCollection)
             .where(col(UserCollection.user_id) == user_id)
         )
+        if status is not None:
+            stmt = stmt.where(col(UserCollection.status) == status)
         return self.session.exec(stmt).one()
 
     def count_pinned_for_user(self, user_id: uuid.UUID) -> int:

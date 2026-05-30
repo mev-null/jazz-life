@@ -94,16 +94,21 @@ class RecordService:
         user_id: UUID,
         limit: int | None = None,
         offset: int = 0,
+        status: str | None = None,
+        sort: str | None = None,
     ) -> tuple[list[VinylRecordRead], int]:
         """user の record 一覧と total を返す。
 
-        limit を渡すと paginated。`total` は限界値ではなく user の collection
-        全件数なので、フロント側で `Math.ceil(total / limit)` でページ数を出せる。
+        `status` で owned/wanted を絞り込み、`sort` で並び替える (ADR-013)。
+        limit を渡すと paginated。`total` は `status` 絞り込み後の全件数なので、
+        フロント側で `Math.ceil(total / limit)` でページ数を出せる。
         """
-        rows = self.collection_repo.list_for_user_with_catalog(user_id, limit=limit, offset=offset)
+        rows = self.collection_repo.list_for_user_with_catalog(
+            user_id, limit=limit, offset=offset, status=status, sort=sort
+        )
         favorites_map = self.favorite_track_repo.list_by_collection_ids([c.id for c, _ in rows])
         items = [self._to_read(c, vr, favorites_map.get(c.id, [])) for c, vr in rows]
-        total = self.collection_repo.count_for_user(user_id)
+        total = self.collection_repo.count_for_user(user_id, status=status)
         return items, total
 
     def count_owned_by_artist_for_user(self, user_id: UUID) -> dict[str, int]:

@@ -4,15 +4,13 @@
 //
 //   実 API パス:
 //     - artists / records / releases は orval 生成 fetcher (src/api/generated/) を経由
-//     - concerts / jacket upload は backend 未実装のため fetch のまま
-//       (jacket upload の実 API は Phase B-3 以降)
+//     - jacket upload は backend 未実装のため fetch のまま (Phase B-3 以降)
 // ====================================================================
 
 import { API_BASE, USE_MOCK } from "../lib/env";
 import type {
   Artist,
   ArtistRecordCount,
-  Concert,
   ListResponse,
   Release,
   SyncRunResult,
@@ -58,17 +56,8 @@ import type {
 } from "./generated/model";
 
 import artistsMock from "./mocks/artists.json";
-import concertsMock from "./mocks/concerts.json";
 import releasesMock from "./mocks/releases.json";
 import vinylRecordsMock from "./mocks/vinyl_records.json";
-
-async function fetchJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) {
-    throw new Error(`API error ${res.status}: ${path}`);
-  }
-  return (await res.json()) as T;
-}
 
 // In-memory mutable mirror of the records mock — initialised once per page load.
 // Mutations modify this so subsequent reads reflect the change. Lost on refresh.
@@ -266,6 +255,35 @@ export async function getVinylRecords(
 }
 
 /**
+ * Digging の Hunt list 用。`status=wanted` で絞り込み、並び替えは backend 責務
+ * (ADR-013)。`sort="artist"` は artist 名昇順(→title)、`sort="added"` は
+ * on the hunt 登録日 (created_at) 降順。frontend は backend が返した順を尊重して
+ * 見出しグループ化するだけ。
+ *
+ * mock 経路でも同じ並びを再現する (artist は artistsMock で name lookup)。
+ */
+export async function getWantedRecords(
+  sort: "artist" | "added",
+): Promise<ListResponse<VinylRecord>> {
+  if (USE_MOCK) {
+    const nameById = new Map(
+      (artistsMock as ListResponse<Artist>).items.map((a) => [a.spotify_id, a.name]),
+    );
+    const items = mockRecordsStore
+      .filter((r) => r.status === "wanted")
+      .sort((a, b) => {
+        if (sort === "added") return b.created_at.localeCompare(a.created_at);
+        const an = nameById.get(a.artist_id) ?? "";
+        const bn = nameById.get(b.artist_id) ?? "";
+        return an.localeCompare(bn) || a.title.localeCompare(b.title);
+      });
+    return { items, total: items.length };
+  }
+  const res = await listRecordsApiRecordsGet({ status: "wanted", sort });
+  return res.data as ListResponse<VinylRecord>;
+}
+
+/**
  * drag & drop で並び替えた pin 一覧の順序を保存する。
  *
  * `ids` は **現在 pin している全行** を、ユーザが望む順序で並べたもの。
@@ -322,7 +340,7 @@ export async function getReleases(
 /**
  * release の既読フラグを切り替える (PATCH 経由)。auth 必須。
  *
- * frontend では「Feed の release 行をクリック」 / 「FeedDetailModal で
+ * frontend では「Digging の release 行をクリック」 / 「ReleaseDetailModal で
  * mark as read / unread」のタイミングで呼ぶ。release.is_read が backend
  * 永続化されるので、ブラウザを跨いでも既読状態が保持される (localStorage
  * 時代との違い)。
@@ -389,12 +407,6 @@ export async function getReleaseSyncStatus(): Promise<SyncStatus> {
   }
   const res = await getSyncStatusApiReleasesSyncStatusGet();
   return res.data as SyncStatus;
-}
-
-// backend 未実装。実 API 接続は Phase B-3 以降。
-export async function getConcerts(): Promise<ListResponse<Concert>> {
-  if (USE_MOCK) return concertsMock as ListResponse<Concert>;
-  return fetchJson<ListResponse<Concert>>("/api/concerts");
 }
 
 // id / created_at / updated_at / display_order は backend が採番する。

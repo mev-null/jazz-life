@@ -36,7 +36,7 @@ export function LoginPage() {
           Analog Life
         </h1>
         <p className="mt-6 text-base italic text-ink-mute sm:text-lg">
-          An almanac of records, releases &amp; concerts.
+          An almanac of records &amp; releases.
         </p>
 
         <button

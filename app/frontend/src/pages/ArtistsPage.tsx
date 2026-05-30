@@ -1,29 +1,27 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
-  getConcerts,
   getFollowedArtists,
   getRecordCounts,
   getReleases,
+  setReleaseRead,
 } from "../api/client";
 import { AddArtistModal } from "../components/artists/AddArtistModal";
 import { ArtistDetailModal } from "../components/artists/ArtistDetailModal";
 import {
-  FeedDetailModal,
-  type FeedItem,
-} from "../components/feed/FeedDetailModal";
+  ReleaseDetailModal,
+  type ReleaseItem,
+} from "../components/feed/ReleaseDetailModal";
 import { RecordDetailModal } from "../components/records/RecordDetailModal";
 import {
   RecordFormModal,
   type FormMode,
 } from "../components/records/RecordFormModal";
 import { useBreakpoint } from "../hooks/useBreakpoint";
-import { concertMatchesArtist } from "../lib/matchArtist";
 import { MOBILE_UI_ENABLED } from "../lib/featureFlags";
 import { useAuth } from "../lib/useAuth";
-import { useReadState } from "../lib/useReadState";
-import type { Artist, Concert, Release, VinylRecord } from "../types/api";
+import type { Artist, Release, VinylRecord } from "../types/api";
 
 export function ArtistsPage() {
   const { isMobile } = useBreakpoint();
@@ -43,22 +41,27 @@ export function ArtistsPage() {
     queryKey: ["record-counts"],
     queryFn: getRecordCounts,
   });
-  // 行頭の「未読黒豆」表示用。release は backend (is_read)、concert は
-  // localStorage (useReadState) を見る。FeedPage / ArtistDetailModal と
-  // 同じ query key なのでキャッシュは共有される。
+  // 行頭の「未読黒豆」表示用。release は backend (is_read) を見る。
+  // DiggingPage / ArtistDetailModal と同じ query key なのでキャッシュは共有される。
   const releasesQ = useQuery({
     queryKey: ["releases"],
     queryFn: () => getReleases(),
   });
-  const concertsQ = useQuery({ queryKey: ["concerts"], queryFn: getConcerts });
+
+  const queryClient = useQueryClient();
+  const setReleaseReadMutation = useMutation({
+    mutationFn: ({ id, isRead }: { id: string; isRead: boolean }) =>
+      setReleaseRead(id, isRead),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["releases"] });
+    },
+  });
 
   const [openArtist, setOpenArtist] = useState<Artist | null>(null);
   const [openRecord, setOpenRecord] = useState<VinylRecord | null>(null);
-  const [openFeedItem, setOpenFeedItem] = useState<FeedItem | null>(null);
+  const [openRelease, setOpenRelease] = useState<ReleaseItem | null>(null);
   const [formMode, setFormMode] = useState<FormMode | null>(null);
   const [addArtistOpen, setAddArtistOpen] = useState(false);
-
-  const { isRead, markRead, markUnread } = useReadState();
 
   const artistById = (id: string) =>
     artistsQ.data?.items.find((a) => a.spotify_id === id);
@@ -72,49 +75,36 @@ export function ArtistsPage() {
     return map;
   }, [recordCountsQ.data]);
 
-  // artist_id -> 未読 release または未読 concert が 1 件でもあるか。
-  // concert は単一 artist に紐付かない (タイトル文字列マッチ) ので、各 concert を
-  // 全 artist と突き合わせて該当 artist の set に積む。
+  // artist_id -> 未読 release が 1 件でもあるか (backend の is_read を真とする)。
   const unreadArtistIds = useMemo(() => {
     const set = new Set<string>();
     for (const r of releasesQ.data?.items ?? []) {
       if (!r.is_read) set.add(r.artist_id);
     }
-    const artistList = artistsQ.data?.items ?? [];
-    for (const c of concertsQ.data?.items ?? []) {
-      if (isRead(`concert:${c.id}`)) continue;
-      for (const a of artistList) {
-        if (concertMatchesArtist(c, a)) set.add(a.spotify_id);
-      }
-    }
     return set;
-  }, [releasesQ.data, concertsQ.data, artistsQ.data, isRead]);
+  }, [releasesQ.data]);
 
-  // FeedDetailModal toggle state
-  const openFeedKey = openFeedItem
-    ? openFeedItem.kind === "release"
-      ? `release:${openFeedItem.data.spotify_id}`
-      : `concert:${openFeedItem.data.id}`
+  // ReleaseDetailModal の既読 toggle 用。開いている release の最新 is_read を
+  // releases query から look up する。
+  const openReleaseLatest = openRelease
+    ? releasesQ.data?.items.find(
+        (r) => r.spotify_id === openRelease.release.spotify_id,
+      ) ?? openRelease.release
     : null;
-  const openFeedIsRead = openFeedKey ? isRead(openFeedKey) : false;
-  function toggleOpenFeedRead() {
-    if (!openFeedKey) return;
-    if (openFeedIsRead) markUnread(openFeedKey);
-    else markRead(openFeedKey);
-  }
-
-  function handleReleaseClick(r: Release) {
-    markRead(`release:${r.spotify_id}`);
-    setOpenFeedItem({
-      kind: "release",
-      data: r,
-      artist: artistById(r.artist_id),
+  const openReleaseIsRead = Boolean(openReleaseLatest?.is_read);
+  function toggleOpenReleaseRead() {
+    if (!openRelease) return;
+    setReleaseReadMutation.mutate({
+      id: openRelease.release.spotify_id,
+      isRead: !openReleaseIsRead,
     });
   }
 
-  function handleConcertClick(c: Concert, matchedArtist?: Artist) {
-    markRead(`concert:${c.id}`);
-    setOpenFeedItem({ kind: "concert", data: c, artist: matchedArtist });
+  function handleReleaseClick(r: Release) {
+    if (!r.is_read) {
+      setReleaseReadMutation.mutate({ id: r.spotify_id, isRead: true });
+    }
+    setOpenRelease({ release: r, artist: artistById(r.artist_id) });
   }
 
   function handleEditOpenRecord() {
@@ -125,12 +115,12 @@ export function ArtistsPage() {
   }
 
   /**
-   * Activity の release を開いた状態で「買った/ほしい」を押した時のハンドラ。
-   * FeedPage と同じ動作: FeedDetailModal を閉じてから RecordFormModal を
+   * Activity の release を開いた状態で「On the hunt / On the shelf」を押した時の
+   * ハンドラ。DiggingPage と同じ動作: 詳細を閉じてから RecordFormModal を
    * release のメタデータ pre-fill で開く。
    */
   function handleCollectFromRelease(r: Release, status: "owned" | "wanted") {
-    setOpenFeedItem(null);
+    setOpenRelease(null);
     setFormMode({
       kind: "add",
       defaults: {
@@ -219,7 +209,6 @@ export function ArtistsPage() {
         onClose={() => setOpenArtist(null)}
         onRecordClick={(r) => setOpenRecord(r)}
         onReleaseClick={handleReleaseClick}
-        onConcertClick={handleConcertClick}
         onAddRecord={(a, status) =>
           setFormMode({
             kind: "add",
@@ -244,12 +233,12 @@ export function ArtistsPage() {
         onClose={() => setFormMode(null)}
       />
 
-      <FeedDetailModal
-        item={openFeedItem}
-        isRead={openFeedIsRead}
-        onToggleRead={toggleOpenFeedRead}
-        onClose={() => setOpenFeedItem(null)}
-        onCollectFromRelease={handleCollectFromRelease}
+      <ReleaseDetailModal
+        item={openRelease}
+        isRead={openReleaseIsRead}
+        onToggleRead={toggleOpenReleaseRead}
+        onClose={() => setOpenRelease(null)}
+        onCollect={handleCollectFromRelease}
       />
 
       <AddArtistModal

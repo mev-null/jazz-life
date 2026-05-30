@@ -248,7 +248,7 @@
           "records"
         ],
         "summary": "List Records",
-        "description": "current user の collection を返す (ADR-006 §3.4)。\n\n`limit` を渡すと paginated。レスポンス `total` は user の collection 全件数\nなので、フロント側で `Math.ceil(total / limit)` でページ数を出せる。limit\n省略時は全件 + total を返す (従来挙動を維持)。並び順は\n`is_pinned DESC, display_order ASC` 固定。",
+        "description": "current user の collection を返す (ADR-006 §3.4)。\n\n`limit` を渡すと paginated。レスポンス `total` は (status 絞り込み後の) user の\ncollection 件数なので、フロント側で `Math.ceil(total / limit)` でページ数を出せる。\n\n- `status`: owned / wanted で絞り込み (ADR-013 の Hunt list は `wanted`)。\n- `sort`: `artist` (アーティスト名→title 昇順) / `added` (created_at 降順)。\n  省略時は `is_pinned DESC, pin_order ASC, display_order ASC` (Home マトリクス用)。",
         "operationId": "list_records_api_records_get",
         "parameters": [
           {
@@ -278,6 +278,46 @@
               "minimum": 0,
               "default": 0,
               "title": "Offset"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "owned",
+                    "wanted"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "artist",
+                    "added"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort"
             }
           }
         ],
