@@ -14,9 +14,9 @@ import { useBreakpoint } from "../hooks/useBreakpoint";
 import { MOBILE_UI_ENABLED } from "../lib/featureFlags";
 import type { VinylRecord } from "../types/api";
 
-// PC 側は ArtistDetailModal の RecordsSection と同じ 8 件 (4 列 × 2 行)。
-// Mobile は 2 列 × 3 行で 6 件に減らし、view all 経由で全件閲覧へ。
-const HOME_PREVIEW_LIMIT = 8;
+// PC / Mobile とも 6 件 showcase に統一 (PIN_LIMIT=6 と一致させ、満杯時は
+// 追加タイルを出さない)。PC は 3 列 × 2 行、Mobile は 2 列 × 3 行。
+const HOME_PREVIEW_LIMIT = 6;
 const HOME_MOBILE_PREVIEW_LIMIT = 6;
 
 export function HomePage() {
@@ -37,9 +37,9 @@ export function HomePage() {
   const mobile = MOBILE_UI_ENABLED && isMobile;
   const previewLimit = mobile ? HOME_MOBILE_PREVIEW_LIMIT : HOME_PREVIEW_LIMIT;
 
-  // Mobile の Home は「棚をひと目で見せる」コンセプトに合わせて body スクロールを抑止。
-  // 6 件 + ヘッダ + 余白で iPhone 14 (390x844) 程度の縦に収まる前提。
-  // 他ページや PC では効かないよう unmount / breakpoint 変化で必ず元に戻す。
+  // Mobile の Home は「棚をひと目で見せる」コンセプトで body スクロールを抑止する。
+  // レイアウトは dvh 基準 (AppLayout) + 高さを埋めるグリッドで可視領域に収めるので、
+  // スクロールせずに 6 枚すべてが収まる。
   useEffect(() => {
     if (!mobile) return;
     const prev = document.body.style.overflow;
@@ -71,7 +71,7 @@ export function HomePage() {
   }
 
   return (
-    <section>
+    <section className={mobile ? "flex h-full flex-col" : ""}>
       <h1 className="flex items-baseline gap-3 text-base">
         <span className="font-medium">Records</span>
         <span className="text-ink-faint tabular-nums">
@@ -88,7 +88,10 @@ export function HomePage() {
         )}
       </h1>
 
-      <div className="my-6">
+      <div
+        className={mobile ? "mt-4 min-h-0 flex-1" : "my-6"}
+        data-tour="home-records"
+      >
         {records.isLoading && (
           <p className="text-sm text-ink-faint">loading…</p>
         )}
@@ -98,16 +101,28 @@ export function HomePage() {
         {records.data &&
           (pinnedRecords.length > 0 ? (
             // ピン済みの showcase。room があれば末尾に追加タイルも出す。
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            // mobile = 2 列 × 3 行で利用可能な高さ (dvh) を埋め、タイルは高さ基準の
+            // 正方形にして 1 画面に収める。sm 以上 = 3 列 × 2 行 (幅を抑えた center)。
+            <div
+              className={
+                mobile
+                  ? "grid h-full grid-cols-2 grid-rows-3 place-items-center gap-3"
+                  : "mx-auto grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-3"
+              }
+            >
               {pinnedRecords.map((r) => (
                 <JacketCard
                   key={r.id}
                   record={r}
                   onClick={() => setOpenRecord(r)}
+                  fillHeight={mobile}
                 />
               ))}
               {hasRoomForAdd && (
-                <AddRecordTile onClick={() => setFormMode({ kind: "add" })} />
+                <AddRecordTile
+                  onClick={() => setFormMode({ kind: "add" })}
+                  fillHeight={mobile}
+                />
               )}
             </div>
           ) : ownedRecords.length > 0 ? (

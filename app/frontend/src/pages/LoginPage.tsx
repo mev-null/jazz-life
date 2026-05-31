@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
 
+import { USE_MOCK } from "../lib/env";
 import { useAuth } from "../lib/useAuth";
 
 export function LoginPage() {
@@ -45,10 +46,20 @@ export function LoginPage() {
           disabled={submitting}
           className="mt-16 border border-ink px-10 py-3 text-sm transition-colors hover:bg-ink hover:text-paper disabled:opacity-50"
         >
-          {submitting ? "redirecting…" : "Sign in with Spotify"}
+          {submitting
+            ? "redirecting…"
+            : USE_MOCK
+              ? "Enter demo"
+              : "Sign in with Spotify"}
         </button>
 
-        <p className="mt-12 text-xs italic text-ink-faint">invite-only</p>
+        {USE_MOCK ? (
+          <p className="mt-12 text-xs italic text-ink-faint">
+            Demo — クリックでサンプルデータを表示します（Spotify 認証は不要）
+          </p>
+        ) : (
+          <p className="mt-12 text-xs italic text-ink-faint">invite-only</p>
+        )}
       </div>
     </div>
   );

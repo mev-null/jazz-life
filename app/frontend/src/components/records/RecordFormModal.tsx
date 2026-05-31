@@ -11,6 +11,7 @@ import {
   uploadJacket,
   upsertArtist,
 } from "../../api/client";
+import { USE_MOCK } from "../../lib/env";
 import { PIN_LIMIT } from "../../lib/pins";
 import type { Artist, VinylRecord } from "../../types/api";
 import type {
@@ -628,6 +629,11 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
               </div>
               {spotifyOpen && (
                 <div className="mt-3 max-h-72 overflow-y-auto border border-ink/10 bg-paper">
+                  {USE_MOCK && !spotifyError && (
+                    <div className="border-b border-ink/10 px-3 py-1.5 text-xs italic text-ink-faint">
+                      demo — サンプルの検索結果を表示しています
+                    </div>
+                  )}
                   {spotifyError ? (
                     <div className="p-3 text-sm italic text-ink-mute">
                       {spotifyError}

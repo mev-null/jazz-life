@@ -7,6 +7,7 @@ import {
   upsertArtist,
 } from "../../api/client";
 import type { SpotifyArtistSummary } from "../../api/generated/model";
+import { USE_MOCK } from "../../lib/env";
 import { ModalShell } from "../ModalShell";
 
 type Props = {
@@ -144,6 +145,11 @@ export function AddArtistModal({ open, onClose }: Props) {
             </div>
           ) : (
             <ul className="divide-y divide-ink/10">
+              {USE_MOCK && (
+                <li className="px-3 py-1.5 text-xs italic text-ink-faint">
+                  demo — サンプルの検索結果を表示しています
+                </li>
+              )}
               {results.map((a) => {
                 const isPending = pendingId === a.spotify_id;
                 return (

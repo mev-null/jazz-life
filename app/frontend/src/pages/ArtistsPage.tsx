@@ -136,7 +136,7 @@ export function ArtistsPage() {
 
   return (
     <section>
-      <h1 className="flex items-baseline gap-3 text-base">
+      <h1 className="flex items-baseline gap-3 text-base" data-tour="artists">
         <span className="font-medium">Artists</span>
         <span className="text-ink-faint tabular-nums">
           {artistsQ.data ? artistsQ.data.items.length : ""}
