@@ -114,18 +114,18 @@ frontend / backend が別オリジンになる点は Railway 構成と同じ（[
 
 ### 3.3 infra
 
-- `.github/workflows/daily-sync.yml`（`schedule:` cron, `curl -X POST` で `/api/releases/sync` を共有シークレットヘッダ付きで叩く）。
 - Neon / Render（or Fly.io）/ Cloudflare Pages の各プロジェクト作成（手動・README に手順を追記）。
+- cron 用 workflow は**作らない**（§2.5: 同期は手動トリガーのまま）。
 
 ### 3.4 OpenAPI spec への影響
 
-- sync のガード変更はパラメータ追加を伴わなければ spec 不変。
+- 本移行は router の追加・削除・パラメータ変更を伴わない → **spec 不変**。
 - recognition provider 切替も応答形状を維持すれば spec 不変。
-- → `make spec` 再生成は基本不要、CI の `openapi-spec-check` も pass する見込み。
+- → `make spec` 再生成は不要、CI の `openapi-spec-check` も pass する見込み。
 
 ### 3.5 README
 
-- デプロイ手順を「Railway 単体」→「Cloudflare Pages + Render/Fly + Neon + cron」の分散構成に更新。env 表（§2.7）、cron 設定、各サービスの作成手順、コールドスタートの注意を記載。
+- デプロイ手順を「Railway 単体」→「Cloudflare Pages + Render/Fly + Neon」の分散構成に更新。env 表（§2.7）、各サービスの作成手順、コールドスタートの注意を記載。
 
 ---
 
