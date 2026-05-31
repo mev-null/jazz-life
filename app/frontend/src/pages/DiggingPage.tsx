@@ -223,13 +223,25 @@ export function DiggingPage() {
 
       {/* タブバー */}
       <nav className="mt-8 flex items-baseline gap-6 text-base">
-        <TabButton active={tab === "hunt"} onClick={() => setTab("hunt")}>
+        <TabButton
+          active={tab === "hunt"}
+          onClick={() => setTab("hunt")}
+          dataTour="subtab-hunt"
+        >
           On the hunt
         </TabButton>
-        <TabButton active={tab === "listen"} onClick={() => setTab("listen")}>
+        <TabButton
+          active={tab === "listen"}
+          onClick={() => setTab("listen")}
+          dataTour="subtab-listen"
+        >
           Listen
         </TabButton>
-        <TabButton active={tab === "releases"} onClick={() => setTab("releases")}>
+        <TabButton
+          active={tab === "releases"}
+          onClick={() => setTab("releases")}
+          dataTour="subtab-releases"
+        >
           Releases
         </TabButton>
       </nav>
@@ -246,7 +258,7 @@ export function DiggingPage() {
         ) : tab === "listen" ? (
           <ListenPanel onAdd={handleRecognizedAdd} />
         ) : (
-          <div>
+          <div data-tour="releases-feed">
             <h1 className="flex items-baseline gap-3 text-base">
               <span className="font-medium">Records</span>
               {releases.data && (
@@ -331,15 +343,18 @@ function TabButton({
   active,
   onClick,
   children,
+  dataTour,
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
+  dataTour?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      data-tour={dataTour}
       className={`cursor-pointer transition-colors ${
         active ? "font-medium text-ink" : "italic text-ink-mute hover:text-ink"
       }`}

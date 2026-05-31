@@ -59,6 +59,7 @@ import type {
 
 import artistsMock from "./mocks/artists.json";
 import releasesMock from "./mocks/releases.json";
+import spotifySearchMock from "./mocks/spotify_search.json";
 import vinylRecordsMock from "./mocks/vinyl_records.json";
 
 // In-memory mutable mirror of the records mock — initialised once per page load.
@@ -66,6 +67,20 @@ import vinylRecordsMock from "./mocks/vinyl_records.json";
 const mockRecordsStore: VinylRecord[] = (
   vinylRecordsMock as ListResponse<VinylRecord>
 ).items.slice();
+
+// Artists も records と同じく可変ミラーを持つ。upsertArtist / Spotify 検索からの
+// follow 追加が一覧 (getArtists / getFollowedArtists) に即反映されるようにするため
+// (demo で「検索 → 追加 → 一覧に出る」体験を成立させる)。リロードで初期化。
+const mockArtistsStore: Artist[] = (
+  artistsMock as ListResponse<Artist>
+).items.slice();
+
+// demo の擬似 Spotify 検索結果。実 API と同じ shape の候補を返し、選択 → 自動入力 →
+// 保存 / フォロー追加まで mock 経路で完走させる。`keywords` は曲名など別名検索用の
+// 内部フィールドで、返却時に除去して SpotifyAlbumSummary 型に合わせる。
+type MockAlbum = SpotifyAlbumSummary & { keywords?: string[] };
+const mockSearchAlbums = spotifySearchMock.albums as MockAlbum[];
+const mockSearchArtists = spotifySearchMock.artists as SpotifyArtistSummary[];
 
 // backend の `is_pinned DESC, pin_order ASC NULLS LAST, display_order ASC`
 // 順を mock 経路でも再現する。HomePage のプレビュー (slice 0..previewLimit) が
@@ -84,7 +99,7 @@ function sortedMockRecords(): VinylRecord[] {
 const MOCK_PIN_LIMIT = PIN_LIMIT;
 
 export async function getArtists(): Promise<ListResponse<Artist>> {
-  if (USE_MOCK) return artistsMock as ListResponse<Artist>;
+  if (USE_MOCK) return { items: mockArtistsStore.slice() };
   const res = await listArtistsApiArtistsGet();
   return res.data as ListResponse<Artist>;
 }
@@ -98,8 +113,7 @@ export async function getArtists(): Promise<ListResponse<Artist>> {
  */
 export async function getArtist(spotifyId: string): Promise<Artist | null> {
   if (USE_MOCK) {
-    const mock = artistsMock as ListResponse<Artist>;
-    return mock.items.find((a) => a.spotify_id === spotifyId) ?? null;
+    return mockArtistsStore.find((a) => a.spotify_id === spotifyId) ?? null;
   }
   const res = await getArtistApiArtistsSpotifyIdGet(spotifyId);
   if (res.status === 200) {
@@ -147,7 +161,7 @@ export async function getRecordCounts(): Promise<ListResponse<ArtistRecordCount>
  * しないため、ArtistsPage では全 mock artists が見える)。
  */
 export async function getFollowedArtists(): Promise<ListResponse<Artist>> {
-  if (USE_MOCK) return artistsMock as ListResponse<Artist>;
+  if (USE_MOCK) return { items: mockArtistsStore.slice() };
   const res = await listFollowedArtistsApiUserFollowsArtistsGet();
   return res.data as ListResponse<Artist>;
 }
@@ -162,7 +176,16 @@ export async function getFollowedArtists(): Promise<ListResponse<Artist>> {
 export async function searchSpotifyArtists(
   q: string,
 ): Promise<SpotifyArtistSummary[]> {
-  if (USE_MOCK) return [];
+  if (USE_MOCK) {
+    if (!q.trim()) return [];
+    await new Promise((r) => setTimeout(r, 250));
+    const ql = q.trim().toLowerCase();
+    const hit = mockSearchArtists.filter((a) =>
+      a.name.toLowerCase().includes(ql),
+    );
+    // demo は「常に何か出る」方が体験が良いので、部分一致が無ければ全候補を返す。
+    return hit.length ? hit : mockSearchArtists;
+  }
   if (!q.trim()) return [];
   const res = await searchArtistsApiSpotifyArtistsSearchGet({ q });
   if (res.status === 200) {
@@ -214,17 +237,25 @@ export async function unfollowArtist(spotifyId: string): Promise<void> {
 export async function upsertArtist(input: ArtistCreate): Promise<Artist> {
   if (USE_MOCK) {
     await new Promise((r) => setTimeout(r, 30));
-    // mock では artists.json をディープに更新する設計まではしない。
-    // 呼び出し側の record 作成と form 上の整合だけ保てれば十分なので、
-    // 入力をそのまま Artist 互換で返して上位の cache に任せる。
-    const now = new Date().toISOString();
-    return {
+    // demo では可変ストアに upsert して、Spotify 検索 → 追加した artist が
+    // ArtistsPage 一覧 / HomePage の名前解決に即反映されるようにする。
+    const existing = mockArtistsStore.find(
+      (a) => a.spotify_id === input.spotify_id,
+    );
+    if (existing) {
+      existing.name = input.name;
+      if (input.image_url !== undefined) existing.image_url = input.image_url;
+      return existing;
+    }
+    const created: Artist = {
       spotify_id: input.spotify_id,
       name: input.name,
       image_url: input.image_url ?? null,
       source: input.source ?? "spotify_dynamic",
-      added_at: now,
+      added_at: new Date().toISOString(),
     } as Artist;
+    mockArtistsStore.push(created);
+    return created;
   }
   const res = await upsertArtistApiArtistsPost(input);
   return res.data as Artist;
@@ -279,7 +310,7 @@ export async function getWantedRecords(
 ): Promise<ListResponse<VinylRecord>> {
   if (USE_MOCK) {
     const nameById = new Map(
-      (artistsMock as ListResponse<Artist>).items.map((a) => [a.spotify_id, a.name]),
+      mockArtistsStore.map((a) => [a.spotify_id, a.name]),
     );
     const items = mockRecordsStore
       .filter((r) => r.status === "wanted")
@@ -579,7 +610,29 @@ export async function searchSpotifyAlbums(
   q: string,
   artist?: string,
 ): Promise<SpotifyAlbumSummary[]> {
-  if (USE_MOCK) return [];
+  if (USE_MOCK) {
+    if (!q.trim()) return [];
+    await new Promise((r) => setTimeout(r, 250));
+    const ql = q.trim().toLowerCase();
+    const al = artist?.trim().toLowerCase();
+    const matches = (a: MockAlbum): boolean => {
+      const hay = [
+        a.name.toLowerCase(),
+        ...a.artist_names.map((n) => n.toLowerCase()),
+        ...(a.keywords ?? []),
+      ];
+      const byTitle = hay.some((h) => h.includes(ql));
+      const byArtist = al
+        ? a.artist_names.some((n) => n.toLowerCase().includes(al))
+        : false;
+      return byTitle || byArtist;
+    };
+    const hit = mockSearchAlbums.filter(matches);
+    // 候補ゼロだと「no results」で体験が途切れるので、未ヒット時は全候補を出す。
+    const pool = hit.length ? hit : mockSearchAlbums;
+    // keywords は内部用なので除去して API 型 (SpotifyAlbumSummary) に揃える。
+    return pool.map(({ keywords: _keywords, ...rest }) => rest);
+  }
   if (!q.trim()) return [];
   const params = artist ? { q, artist } : { q };
   const res = await searchAlbumsApiSpotifyAlbumsSearchGet(params);
@@ -635,7 +688,9 @@ export async function uploadJacket(
  */
 export async function recognizeAudio(blob: Blob): Promise<RecognitionResult> {
   if (USE_MOCK) {
-    await new Promise((r) => setTimeout(r, 600));
+    // demo は「実際に検索している」感を出すため、認識 (Reading the groove) を
+    // やや長めに取る (Shazam 風の指紋照合を模した待ち時間)。
+    await new Promise((r) => setTimeout(r, 2800));
     // UI 確認用ダミー。ジャケット表示を見せるため実在のカバー画像を持たせる。
     return {
       matched: true,

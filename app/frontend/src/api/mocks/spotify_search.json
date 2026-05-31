@@ -1,0 +1,104 @@
+{
+  "albums": [
+    {
+      "id": "mock_alb_kind_of_blue",
+      "name": "Kind of Blue",
+      "release_date": "1959-08-17",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music/7f/9f/d6/mzi.vtnaewef.jpg/600x600bb.jpg",
+      "artist_names": ["Miles Davis"],
+      "primary_artist_id": "0kbYTNQb4Pb1rPbbaF0pT4",
+      "keywords": ["blue in green", "so what", "kind of blue", "miles davis", "freddie freeloader"]
+    },
+    {
+      "id": "mock_alb_explorations",
+      "name": "Explorations",
+      "release_date": "1961-02-02",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/1b/ab/89/1bab89a5-ebad-9534-55e3-a5699daeb173/00888072330443.rgb.jpg/600x600bb.jpg",
+      "artist_names": ["Bill Evans Trio"],
+      "primary_artist_id": "4xRYI6VqpkE3UwrDrAZL8L"
+    },
+    {
+      "id": "mock_alb_moon_beams",
+      "name": "Moon Beams",
+      "release_date": "1962-05-01",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/45/d6/a0/45d6a0a0-0d2b-1a20-2bab-5fbc973931b3/24CRGIM46034.rgb.jpg/600x600bb.jpg",
+      "artist_names": ["Bill Evans Trio"],
+      "primary_artist_id": "4xRYI6VqpkE3UwrDrAZL8L"
+    },
+    {
+      "id": "mock_alb_continuo",
+      "name": "Continuo",
+      "release_date": "2006-05-23",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/49/00/01/4900011c-b1cf-ab29-2c31-9c5780422c75/cover.jpg/600x600bb.jpg",
+      "artist_names": ["Avishai Cohen"],
+      "primary_artist_id": "7HRgLn5KUXfLeKjsoXl5XS"
+    },
+    {
+      "id": "mock_alb_almah",
+      "name": "Almah",
+      "release_date": "2013-11-04",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/7c/0c/20/7c0c2002-d581-251f-df28-effd434e600b/825646367900.jpg/600x600bb.jpg",
+      "artist_names": ["Avishai Cohen"],
+      "primary_artist_id": "7HRgLn5KUXfLeKjsoXl5XS"
+    },
+    {
+      "id": "mock_alb_virtuosi",
+      "name": "Virtuosi",
+      "release_date": "2002-01-01",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music118/v4/cd/0f/ae/cd0faeea-f91c-9e13-088f-dc642531c666/00013431210528.rgb.jpg/600x600bb.jpg",
+      "artist_names": ["Gary Burton", "Makoto Ozone"],
+      "primary_artist_id": "1d4dvLcRoOiH3w2Eb4TPDD"
+    },
+    {
+      "id": "mock_alb_we_get_requests",
+      "name": "We Get Requests",
+      "release_date": "1964-01-01",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/6a/92/89/6a9289d1-69aa-6e20-7cef-4279b6cc415d/15UMGIM33844.rgb.jpg/600x600bb.jpg",
+      "artist_names": ["Oscar Peterson Trio"],
+      "primary_artist_id": "6Mt1DgI3mzrnvY1xGruqLk"
+    },
+    {
+      "id": "mock_alb_cole_porter",
+      "name": "Oscar Peterson Plays the Cole Porter Songbook",
+      "release_date": "1959-01-01",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music128/v4/8d/ea/7b/8dea7b51-5057-6eb4-ab6a-ac66dd308dbf/00602547464149.rgb.jpg/600x600bb.jpg",
+      "artist_names": ["Oscar Peterson"],
+      "primary_artist_id": "6Mt1DgI3mzrnvY1xGruqLk"
+    },
+    {
+      "id": "mock_alb_symbiosis",
+      "name": "Symbiosis",
+      "release_date": "2009-09-22",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music/62/3c/64/mzi.edjvdgtw.jpg/600x600bb.jpg",
+      "artist_names": ["The Jeff Hamilton Trio"],
+      "primary_artist_id": "2T0HkYzLYxPjXNJqNZTUzz"
+    }
+  ],
+  "artists": [
+    {
+      "spotify_id": "0kbYTNQb4Pb1rPbbaF0pT4",
+      "name": "Miles Davis",
+      "image_url": null
+    },
+    {
+      "spotify_id": "2hPgGN4uhvXAxiXQBIXOmE",
+      "name": "John Coltrane",
+      "image_url": null
+    },
+    {
+      "spotify_id": "2ZvrvbQNrci3jM490M5fA4",
+      "name": "Herbie Hancock",
+      "image_url": null
+    },
+    {
+      "spotify_id": "4Ww5mwS7BWYjoZTUIrMHfC",
+      "name": "Keith Jarrett",
+      "image_url": null
+    },
+    {
+      "spotify_id": "5HxhfvBuQNl8jfdEHbBxQ8",
+      "name": "Chet Baker",
+      "image_url": null
+    }
+  ]
+}

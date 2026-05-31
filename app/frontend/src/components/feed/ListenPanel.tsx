@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { recognizeAudio } from "../../api/client";
+import { USE_MOCK } from "../../lib/env";
 import type { RecognitionResult } from "../../types/api";
 
 type Status =
@@ -59,7 +60,9 @@ export function ListenPanel({ onAdd }: Props) {
   // Cancel 時は onstop で認識へ進めず破棄するためのフラグ。
   const canceledRef = useRef(false);
 
-  const supported = isRecordingSupported();
+  // demo (USE_MOCK) ではマイクを使わず固定のサンプル結果を返すので、録音対応の
+  // 有無に関わらず操作可能にする (採用担当の環境にマイクが無くても showcase が動く)。
+  const supported = USE_MOCK || isRecordingSupported();
   const spinning = status === "recording" || status === "recognizing";
 
   // unmount 時にマイクと録音を確実に止める (常時 ON 防止)。
@@ -108,6 +111,12 @@ export function ListenPanel({ onAdd }: Props) {
     setErrorMsg(null);
     setResult(null);
     setElapsed(0);
+    // demo: マイク録音を丸ごとスキップし、Tap で即「認識中 → サンプル結果」へ。
+    // recognizeAudio (mock) は blob を無視して固定結果を返すので空 blob で良い。
+    if (USE_MOCK) {
+      void handleRecognize(new Blob());
+      return;
+    }
     // 許可ダイアログはユーザー操作 (このクリック) のタイミングで初めて呼ぶ。
     let stream: MediaStream;
     try {
@@ -238,11 +247,17 @@ export function ListenPanel({ onAdd }: Props) {
   }
 
   return (
-    <div className="flex flex-col items-center pt-2">
+    <div
+      data-tour="listen-area"
+      className="mx-auto flex w-fit flex-col items-center pt-2"
+    >
       {/* レコードプレーヤー風のステージ。
           サイズは単一固定 (sm: で拡大しない)。盤とトーンアームの位置関係を px で
           固定し、画面幅が変わっても針が必ず溝の上に着地するようにするため。 */}
-      <div className="relative mt-4 flex h-72 w-72 items-center justify-center">
+      <div
+        data-tour="listen-disc"
+        className="relative mt-4 flex h-72 w-72 items-center justify-center"
+      >
         {/* トーンアーム: ステージ基準で配置 (盤と同じ固定座標系)。 */}
         <Tonearm engaged={spinning} />
 
@@ -273,9 +288,16 @@ export function ListenPanel({ onAdd }: Props) {
       {/* キャプション / アクション */}
       <div className="mt-8 flex min-h-[5.5rem] flex-col items-center gap-3 text-center">
         {status === "idle" && (
-          <p className="max-w-xs text-sm italic leading-relaxed text-ink-mute">
-            Tap Vinyle !
-          </p>
+          <>
+            <p className="max-w-xs text-sm italic leading-relaxed text-ink-mute">
+              Tap Vinyle !
+            </p>
+            {USE_MOCK && (
+              <p className="max-w-xs text-xs italic leading-relaxed text-ink-faint">
+                demo — 録音せずサンプル音源で認識します
+              </p>
+            )}
+          </>
         )}
 
         {status === "recording" && (

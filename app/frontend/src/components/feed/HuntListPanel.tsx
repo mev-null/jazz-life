@@ -113,7 +113,7 @@ export function HuntListPanel({
   }
 
   return (
-    <div>
+    <div data-tour="hunt-list">
       <h1 className="flex items-baseline gap-3 text-base">
         <span className="font-medium">Records</span>
         <span className="text-ink-faint tabular-nums">{records.length}</span>
