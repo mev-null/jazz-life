@@ -9,8 +9,9 @@
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 
+from app.core.db import SessionFactory, get_session_factory
 from app.core.repositories.sync_status_repository import SyncStatusRepository
 from app.models.user import User
 from app.routers._handlers import http_errors
@@ -24,11 +25,13 @@ from app.schemas.common import ListResponse
 from app.schemas.release import (
     ReleaseRead,
     ReleaseReadStatusUpdate,
+    SyncRunAccepted,
     SyncRunRequest,
-    SyncRunResult,
+    SyncRunSummary,
     SyncStatusRead,
 )
 from app.services.release_service import RELEASE_SYNC_SOURCE, ReleaseService
+from app.services.release_sync_runner import release_sync_runner
 from app.services.spotify_app_client import SpotifyAppClient
 
 router = APIRouter(prefix="/api/releases", tags=["releases"])
@@ -72,14 +75,35 @@ def get_sync_status(
     _: User = Depends(get_current_user),
 ) -> SyncStatusRead:
     row = repo.get(RELEASE_SYNC_SOURCE)
+    is_running = release_sync_runner.is_running
+    result = release_sync_runner.last_result
+    last_run = (
+        SyncRunSummary(
+            artists_total=result.artists_total,
+            artists_succeeded=result.artists_succeeded,
+            albums_ingested=result.albums_ingested,
+            first_error=result.first_error,
+        )
+        if result is not None
+        else None
+    )
     if row is None:
         return SyncStatusRead(
             source=RELEASE_SYNC_SOURCE,
             last_success_at=None,
             last_attempt_at=None,
             last_error=None,
+            is_running=is_running,
+            last_run=last_run,
         )
-    return SyncStatusRead.model_validate(row)
+    return SyncStatusRead(
+        source=row.source,
+        last_success_at=row.last_success_at,
+        last_attempt_at=row.last_attempt_at,
+        last_error=row.last_error,
+        is_running=is_running,
+        last_run=last_run,
+    )
 
 
 @router.patch("/{spotify_id}/read", response_model=ReleaseRead)
@@ -98,25 +122,32 @@ def set_release_read_status(
         return service.set_read_status(spotify_id, payload.is_read, current_user.id)
 
 
-@router.post("/sync", response_model=SyncRunResult, status_code=status.HTTP_200_OK)
+@router.post("/sync", response_model=SyncRunAccepted, status_code=status.HTTP_202_ACCEPTED)
 def trigger_sync(
+    background_tasks: BackgroundTasks,
     payload: SyncRunRequest | None = None,
-    service: ReleaseService = Depends(get_release_service),
     spotify: SpotifyAppClient = Depends(get_spotify_app_client),
+    session_factory: SessionFactory = Depends(get_session_factory),
     current_user: User = Depends(get_current_user),
-) -> SyncRunResult:
-    """フォロー中アーティスト全件の releases を Spotify から取り込む。
+) -> SyncRunAccepted:
+    """フォロー中アーティスト全件の releases を Spotify から取り込む (非同期)。
 
-    Phase B-3 では同期実行 (long poll、数十秒の可能性)。Phase B-4 で
-    APScheduler の日次バッチに移行する前提のため、ここは shim 実装。
+    Spotify レート制限の都合で sync は数十秒〜分かかりうるため、リクエスト内で
+    同期実行せずバックグラウンドジョブを投入して即 202 を返す。進捗はフロントが
+    `/sync-status` の `is_running` を polling して把握する。既に実行中なら多重
+    起動を避けて already_running を返す (Phase B-4 で APScheduler 日次バッチへ移行)。
     """
     default_from, default_to = _default_window()
     since = (payload.since_date if payload else None) or default_from
     until = (payload.until_date if payload else None) or default_to
-    result = service.sync_for_user(current_user.id, spotify, since, until)
-    return SyncRunResult(
-        artists_total=result.artists_total,
-        artists_succeeded=result.artists_succeeded,
-        albums_ingested=result.albums_ingested,
-        first_error=result.first_error,
+    if not release_sync_runner.try_begin():
+        return SyncRunAccepted(status="already_running", is_running=True)
+    background_tasks.add_task(
+        release_sync_runner.run,
+        current_user.id,
+        spotify,
+        since,
+        until,
+        session_factory,
     )
+    return SyncRunAccepted(status="started", is_running=True)

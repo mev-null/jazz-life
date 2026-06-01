@@ -8,6 +8,7 @@
 
 import re
 from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
@@ -16,7 +17,7 @@ from fastapi.testclient import TestClient
 from pytest_httpx import HTTPXMock
 from sqlmodel import Session, select
 
-from app.core.db import get_session
+from app.core.db import get_session, get_session_factory
 from app.core.settings import Settings, get_settings
 from app.main import app
 from app.models.artist import Artist
@@ -25,6 +26,7 @@ from app.models.release_read_state import ReleaseReadState
 from app.models.user import User
 from app.models.user_follow import UserFollow
 from app.routers.deps import get_current_user, get_spotify_app_client
+from app.services.release_sync_runner import release_sync_runner
 from app.services.spotify_app_client import SPOTIFY_TOKEN_URL, SpotifyAppClient
 from tests.conftest import make_settings
 
@@ -78,6 +80,14 @@ def _test_settings() -> Settings:
     return make_settings()
 
 
+@pytest.fixture(autouse=True)
+def _reset_sync_runner() -> Iterator[None]:
+    """process-wide な release_sync_runner の in-memory 状態をテスト毎に初期化。"""
+    release_sync_runner.reset()
+    yield
+    release_sync_runner.reset()
+
+
 @pytest.fixture
 def unauthed_client(session: Session, _test_settings: Settings) -> Iterator[TestClient]:
     """`POST /api/releases/sync` の未認証 → 401 を検証するため auth override 無し。"""
@@ -107,6 +117,12 @@ def authed_client(session: Session, _test_settings: Settings) -> Iterator[TestCl
     def _override_session() -> Iterator[Session]:
         yield session
 
+    @contextmanager
+    def _override_session_scope() -> Iterator[Session]:
+        # バックグラウンドジョブ用の session ファクトリ。テストでは新規に開かず、
+        # テスト session をそのまま貸す (close はフィクスチャ側に任せる)。
+        yield session
+
     def _override_user() -> User:
         return user
 
@@ -114,6 +130,7 @@ def authed_client(session: Session, _test_settings: Settings) -> Iterator[TestCl
         return SpotifyAppClient(_test_settings)
 
     app.dependency_overrides[get_session] = _override_session
+    app.dependency_overrides[get_session_factory] = lambda: _override_session_scope
     app.dependency_overrides[get_settings] = lambda: _test_settings
     app.dependency_overrides[get_current_user] = _override_user
     app.dependency_overrides[get_spotify_app_client] = _override_spotify
@@ -315,6 +332,7 @@ def test_sync_status_returns_null_fields_when_never_synced(
     assert body["last_success_at"] is None
     assert body["last_attempt_at"] is None
     assert body["last_error"] is None
+    assert body["is_running"] is False
 
 
 # ---- POST /api/releases/sync ----
@@ -363,13 +381,13 @@ def test_post_sync_ingests_albums_for_followed_artists(
         json=_albums_page([_album(id_="alb-B1", release_date=today)]),
     )
 
+    # sync はバックグラウンド実行 (202 即返し)。TestClient は background task を
+    # レスポンス返却前に完走させるので、この後に DB / sync-status を検証できる。
     res = authed_client.post("/api/releases/sync")
-    assert res.status_code == 200, res.text
+    assert res.status_code == 202, res.text
     body = res.json()
-    assert body["artists_total"] == 2
-    assert body["artists_succeeded"] == 2
-    assert body["albums_ingested"] == 2
-    assert body["first_error"] is None
+    assert body["status"] == "started"
+    assert body["is_running"] is True
 
     session.expire_all()
     release_rows = list(session.exec(select(Release)).all())
@@ -378,6 +396,13 @@ def test_post_sync_ingests_albums_for_followed_artists(
     status_res = authed_client.get("/api/releases/sync-status").json()
     assert status_res["last_success_at"] is not None
     assert status_res["last_error"] is None
+    # ジョブ完走後なので is_running は False に戻っている。
+    assert status_res["is_running"] is False
+    # 直近ジョブの件数サマリが last_run に乗る。
+    assert status_res["last_run"]["artists_total"] == 2
+    assert status_res["last_run"]["artists_succeeded"] == 2
+    assert status_res["last_run"]["albums_ingested"] == 2
+    assert status_res["last_run"]["first_error"] is None
 
 
 def test_post_sync_marks_error_when_all_artists_fail(
@@ -398,15 +423,15 @@ def test_post_sync_marks_error_when_all_artists_fail(
     httpx_mock.add_response(url=_ARTIST_ALBUMS_URL_PATTERN, method="GET", status_code=500)
 
     res = authed_client.post("/api/releases/sync")
-    assert res.status_code == 200
+    assert res.status_code == 202
     body = res.json()
-    assert body["artists_total"] == 1
-    assert body["artists_succeeded"] == 0
-    assert body["first_error"] is not None
+    assert body["status"] == "started"
+    assert body["is_running"] is True
 
     status_res = authed_client.get("/api/releases/sync-status").json()
     assert status_res["last_success_at"] is None
     assert status_res["last_error"] is not None
+    assert status_res["is_running"] is False
 
 
 # ---- PATCH /api/releases/{spotify_id}/read ----

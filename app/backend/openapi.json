@@ -699,7 +699,7 @@
           "releases"
         ],
         "summary": "Trigger Sync",
-        "description": "フォロー中アーティスト全件の releases を Spotify から取り込む。\n\nPhase B-3 では同期実行 (long poll、数十秒の可能性)。Phase B-4 で\nAPScheduler の日次バッチに移行する前提のため、ここは shim 実装。",
+        "description": "フォロー中アーティスト全件の releases を Spotify から取り込む (非同期)。\n\nSpotify レート制限の都合で sync は数十秒〜分かかりうるため、リクエスト内で\n同期実行せずバックグラウンドジョブを投入して即 202 を返す。進捗はフロントが\n`/sync-status` の `is_running` を polling して把握する。既に実行中なら多重\n起動を避けて already_running を返す (Phase B-4 で APScheduler 日次バッチへ移行)。",
         "operationId": "trigger_sync_api_releases_sync_post",
         "requestBody": {
           "content": {
@@ -719,12 +719,12 @@
           }
         },
         "responses": {
-          "200": {
+          "202": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SyncRunResult"
+                  "$ref": "#/components/schemas/SyncRunAccepted"
                 }
               }
             }
@@ -1665,6 +1665,29 @@
         "title": "SpotifyArtistSummary",
         "description": "Spotify artist search 結果の 1 件を表す DTO。\n\nArtistsPage の「フォロー追加」モーダルが Spotify から候補を引く時に使う。\n`upsert_artist` (POST /api/artists) と `follow_artist` (POST /api/user-follows)\nに渡せるよう、`spotify_id` / `name` / `image_url` を露出する。"
       },
+      "SyncRunAccepted": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "started",
+              "already_running"
+            ],
+            "title": "Status"
+          },
+          "is_running": {
+            "type": "boolean",
+            "title": "Is Running"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "is_running"
+        ],
+        "title": "SyncRunAccepted",
+        "description": "`POST /api/releases/sync` のレスポンス (202 Accepted)。\n\nsync はバックグラウンド実行に切り出したため、件数などの結果は同期的に\n返さない。フロントは `is_running` を見てローディングし、`/sync-status` を\npolling して完了 / エラーを知る。\n- status=started: 今回ジョブを投入した\n- status=already_running: 既に実行中だったので投入をスキップした"
+      },
       "SyncRunRequest": {
         "properties": {
           "since_date": {
@@ -1696,7 +1719,7 @@
         "title": "SyncRunRequest",
         "description": "`POST /api/releases/sync` の任意 body。\n\n省略時は service 側で `today - 365d` / `today + 30d` を採用する。"
       },
-      "SyncRunResult": {
+      "SyncRunSummary": {
         "properties": {
           "artists_total": {
             "type": "integer",
@@ -1729,8 +1752,8 @@
           "albums_ingested",
           "first_error"
         ],
-        "title": "SyncRunResult",
-        "description": "`POST /api/releases/sync` のレスポンス。\n\nartists_total = フォロー中アーティスト数 (= sync 対象の母数)。\nartists_succeeded = Spotify からアルバム取得に成功した数。\nalbums_ingested = 取り込んだ release 行数 (upsert 含む)。\nfirst_error = 最初に発生したエラー (続行可能だったもの)。null なら全件成功。"
+        "title": "SyncRunSummary",
+        "description": "直近に完走した sync ジョブの結果サマリ。\n\nsync_status の last_* (DB 永続) と違い in-memory 由来 (プロセス再起動で消える)。\nフロントが「partial: N ingested / rate limited」等の補足表示に使う。\nartists_succeeded < artists_total なら一部のアーティストが取り込めていない\n(rate limit で打ち切り or per-artist エラー)。"
       },
       "SyncStatusRead": {
         "properties": {
@@ -1772,6 +1795,20 @@
               }
             ],
             "title": "Last Error"
+          },
+          "is_running": {
+            "type": "boolean",
+            "title": "Is Running"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncRunSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -1779,10 +1816,11 @@
           "source",
           "last_success_at",
           "last_attempt_at",
-          "last_error"
+          "last_error",
+          "is_running"
         ],
         "title": "SyncStatusRead",
-        "description": "`/api/releases/sync-status` のレスポンス。\n\nフロント Feed 側で「最終同期日時 / エラー状態」を表示するため (ADR-000 §314)。\nRow が無い (一度も sync していない) ケースでは全フィールドが null になる。"
+        "description": "`/api/releases/sync-status` のレスポンス。\n\nフロント Feed 側で「最終同期日時 / エラー状態」を表示するため (ADR-000 §314)。\nRow が無い (一度も sync していない) ケースでは last_* が null になる。"
       },
       "UserFollowCreate": {
         "properties": {
