@@ -22,11 +22,26 @@ class ReleaseRead(BaseModel):
     read_at: datetime | None
 
 
+class SyncRunSummary(BaseModel):
+    """直近に完走した sync ジョブの結果サマリ。
+
+    sync_status の last_* (DB 永続) と違い in-memory 由来 (プロセス再起動で消える)。
+    フロントが「partial: N ingested / rate limited」等の補足表示に使う。
+    artists_succeeded < artists_total なら一部のアーティストが取り込めていない
+    (rate limit で打ち切り or per-artist エラー)。
+    """
+
+    artists_total: int
+    artists_succeeded: int
+    albums_ingested: int
+    first_error: str | None
+
+
 class SyncStatusRead(BaseModel):
     """`/api/releases/sync-status` のレスポンス。
 
     フロント Feed 側で「最終同期日時 / エラー状態」を表示するため (ADR-000 §314)。
-    Row が無い (一度も sync していない) ケースでは全フィールドが null になる。
+    Row が無い (一度も sync していない) ケースでは last_* が null になる。
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -35,21 +50,25 @@ class SyncStatusRead(BaseModel):
     last_success_at: datetime | None
     last_attempt_at: datetime | None
     last_error: str | None
+    # sync が今まさにバックグラウンド実行中か。フロントはこれを polling して
+    # ローディング表示する。in-memory フラグ由来で DB には永続化しない。
+    is_running: bool
+    # 直近完走ジョブの結果サマリ (in-memory)。未実行 / 再起動直後は null。
+    last_run: SyncRunSummary | None = None
 
 
-class SyncRunResult(BaseModel):
-    """`POST /api/releases/sync` のレスポンス。
+class SyncRunAccepted(BaseModel):
+    """`POST /api/releases/sync` のレスポンス (202 Accepted)。
 
-    artists_total = フォロー中アーティスト数 (= sync 対象の母数)。
-    artists_succeeded = Spotify からアルバム取得に成功した数。
-    albums_ingested = 取り込んだ release 行数 (upsert 含む)。
-    first_error = 最初に発生したエラー (続行可能だったもの)。null なら全件成功。
+    sync はバックグラウンド実行に切り出したため、件数などの結果は同期的に
+    返さない。フロントは `is_running` を見てローディングし、`/sync-status` を
+    polling して完了 / エラーを知る。
+    - status=started: 今回ジョブを投入した
+    - status=already_running: 既に実行中だったので投入をスキップした
     """
 
-    artists_total: int
-    artists_succeeded: int
-    albums_ingested: int
-    first_error: str | None
+    status: Literal["started", "already_running"]
+    is_running: bool
 
 
 class SyncRunRequest(BaseModel):

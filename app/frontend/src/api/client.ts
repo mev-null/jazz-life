@@ -14,7 +14,7 @@ import type {
   ArtistRecordCount,
   ListResponse,
   Release,
-  SyncRunResult,
+  SyncRunAccepted,
   SyncStatus,
   VinylRecord,
 } from "../types/api";
@@ -416,22 +416,21 @@ export async function setReleaseRead(
  * releases テーブルを upsert する。認証必須 (current_user 経由で
  * user_follows を絞る)。
  *
+ * backend はバックグラウンドジョブを投入して即 202 を返すため、戻り値は件数
+ * ではなく受付結果 (status / is_running)。進捗・完了はこの後 getReleaseSyncStatus
+ * を polling して判定する。
+ *
  * USE_MOCK 時はネットワークを叩かず、ダミー結果を返す (mock は再同期不要)。
  */
 export async function triggerReleaseSync(
   payload?: SyncRunRequest,
-): Promise<SyncRunResult> {
+): Promise<SyncRunAccepted> {
   if (USE_MOCK) {
     await new Promise((r) => setTimeout(r, 30));
-    return {
-      artists_total: 0,
-      artists_succeeded: 0,
-      albums_ingested: 0,
-      first_error: null,
-    };
+    return { status: "started", is_running: false };
   }
   const res = await triggerSyncApiReleasesSyncPost(payload ?? null);
-  return res.data as SyncRunResult;
+  return res.data as SyncRunAccepted;
 }
 
 /**
@@ -446,6 +445,7 @@ export async function getReleaseSyncStatus(): Promise<SyncStatus> {
       last_success_at: null,
       last_attempt_at: null,
       last_error: null,
+      is_running: false,
     };
   }
   const res = await getSyncStatusApiReleasesSyncStatusGet();

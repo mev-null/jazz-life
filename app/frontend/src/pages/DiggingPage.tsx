@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -73,15 +73,34 @@ export function DiggingPage() {
     queryKey: ["release-sync-status"],
     queryFn: getReleaseSyncStatus,
     enabled: tab === "releases",
+    // sync はバックグラウンド実行なので、実行中 (is_running) はジョブ完了を
+    // 検知するため 2 秒間隔で polling する。完了すると false になり polling 停止。
+    refetchInterval: (query) =>
+      query.state.data?.is_running ? 2000 : false,
   });
 
   const syncMutation = useMutation({
     mutationFn: () => triggerReleaseSync(),
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["releases"] });
+      // POST は 202 即返し。完了は sync-status の polling で検知するので、ここでは
+      // status を取り直して polling (refetchInterval) を起動するだけ。
       queryClient.invalidateQueries({ queryKey: ["release-sync-status"] });
     },
   });
+
+  // sync 実行中か (POST 飛行中 or バックグラウンドジョブ稼働中)。
+  const isSyncing =
+    syncMutation.isPending || Boolean(syncStatusQ.data?.is_running);
+
+  // sync が完了 (is_running: true -> false) した瞬間に releases 一覧を取り直す。
+  const wasSyncingRef = useRef(false);
+  useEffect(() => {
+    const running = Boolean(syncStatusQ.data?.is_running);
+    if (wasSyncingRef.current && !running) {
+      queryClient.invalidateQueries({ queryKey: ["releases"] });
+    }
+    wasSyncingRef.current = running;
+  }, [syncStatusQ.data?.is_running, queryClient]);
 
   // release の既読化は backend (release.is_read / read_at) を真とする mutation。
   const setReleaseReadMutation = useMutation({
@@ -204,12 +223,26 @@ export function DiggingPage() {
     (r) => r.release_date,
   );
 
-  const syncStatusLine = syncMutation.isError ? (
+  const lastRun = syncStatusQ.data?.last_run ?? null;
+  const lastRunFailed = lastRun
+    ? lastRun.artists_total - lastRun.artists_succeeded
+    : 0;
+  const isRateLimited = lastRun?.first_error
+    ? /rate limit/i.test(lastRun.first_error)
+    : false;
+
+  const syncStatusLine = isSyncing ? (
+    <span className="text-ink-mute">syncing…</span>
+  ) : syncMutation.isError ? (
     <span className="text-ink-mute">sync failed</span>
-  ) : syncMutation.data?.first_error ? (
+  ) : isRateLimited ? (
+    // partial 同期 (rate limit で打ち切り)。残りは再 sync で取り込まれる。
     <span className="text-ink-mute">
-      partial: {syncMutation.data.albums_ingested} ingested ·{" "}
-      {syncMutation.data.artists_total - syncMutation.data.artists_succeeded} failed
+      Spotify rate limit — {lastRunFailed} deferred, try again shortly
+    </span>
+  ) : lastRun && lastRunFailed > 0 ? (
+    <span className="text-ink-mute">
+      partial: {lastRun.albums_ingested} ingested · {lastRunFailed} failed
     </span>
   ) : syncStatusQ.data?.last_success_at ? (
     <span>last sync {formatShortDate(syncStatusQ.data.last_success_at)}</span>
@@ -270,14 +303,32 @@ export function DiggingPage() {
               <button
                 type="button"
                 onClick={() => syncMutation.mutate()}
-                disabled={syncMutation.isPending}
-                className="ml-auto cursor-pointer text-xs italic text-ink-mute transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isSyncing}
+                className="ml-auto inline-flex items-center gap-1.5 cursor-pointer text-xs italic text-ink-mute transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {syncMutation.isPending ? "syncing…" : "sync now"}
+                {isSyncing && (
+                  <span
+                    aria-hidden
+                    className="inline-block h-3 w-3 animate-spin rounded-full border border-ink-faint border-t-transparent"
+                  />
+                )}
+                {isSyncing ? "syncing…" : "sync now"}
               </button>
             </h1>
             <div className="mt-1 text-xs italic text-ink-faint">{syncStatusLine}</div>
             <div className="mt-4">
+              {isSyncing && (
+                <div
+                  data-tour="releases-syncing"
+                  className="mb-3 flex items-center gap-2 text-xs italic text-ink-faint"
+                >
+                  <span
+                    aria-hidden
+                    className="inline-block h-3 w-3 animate-spin rounded-full border border-ink-faint border-t-transparent"
+                  />
+                  Spotify から新譜を取得中…
+                </div>
+              )}
               {releaseParts.upcoming.length > 0 && (
                 <div className="divide-y divide-ink-faint/30">
                   {releaseParts.upcoming.map((r) => (

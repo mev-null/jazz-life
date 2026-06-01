@@ -4,16 +4,19 @@
  * jazz-life
  * OpenAPI spec version: 0.1.0
  */
+import type { SyncRunSummary } from './syncRunSummary';
 
 /**
  * `/api/releases/sync-status` のレスポンス。
 
 フロント Feed 側で「最終同期日時 / エラー状態」を表示するため (ADR-000 §314)。
-Row が無い (一度も sync していない) ケースでは全フィールドが null になる。
+Row が無い (一度も sync していない) ケースでは last_* が null になる。
  */
 export interface SyncStatusRead {
   source: string;
   last_success_at: string | null;
   last_attempt_at: string | null;
   last_error: string | null;
+  is_running: boolean;
+  last_run?: SyncRunSummary | null;
 }

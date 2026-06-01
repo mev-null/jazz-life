@@ -8,7 +8,7 @@ export type {
   RecognitionResult,
   ReleaseRead as Release,
   ReleaseReadAlbumType as AlbumType,
-  SyncRunResult,
+  SyncRunAccepted,
   SyncStatusRead as SyncStatus,
   VinylRecordRead as VinylRecord,
 } from "../api/generated/model";

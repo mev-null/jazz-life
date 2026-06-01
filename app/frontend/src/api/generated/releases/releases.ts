@@ -29,8 +29,8 @@ import type {
   ListResponseReleaseRead,
   ReleaseRead,
   ReleaseReadStatusUpdate,
+  SyncRunAccepted,
   SyncRunRequest,
-  SyncRunResult,
   SyncStatusRead
 } from '../model';
 
@@ -375,9 +375,9 @@ export const useSetReleaseReadStatusApiReleasesSpotifyIdReadPatch = <TError = HT
       > => {
       return useMutation(getSetReleaseReadStatusApiReleasesSpotifyIdReadPatchMutationOptions(options), queryClient);
     }
-    export type triggerSyncApiReleasesSyncPostResponse200 = {
-  data: SyncRunResult
-  status: 200
+    export type triggerSyncApiReleasesSyncPostResponse202 = {
+  data: SyncRunAccepted
+  status: 202
 }
 
 export type triggerSyncApiReleasesSyncPostResponse422 = {
@@ -385,7 +385,7 @@ export type triggerSyncApiReleasesSyncPostResponse422 = {
   status: 422
 }
 
-export type triggerSyncApiReleasesSyncPostResponseSuccess = (triggerSyncApiReleasesSyncPostResponse200) & {
+export type triggerSyncApiReleasesSyncPostResponseSuccess = (triggerSyncApiReleasesSyncPostResponse202) & {
   headers: Headers;
 };
 export type triggerSyncApiReleasesSyncPostResponseError = (triggerSyncApiReleasesSyncPostResponse422) & {
@@ -403,10 +403,12 @@ export const getTriggerSyncApiReleasesSyncPostUrl = () => {
 }
 
 /**
- * フォロー中アーティスト全件の releases を Spotify から取り込む。
+ * フォロー中アーティスト全件の releases を Spotify から取り込む (非同期)。
 
-Phase B-3 では同期実行 (long poll、数十秒の可能性)。Phase B-4 で
-APScheduler の日次バッチに移行する前提のため、ここは shim 実装。
+Spotify レート制限の都合で sync は数十秒〜分かかりうるため、リクエスト内で
+同期実行せずバックグラウンドジョブを投入して即 202 を返す。進捗はフロントが
+`/sync-status` の `is_running` を polling して把握する。既に実行中なら多重
+起動を避けて already_running を返す (Phase B-4 で APScheduler 日次バッチへ移行)。
  * @summary Trigger Sync
  */
 export const triggerSyncApiReleasesSyncPost = async (syncRunRequestNull?: SyncRunRequest | null, options?: RequestInit): Promise<triggerSyncApiReleasesSyncPostResponse> => {
