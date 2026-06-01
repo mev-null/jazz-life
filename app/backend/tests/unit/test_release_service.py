@@ -15,6 +15,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID
 
+import pytest
 from sqlmodel import Session
 
 from app.core.exceptions import NotFoundError, SpotifyApiError
@@ -83,6 +84,12 @@ def _seed_artist(session: Session, spotify_id: str, name: str = "X") -> Artist:
 def _seed_follow(session: Session, user_id: UUID, artist_id: str) -> None:
     session.add(UserFollow(user_id=user_id, artist_id=artist_id))
     session.commit()
+
+
+@pytest.fixture(autouse=True)
+def _no_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
+    """アーティスト間スロットルの実スリープを無効化してテストを高速化する。"""
+    monkeypatch.setattr("app.services.release_service.time.sleep", lambda _seconds: None)
 
 
 def _make_service(session: Session) -> ReleaseService:
@@ -222,8 +229,6 @@ def test_sync_does_not_touch_read_states(session: Session) -> None:
     user が既読化した release を Spotify から再 ingest しても、release_read_states
     の行は触られない (独立テーブルなので preserve は自動)。
     """
-    import pytest
-
     user = _seed_user(session)
     _seed_artist(session, "art-1")
     _seed_follow(session, user.id, "art-1")
@@ -266,8 +271,6 @@ def test_sync_does_not_touch_read_states(session: Session) -> None:
         .get("alb-1")
     )
     assert read_at_after == read_at_before
-    # pytest を関数ローカルで触っているので import warning を抑える
-    _ = pytest
 
 
 # ---- list_window / set_read_status ----
@@ -357,8 +360,6 @@ def test_list_window_returns_is_read_per_user(session: Session) -> None:
 
 
 def test_set_read_status_unknown_release_raises_not_found(session: Session) -> None:
-    import pytest
-
     user = _seed_user(session)
     service = _make_service(session)
     with pytest.raises(NotFoundError, match="release"):

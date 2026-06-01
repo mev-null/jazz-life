@@ -42,10 +42,34 @@ _ARTIST_ALBUMS_PAGE_LIMIT = 10
 _ARTIST_ALBUMS_INCLUDE_GROUPS = "album,single"
 # /v1/artists/{id}/albums は market 無しだと同一アルバムを 30+ リージョン別に
 # 重複返却する (Spotify 公式仕様、"If neither market or user country are
-# provided, the content is considered unavailable for the client")。
-# 日本ジャズリスナー向けアプリなので JP に固定して dedup を効かせる。
-# 将来マルチユーザ化したら users.country を見るのが正道。
-_ARTIST_ALBUMS_MARKET = "JP"
+# provided, the content is considered unavailable for the client")。なので
+# market は指定して dedup を効かせる。
+#
+# 値は US。当初 JP にしていたが、ジャズは US 先行リリース / 輸入盤主体で、JP
+# 配信が遅れる (or 来ない) 盤が多い。market=JP だと「US では既発売だが JP 未配信」
+# のアルバムが available_markets から外れて items に出ず、Feed への登場が実発売
+# から大きく遅れていた (実例: Avishai Cohen "Eternal Child" が JP 配信後に初出)。
+# US に寄せることで輸入盤ジャズを最速で拾う。トレードオフとして JP 限定配信の
+# 邦楽ジャズ等は取りこぼしうる。将来マルチユーザ化したら users.country を見るのが正道。
+_ARTIST_ALBUMS_MARKET = "US"
+
+# release sync (Get Artist's Albums) 専用のレート制限対策パラメータ。
+# sync は POST リクエスト同期実行なので、待ち時間がそのままレスポンス時間に
+# なる点に注意 (大きくしすぎない)。対話的な search 系には適用しない。
+#
+# RELEASE_SYNC_THROTTLE_SECONDS:
+#   連続する Spotify リクエスト (ページ間は client 側 / アーティスト間は
+#   release_service 側) に挟む最小スリープ。間隔ゼロの連射で rolling ~30s
+#   window を一気に使い切って 429 を踏むのを防ぐ。
+# _RATE_LIMIT_MAX_RETRIES:
+#   429 を踏んだとき Retry-After を見て待ってから同一リクエストを再送する最大回数。
+# _RATE_LIMIT_DEFAULT_WAIT_SECONDS / _RATE_LIMIT_MAX_WAIT_SECONDS:
+#   Retry-After が無い / 不正なときのフォールバック秒と、過大値の頭打ち上限
+#   (同期リクエストを長時間ブロックしないため)。
+RELEASE_SYNC_THROTTLE_SECONDS = 0.2
+_RATE_LIMIT_MAX_RETRIES = 1
+_RATE_LIMIT_DEFAULT_WAIT_SECONDS = 2.0
+_RATE_LIMIT_MAX_WAIT_SECONDS = 30.0
 
 
 @dataclass(frozen=True)
@@ -251,22 +275,7 @@ class SpotifyAppClient:
         url = SPOTIFY_ARTIST_ALBUMS_URL_TEMPLATE.format(id=artist_id)
         offset = 0
         while True:
-            try:
-                with httpx.Client(timeout=10.0) as client:
-                    res = client.get(
-                        url,
-                        headers={"Authorization": f"Bearer {token}"},
-                        params={
-                            "include_groups": _ARTIST_ALBUMS_INCLUDE_GROUPS,
-                            "limit": _ARTIST_ALBUMS_PAGE_LIMIT,
-                            "offset": offset,
-                            "market": _ARTIST_ALBUMS_MARKET,
-                        },
-                    )
-            except httpx.HTTPError as exc:
-                raise SpotifyApiError("failed to reach Spotify artist albums endpoint") from exc
-            if res.status_code == 429:
-                raise SpotifyApiError("spotify rate limit exceeded", status_code=429)
+            res = self._get_albums_page(token, url, offset, artist_id)
             if res.status_code == 404:
                 # 404 は「invalid artist_id」または「指定 market に該当コンテンツ無し」の
                 # 両方で起こる (Spotify 公式仕様)。どちらでもユーザにとっての結果は
@@ -311,7 +320,54 @@ class SpotifyAppClient:
             if len(items) < _ARTIST_ALBUMS_PAGE_LIMIT:
                 break
             offset += _ARTIST_ALBUMS_PAGE_LIMIT
+            # 次ページを取りに行く前にスロットル。連続ページングで rate limit
+            # window を一気に消費しないため (アーティスト間の pacing は
+            # release_service 側で別途入れる)。
+            time.sleep(RELEASE_SYNC_THROTTLE_SECONDS)
         return results
+
+    def _get_albums_page(self, token: str, url: str, offset: int, artist_id: str) -> httpx.Response:
+        """Get Artist's Albums を 1 ページ分 GET する (429 リトライ込み)。
+
+        429 を踏んだら `Retry-After` を見てその秒数だけ待ち、最大
+        `_RATE_LIMIT_MAX_RETRIES` 回まで同一リクエストを再送する。Spotify の
+        rate limit は rolling ~30s window なので、Retry-After 秒待てば window が
+        空く。再送し切ってもなお 429 のままなら 429 を上げ、呼び出し元
+        (release_service の sync ループ) が残りアーティストを次回送りにする。
+        404 / その他ステータスは判定を呼び出し元に委ねるためそのまま返す。
+        """
+        attempt = 0
+        while True:
+            try:
+                with httpx.Client(timeout=10.0) as client:
+                    res = client.get(
+                        url,
+                        headers={"Authorization": f"Bearer {token}"},
+                        params={
+                            "include_groups": _ARTIST_ALBUMS_INCLUDE_GROUPS,
+                            "limit": _ARTIST_ALBUMS_PAGE_LIMIT,
+                            "offset": offset,
+                            "market": _ARTIST_ALBUMS_MARKET,
+                        },
+                    )
+            except httpx.HTTPError as exc:
+                raise SpotifyApiError("failed to reach Spotify artist albums endpoint") from exc
+            if res.status_code != 429:
+                return res
+            if attempt >= _RATE_LIMIT_MAX_RETRIES:
+                raise SpotifyApiError("spotify rate limit exceeded", status_code=429)
+            wait = _parse_retry_after(res.headers.get("Retry-After"))
+            logger.warning(
+                "spotify artist albums 429 artist_id=%s offset=%d; "
+                "waiting %.1fs then retrying (attempt %d/%d)",
+                artist_id,
+                offset,
+                wait,
+                attempt + 1,
+                _RATE_LIMIT_MAX_RETRIES,
+            )
+            time.sleep(wait)
+            attempt += 1
 
     def _get_app_token(self) -> str:
         cached = self._cached
@@ -354,6 +410,24 @@ class SpotifyAppClient:
             expires_at=time.time() + expires_in - _TOKEN_EXPIRY_MARGIN_SECONDS,
         )
         return access_token
+
+
+def _parse_retry_after(value: str | None) -> float:
+    """Spotify の `Retry-After` レスポンスヘッダ (秒数) を待機秒に変換する。
+
+    欠落 / パース不能 / 負値なら `_RATE_LIMIT_DEFAULT_WAIT_SECONDS` に
+    フォールバックし、過大値は `_RATE_LIMIT_MAX_WAIT_SECONDS` で頭打ちにして
+    同期リクエストを長時間ブロックしないようにする。
+    """
+    if value is None:
+        return _RATE_LIMIT_DEFAULT_WAIT_SECONDS
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        return _RATE_LIMIT_DEFAULT_WAIT_SECONDS
+    if seconds < 0:
+        return _RATE_LIMIT_DEFAULT_WAIT_SECONDS
+    return min(seconds, _RATE_LIMIT_MAX_WAIT_SECONDS)
 
 
 def _parse_release_date(value: str, precision: str | None) -> date | None:

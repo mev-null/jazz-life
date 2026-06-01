@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from datetime import date, datetime
 from uuid import UUID
@@ -26,7 +27,11 @@ from app.core.repositories.sync_status_repository import SyncStatusRepository
 from app.core.repositories.user_follow_repository import UserFollowRepository
 from app.models.release import Release
 from app.schemas.release import ReleaseRead
-from app.services.spotify_app_client import SpotifyAlbumIngest, SpotifyAppClient
+from app.services.spotify_app_client import (
+    RELEASE_SYNC_THROTTLE_SECONDS,
+    SpotifyAlbumIngest,
+    SpotifyAppClient,
+)
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -109,7 +114,12 @@ class ReleaseService:
         succeeded = 0
         albums_ingested = 0
         first_error: str | None = None
-        for artist_id in artist_ids:
+        for index, artist_id in enumerate(artist_ids):
+            if index > 0:
+                # アーティスト間に最小スリープを挟んで連射を緩和する。Spotify の
+                # rate limit (rolling ~30s window) を踏みにくくするための pacing。
+                # client 側はページ間スロットル + 429 の Retry-After リトライを持つ。
+                time.sleep(RELEASE_SYNC_THROTTLE_SECONDS)
             try:
                 ingests = spotify.get_artist_albums(
                     artist_id, since_date=since_date, until_date=until_date
@@ -119,9 +129,10 @@ class ReleaseService:
                 if first_error is None:
                     first_error = f"{artist_id}: {exc}"
                 if exc.status_code == 429:
-                    # Spotify rate limit (rolling 30s window) を踏んだ。残りの artist を
-                    # 続けて叩いてもどの request も 429 で返ってくるだけで、limit window
-                    # を延ばしてしまうので即中断する。残りは次回 sync で取り込む。
+                    # client が Retry-After で 1 回リトライしてもなお 429 = window が
+                    # まだ開いていない。残りの artist を続けて叩いてもどの request も
+                    # 429 で返るだけで limit window を延ばしてしまうので即中断する。
+                    # 残りは次回 sync で取り込む。
                     # https://developer.spotify.com/documentation/web-api/concepts/rate-limits
                     logger.warning(
                         "release sync stopped early due to spotify rate limit; "

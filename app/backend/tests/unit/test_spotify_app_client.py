@@ -45,6 +45,12 @@ def _make_client() -> SpotifyAppClient:
     return SpotifyAppClient(make_settings())
 
 
+@pytest.fixture(autouse=True)
+def _no_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
+    """テスト中は throttle / Retry-After の実スリープを無効化して高速化する。"""
+    monkeypatch.setattr("app.services.spotify_app_client.time.sleep", lambda _seconds: None)
+
+
 def test_search_returns_mapped_albums(httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
     httpx_mock.add_response(
@@ -467,10 +473,11 @@ def test_get_artist_albums_filters_unexpected_album_type(
 def test_get_artist_albums_passes_include_groups_and_market(
     httpx_mock: HTTPXMock,
 ) -> None:
-    """include_groups は album,single 固定、market は JP 固定で叩く。
+    """include_groups は album,single 固定、market は US 固定で叩く。
 
     market を渡さないと Spotify が同一アルバムをリージョン別に重複返却して
-    リリース件数が膨張するため、JP 固定で dedup させる前提。
+    リリース件数が膨張するため market は指定する。値は US (ジャズは US 先行 /
+    輸入盤主体で JP 配信が遅れる盤が多く、JP だと Feed への登場が遅れるため)。
     """
     httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
     httpx_mock.add_response(
@@ -483,16 +490,46 @@ def test_get_artist_albums_passes_include_groups_and_market(
 
     album_reqs = [r for r in httpx_mock.get_requests() if "/albums" in r.url.path]
     assert album_reqs[0].url.params.get("include_groups") == "album,single"
-    assert album_reqs[0].url.params.get("market") == "JP"
+    assert album_reqs[0].url.params.get("market") == "US"
 
 
-def test_get_artist_albums_429_raises(httpx_mock: HTTPXMock) -> None:
+def test_get_artist_albums_429_raises_after_retry_exhausted(httpx_mock: HTTPXMock) -> None:
+    """429 は Retry-After を見て 1 回リトライする。再送後もなお 429 なら 429 を上げる。
+
+    リトライ後も埋まらない window は呼び出し元 (release sync) が残りアーティストを
+    次回送りにする材料にする。
+    """
     httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
-    httpx_mock.add_response(url=_ARTIST_ALBUMS_URL_PATTERN, method="GET", status_code=429)
+    # 1 回目 + Retry-After リトライの計 2 回とも 429。
+    httpx_mock.add_response(
+        url=_ARTIST_ALBUMS_URL_PATTERN, method="GET", status_code=429, headers={"Retry-After": "1"}
+    )
+    httpx_mock.add_response(
+        url=_ARTIST_ALBUMS_URL_PATTERN, method="GET", status_code=429, headers={"Retry-After": "1"}
+    )
 
     with pytest.raises(SpotifyApiError) as exc_info:
         _make_client().get_artist_albums("art-1")
     assert exc_info.value.status_code == 429
+    album_reqs = [r for r in httpx_mock.get_requests() if "/albums" in r.url.path]
+    assert len(album_reqs) == 2
+
+
+def test_get_artist_albums_retries_once_on_429_then_succeeds(httpx_mock: HTTPXMock) -> None:
+    """429 を 1 回踏んでも Retry-After 待ち後の再送が 200 なら結果を返す。"""
+    httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
+    httpx_mock.add_response(
+        url=_ARTIST_ALBUMS_URL_PATTERN, method="GET", status_code=429, headers={"Retry-After": "1"}
+    )
+    httpx_mock.add_response(
+        url=_ARTIST_ALBUMS_URL_PATTERN, method="GET", json=_albums_page([_album_ingest()])
+    )
+
+    items = _make_client().get_artist_albums("art-1")
+
+    assert {i.id for i in items} == {"alb-1"}
+    album_reqs = [r for r in httpx_mock.get_requests() if "/albums" in r.url.path]
+    assert len(album_reqs) == 2
 
 
 def test_get_artist_albums_404_returns_empty_not_raise(httpx_mock: HTTPXMock) -> None:
