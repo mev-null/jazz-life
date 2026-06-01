@@ -42,10 +42,16 @@ _ARTIST_ALBUMS_PAGE_LIMIT = 10
 _ARTIST_ALBUMS_INCLUDE_GROUPS = "album,single"
 # /v1/artists/{id}/albums は market 無しだと同一アルバムを 30+ リージョン別に
 # 重複返却する (Spotify 公式仕様、"If neither market or user country are
-# provided, the content is considered unavailable for the client")。
-# 日本ジャズリスナー向けアプリなので JP に固定して dedup を効かせる。
-# 将来マルチユーザ化したら users.country を見るのが正道。
-_ARTIST_ALBUMS_MARKET = "JP"
+# provided, the content is considered unavailable for the client")。なので
+# market は指定して dedup を効かせる。
+#
+# 値は US。当初 JP にしていたが、ジャズは US 先行リリース / 輸入盤主体で、JP
+# 配信が遅れる (or 来ない) 盤が多い。market=JP だと「US では既発売だが JP 未配信」
+# のアルバムが available_markets から外れて items に出ず、Feed への登場が実発売
+# から大きく遅れていた (実例: Avishai Cohen "Eternal Child" が JP 配信後に初出)。
+# US に寄せることで輸入盤ジャズを最速で拾う。トレードオフとして JP 限定配信の
+# 邦楽ジャズ等は取りこぼしうる。将来マルチユーザ化したら users.country を見るのが正道。
+_ARTIST_ALBUMS_MARKET = "US"
 
 # release sync (Get Artist's Albums) 専用のレート制限対策パラメータ。
 # sync は POST リクエスト同期実行なので、待ち時間がそのままレスポンス時間に

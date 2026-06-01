@@ -473,10 +473,11 @@ def test_get_artist_albums_filters_unexpected_album_type(
 def test_get_artist_albums_passes_include_groups_and_market(
     httpx_mock: HTTPXMock,
 ) -> None:
-    """include_groups は album,single 固定、market は JP 固定で叩く。
+    """include_groups は album,single 固定、market は US 固定で叩く。
 
     market を渡さないと Spotify が同一アルバムをリージョン別に重複返却して
-    リリース件数が膨張するため、JP 固定で dedup させる前提。
+    リリース件数が膨張するため market は指定する。値は US (ジャズは US 先行 /
+    輸入盤主体で JP 配信が遅れる盤が多く、JP だと Feed への登場が遅れるため)。
     """
     httpx_mock.add_response(url=SPOTIFY_TOKEN_URL, method="POST", json=_token_response())
     httpx_mock.add_response(
@@ -489,7 +490,7 @@ def test_get_artist_albums_passes_include_groups_and_market(
 
     album_reqs = [r for r in httpx_mock.get_requests() if "/albums" in r.url.path]
     assert album_reqs[0].url.params.get("include_groups") == "album,single"
-    assert album_reqs[0].url.params.get("market") == "JP"
+    assert album_reqs[0].url.params.get("market") == "US"
 
 
 def test_get_artist_albums_429_raises_after_retry_exhausted(httpx_mock: HTTPXMock) -> None:
