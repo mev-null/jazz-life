@@ -6,9 +6,9 @@
  */
 
 /**
- * `POST /api/releases/sync` の任意 body。
+ * Optional body of `POST /api/releases/sync`.
 
-省略時は service 側で `today - 365d` / `today + 30d` を採用する。
+When omitted, the service falls back to `today - 365d` / `today + 30d`.
  */
 export interface SyncRunRequest {
   since_date?: string | null;

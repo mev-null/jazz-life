@@ -1,168 +1,139 @@
 # jazz-life
 
-> ジャズを軸にした個人ダッシュボード。アナログレコードのコレクション、フォロー中アーティストの新譜・来日公演、Spotify と連動したアーティスト管理を 1 つの画面に集約する。
+> **Analog Life** — a personal dashboard for a jazz record collection. A visual shelf of the vinyl you own, a hunt list of the records you are looking for, new releases from the artists you follow via Spotify, and a "listen" mode that identifies the record playing in the shop and puts it on your list.
 
-「好きな本・音楽・場所をコンテキストとして溜めていって、そこから次の体験への提案をもらう」という長期ビジョン（[docs/999-vision.md](docs/999-vision.md)）の第 1 段階。ジャズ × レコード × ライブを最初のドメインに選び、MVP として作っている。
+Built as a spec-first, ADR-driven full-stack project: **FastAPI + SQLModel + PostgreSQL** on the backend, **React 19 + TypeScript + TanStack Query** on the frontend, with the API contract generated from the backend's OpenAPI spec. The design record lives in [`docs/`](docs/README.md).
 
-## スクリーンショット
-> スクリーンショット内のアーティスト画像・アルバムアートは Spotify Web API 経由で取得したものです。
+## Screenshots
 
-- Listen（音声から探す・最新機能）— 流れている曲を録音 → 認識 → ワンタップで On the hunt（欲しいリスト）に追加。右は導線（Home → Digging → Listen）
+All screenshots and GIFs are taken from the **demo mode** (sample data, no Spotify account). Album art is loaded from public CDN URLs.
+
+| Login (Enter demo) | Home — the shelf |
+|---|---|
+| ![Login screen with the Enter demo button](docs/media/01-login.png) | ![Home: pinned records as a jacket grid](docs/media/02-shelf.png) |
+
+| Artists | Digging — On the hunt |
+|---|---|
+| ![Artists: followed artists with record counts](docs/media/03-artists.png) | ![Digging: the hunt list grouped by artist](docs/media/04-digging.png) |
+
+| Listen — find a record by sound |
+|---|
+| ![Listen: a turntable UI that records, recognizes and adds the album to the hunt list](docs/media/05-listen.png) |
+
 <p>
-  <img alt="Listen: search a record by sound" src="newsletter/listen.gif" height="380" />
+  <img alt="Listen flow: the disc spins, the track is recognized, one tap adds it to the hunt list" src="docs/media/listen.gif" height="380" />
   &nbsp;&nbsp;
-  <img alt="Where to find Listen: Home then Digging then Listen" src="newsletter/nav.gif" height="380" />
+  <img alt="Navigation: Home, then Digging, then the Listen tab" src="docs/media/nav.gif" height="380" />
 </p>
 
-- ログイン画面
+## Live demo — and why it is a demo
 
+The hosted build runs in **mock mode** (`VITE_USE_MOCK=true`): an in-memory store seeded with sample records, so every screen works without a backend, a Spotify account or a microphone — including the Listen flow, which returns a sample recognition result. A short guided tour starts on first visit.
 
+A public deployment with real Spotify login is **not possible by design**, not an omission: the app uses Spotify's Authorization Code flow, and Spotify apps in *Development Mode* can only authenticate up to 25 explicitly allow-listed accounts. *Extended Quota Mode*, which lifts that limit, is not granted to individual/hobby developers. The production instance therefore stays invite-only.
 
-- レコードマトリクス（メイン画面）
-<img width="1470" height="835" alt="Screenshot 2026-05-21 at 13 45 41" src="https://github.com/user-attachments/assets/f75368a6-d6dc-44e9-ac40-ec780e0771e0" />
+If you would like to try the real thing with your own Spotify account, open an issue and I will add you to the allow-list (it takes a minute), or run the full stack locally with your own Spotify app credentials — see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
+## What it does
 
+- **Home** — a curated shelf: up to six pinned records shown as a jacket grid; "view all" for the rest. Each record opens to its back cover: pressing, purchase date and store, favourite tracks, notes.
+- **Digging** — everything you do not own yet, in three tabs: **On the hunt** (wanted records grouped A–Z by artist, or by date added), **Listen** (record ~12 s, identify the track, add the album to the hunt list) and **Releases** (new albums and singles from followed artists, with per-user read state and background sync from Spotify).
+- **Artists** — the artists you follow, seeded automatically when you add a record and extendable via Spotify search.
+- **Sign in with Spotify** — server-side OAuth; refresh tokens are encrypted at rest; the browser only ever holds a short-lived httpOnly session cookie.
 
-アーティスト管理（Spotify 検索 + フォロー）
-<img width="1470" height="835" alt="Screenshot 2026-05-21 at 13 46 02" src="https://github.com/user-attachments/assets/2dd03788-3092-4561-bb95-1c7f7de444bf" />
-
-<img width="598" height="722" alt="Screenshot 2026-05-21 at 13 46 14" src="https://github.com/user-attachments/assets/f94d8e0e-88d5-4b0b-9d4a-10321e4844c1" />
-
-- 新譜フィード
-<img width="1470" height="835" alt="Screenshot 2026-05-21 at 13 47 20" src="https://github.com/user-attachments/assets/c5240787-23a6-45d8-afe9-98d938d681c6" />
-
-<img width="424" height="334" alt="Screenshot 2026-05-21 at 13 53 50" src="https://github.com/user-attachments/assets/14aae45a-d555-44e2-97af-547471c05bb0" />
-
-## ライブデモについて
-
-Railway に本番デプロイ済み（backend / frontend / Postgres）。ただし**公開デモは提供していない**。
-
-理由は Spotify Developer Dashboard の Users and Access による invite 制御をアプリ全体の認可ゲートとして採用しているため（[ADR-005](docs/005-railway-deploy-prep.md)）。アプリ側に独自の allowlist を持たないことで実装をシンプルに保つ代わりに、未登録の Spotify アカウントでは OAuth コールバックが完了しない。
-
-評価のために動作確認したい場合は、ローカル起動（[セットアップ](#ローカルセットアップ)）か、選考担当者の Spotify アカウントを Dashboard 側で許可する形で対応できます。
-
-## 技術ハイライト
-
-ポートフォリオとして見てもらいたい設計判断・実装ポイント。
-
-### 1. backend の 3 層クリーンアーキテクチャ
-
-`routers → services → core/repositories` の単方向依存を厳格に守り、router は HTTP 変換のみ、ビジネスロジック（採番、部分更新、ドメインバリデーション）はすべて service 層に集約。`DomainError` を HTTPException にマップするのは router の `_handlers.py` だけが知っている。
-
-- `app/backend/app/routers/` — FastAPI 薄い API 層
-- `app/backend/app/services/` — ビジネスロジック（DomainError を投げる）
-- `app/backend/app/core/repositories/` — DB アクセス（SQLModel `col()` スタイル）
-
-判断の背景は [ADR-002 §2](docs/002-phase-b-decisions.md)。
-
-### 2. 契約駆動の frontend（OpenAPI → orval）
-
-backend が `openapi.json` を成果物として出力し（`make spec`）、frontend は orval で **型 + react-query hooks** を生成（`make gen`）。Phase A では `openapi-typescript` で型だけ生成していたが、hooks の手書きが冗長になったため Phase B-2 で orval に移行。
-
-`src/api/client.ts` が `VITE_USE_MOCK` で実 API / モックを分岐する設計を維持しており、backend が止まっていてもフロントだけ開発できる。
-
-### 3. Spotify OAuth + refresh token を Fernet で暗号化保存
-
-OAuth 認可コードフローを backend で完結させ、refresh token は `REFRESH_TOKEN_KEY`（Fernet key）で対称鍵暗号化したうえで Postgres に永続化。access token はメモリのみ、ブラウザには httpOnly cookie で短命 JWT を発行する。
-
-OAuth state は単一 process の in-memory で持っており、これに気づかず Railway を multi-replica で動かすと callback がランダムに別 process へ振られて state 検証が必ず失敗する — このトレードオフは [ADR-005](docs/005-railway-deploy-prep.md) と `railway.toml` のコメントに明示している。
-
-### 4. ADR 駆動の意思決定記録
-
-11 本の ADR が「いつ何を決めたか」を残している。特に:
-
-- **000 → 002 の supersede 関係**: SQLite から PostgreSQL へ、フラットから 3 層クリーンアーキへ、UUID v4 から v7 へ、厳格 PUT から寛容 PUT へ、と Phase A 終了時に何を方針変更したかが追える
-- **003**: artist を `artist_registry` / `user_follows` / `records` の 3 層に分離した理由
-- **006**: 現在 `vinyl_records` が user_id でスコープされておらず multi-user 化できない自覚と、刷新計画
-- **010**: Phase C の場所マスタを見越したスキーマ設計
-
-「素早く動くものを作る」と「設計上の負債を自覚して残す」の両方を意識した記録になっている。
-
-CI は `.github/workflows/backend.yml` で ruff (format / check) + mypy + pytest（unit / integration マトリクス）が走る。
-
-## アーキテクチャ概要
+## Architecture
 
 ```
-┌─────────────────────────┐        ┌────────────────────────────┐
-│  React 19 + Vite        │        │  FastAPI                   │
-│  TanStack Query         │        │  ┌──────────────────────┐  │
-│  orval-generated hooks  │  ───►  │  │ routers (薄)         │  │
-│  (VITE_USE_MOCK で      │   HTTP │  │  → services          │  │
-│   モック / 実 API 切替) 　│        │  │    → repositories    │  │
-└─────────────────────────┘        │  └──────────────────────┘  │
-                                   │  Alembic / SQLModel        │
-                                   └─────────────┬──────────────┘
-                                                 │
-                                        ┌────────┴────────┐
-                                        ▼                 ▼
-                                  PostgreSQL 16    Spotify Web API
+┌──────────────────────────────┐          ┌───────────────────────────────────┐
+│  React 19 + Vite + TS        │          │  FastAPI                          │
+│  TanStack Query              │   HTTP   │  ┌─────────────────────────────┐  │
+│  orval-generated hooks       │ ───────► │  │ routers  (HTTP only)        │  │
+│  (VITE_USE_MOCK switches     │          │  │  └─ services (domain rules) │  │
+│   between mock store and     │          │  │      └─ core/repositories   │  │
+│   the real API)              │          │  └─────────────────────────────┘  │
+└──────────────────────────────┘          │  SQLModel + Alembic               │
+                                          └──────────┬────────────┬───────────┘
+                                                     ▼            ▼
+                                             PostgreSQL 16   Spotify Web API · AudD
 ```
-
-詳細は [CLAUDE.md](CLAUDE.md) のディレクトリ構成節。
-
-## 技術スタック
 
 | Layer | Stack |
 |---|---|
-| Backend | Python 3.11, FastAPI, SQLModel, Alembic, psycopg3, uuid6, APScheduler, httpx, BeautifulSoup4, Fernet (cryptography) |
-| Frontend | React 19, Vite 5, TypeScript, Tailwind v4 (`@tailwindcss/vite`), TanStack Query, React Router 6, dnd-kit |
-| Tooling | uv (Python), npm, Docker / docker-compose, **orval**（OpenAPI → 型 + react-query hooks） |
-| DB | PostgreSQL 16（`jazz` / `jazz_test` を同インスタンス内で分離） |
-| Infra | Railway（backend / frontend / Postgres plugin）、GitHub Actions CI |
+| Backend | Python 3.11, FastAPI, SQLModel, Alembic, psycopg 3, pydantic-settings, httpx, PyJWT, uuid6 (UUID v7), cryptography (Fernet) |
+| Frontend | React 19, Vite 5, TypeScript, Tailwind CSS v4, TanStack Query v5, React Router 6 |
+| Contract | OpenAPI spec exported from the backend (`make spec`) → **orval** generates types + react-query hooks (`make gen`); both artifacts are committed and CI fails if they are stale |
+| Data | PostgreSQL 16 (`jazz` + `jazz_test` databases in one instance) |
+| Tooling | uv, npm, Docker Compose, dev container, GitHub Actions (ruff · mypy · pytest unit/integration · OpenAPI and client freshness) |
+| Hosting | Railway (backend, nginx-served frontend, Postgres); Vercel for the mock demo (`app/frontend/vercel.json`) |
 
-## 開発状況
+## Technical highlights
 
-| Phase | 状態 | 内容 |
+1. **Three-layer backend with one-way dependencies.** `routers → services → core/repositories`. Routers only translate HTTP; all domain rules (id assignment, partial updates, pin limits, auto-follow) live in services and raise `DomainError`s that a single `_handlers.py` maps to HTTP status codes. Decision record: [ADR-002 §2.2](docs/002-phase-b-decisions.md).
+2. **Contract-driven frontend.** The backend owns `openapi.json`; the frontend never hand-writes API types. `src/api/client.ts` is the only place that knows whether it is talking to the real API or the in-memory mock, and the mock reproduces backend rules (lenient PUT, pin limit → 409, auto-pin, sort order) so the demo behaves like production.
+3. **Multi-user data model done properly.** Records are split into a shared, de-duplicated *catalog* and per-user *ownership* rows ([ADR-006](docs/006-records-user-scope-schema.md)); releases follow the same pattern with per-user read state ([ADR-007](docs/007-releases-user-scope.md)). The API surface did not change during either migration.
+4. **Spotify OAuth handled server-side.** Authorization Code flow, refresh tokens encrypted with a Fernet key before they touch Postgres, access tokens kept in memory, a short-lived JWT in an httpOnly cookie. Known trade-off: OAuth state is process-local, so the backend runs as a single replica — written down in [ADR-005 §2.10](docs/005-railway-deploy-prep.md) rather than discovered in production.
+5. **Audio recognition as a thin, replaceable service.** Browser `MediaRecorder` → `POST /api/recognize` → AudD → normalized `RecognitionResult` → prefilled add-record form ([ADR-016](docs/016-audio-recognition-on-the-hunt.md)). A missing API token degrades to a 503, not a crash.
+6. **Environment-driven deployment.** The same code runs locally, in a dev container and on Railway; only env vars differ ([ADR-005](docs/005-railway-deploy-prep.md)). Includes the small things that bite in production: `postgres://` URL normalization, an nginx reverse proxy that re-resolves the backend per request, a dual-stack (IPv4/IPv6) launcher.
+7. **Decisions are recorded, including the wrong ones.** Fourteen documents in `docs/` trace the path from SQLite to PostgreSQL, from `openapi-typescript` to orval, from a single-user schema to user-scoped tables, and from "Feed" to "Digging". Each later ADR names what it supersedes. Index with English summaries: [docs/README.md](docs/README.md).
+
+## Project status
+
+| Phase | State | Scope |
 |---|---|---|
-| Phase A | ✅ | frontend モック完成（手書き型 / モック JSON / レコードマトリクス / dnd-kit） |
-| Phase B-1 | ✅ | backend home 機能（vinyl_records CRUD + artists、PostgreSQL、3 層クリーンアーキ、Alembic） |
-| Phase B-2 | ✅ | orval 化して home / artists / records を実 API 接続 |
-| Phase B-3 | 🟡 | Spotify OAuth、album search + records 登録、artist follow / unfollow、releases 同期、records 削除、release 既読 backend 化、view all 拡大表示 が完了。jacket upload / reorder / concerts / 日次自動 sync は未着手 |
-| Phase C  | ⬜ | concerts スクレイピング統合（ADR-010 の場所マスタを基盤に、5 会場 + sync_status） |
+| A — frontend mock | done | hand-written types, mock JSON, layout, record grid |
+| B-1 — backend core | done | records + artists CRUD, PostgreSQL, 3-layer architecture, Alembic |
+| B-2 — contract wiring | done | orval-generated client, real API for Home / Artists / Records |
+| B-3 — features | mostly done | Spotify OAuth, album search, follow/unfollow, background release sync with status polling, read state, pins + auto-pin, hunt list, audio recognition, welcome toast, demo mode + tour. Not started: jacket upload, daily picks ([ADR-012](docs/012-daily-picks.md)) |
+| Concerts | removed from the UI | models kept for a possible return ([ADR-013](docs/013-digging-tab-and-concert-removal.md)) |
+| Hosting | proposed | move from Railway to free tiers, keeping audio recognition as the only paid decision ([ADR-018](docs/018-cost-minimization-service-distribution.md)) |
 
-## AI 協働について
+## How it was built (AI-assisted)
 
-このプロジェクトは Claude Code との協働で開発している（リポジトリ直下の [CLAUDE.md](CLAUDE.md) がセッション規約）。**設計判断・ADR・スキーマ設計・トレードオフ評価は自分が主導**し、AI には主に「決めた設計に沿った実装」「テストの肉付け」「リファクタの実行」を任せている。
+This project was developed spec-first with an AI coding assistant (Claude Code). I wrote the requirements and the ADRs, decided the architecture, the schema and the trade-offs, and reviewed every change; a large share of the implementation and test code was generated from those specifications and then iterated on. The ADRs in [`docs/`](docs/README.md) are the record of what was decided and why — that is the part of the repository I would point a reviewer to first. The agent-facing side of that workflow is kept in the repository too: [`CLAUDE.md`](CLAUDE.md) is the session brief (rules, verification checklist, where to read first) and [`.claude/skills/pr-summary/`](.claude/skills/pr-summary/SKILL.md) drafts PR descriptions from the diff.
 
-ADR と PR description（GitHub の merged PR を参照）に「なぜそう決めたか」を残しているのは、この透明性を担保するためでもある。
+## Getting started
 
-## ローカルセットアップ
-
-GitHub Codespaces を使う場合:
-
-1. [Codespaces user secrets](https://github.com/settings/codespaces) に `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` / `JWT_SECRET` / `REFRESH_TOKEN_KEY` を登録し、本リポジトリへの access を許可
-2. Codespace を Stop → Start（secret は shell 起動時に注入される）
-3. `cd app && make up`（db / backend / frontend が起動）
-
-ローカル Docker のみで動かす場合は上記 env を host shell に export してから `make up`。
-
-確認用エンドポイント:
-
-| URL | 内容 |
-|---|---|
-| <http://localhost:8000/healthz> | `{"status":"ok"}` |
-| <http://localhost:8000/docs> | Swagger UI |
-| <http://localhost:5173> | フロントエンド |
-
-### テスト
+Demo mode only (no backend, no credentials):
 
 ```bash
-cd app/backend && make check       # ruff check + mypy + pytest（要 PostgreSQL）
-cd app/frontend && npm run typecheck
+cd app/frontend
+npm ci
+VITE_USE_MOCK=true npm run dev      # http://localhost:5173 → "Enter demo"
 ```
 
-詳細なコマンドは [CLAUDE.md](CLAUDE.md) の「よく使うコマンド」節、本番デプロイ手順は [ADR-005](docs/005-railway-deploy-prep.md)。
+Full stack (Docker):
 
-## ドキュメント
+```bash
+cp app/.env.example app/.env        # fill in Spotify client id/secret, JWT_SECRET, REFRESH_TOKEN_KEY
+cd app && make up                   # Postgres + backend (http://127.0.0.1:8000) + frontend (http://127.0.0.1:5173)
+```
 
-| ファイル | 内容 |
-|---|---|
-| [docs/000-pre-adr.md](docs/000-pre-adr.md) | 要件定義書 v1.7（機能要件・データモデル・画面仕様） |
-| [docs/001-phase-a-revisions.md](docs/001-phase-a-revisions.md) | Phase A 終了時の確定事項 |
-| [docs/002-phase-b-decisions.md](docs/002-phase-b-decisions.md) | Phase B 方針再評価（PostgreSQL / クリーンアーキ / orval / UUID v7 / 寛容 PUT）。**000 と矛盾時は 002 を正とする** |
-| [docs/003-artist-management.md](docs/003-artist-management.md) | アーティスト管理の 3 層構造 |
-| [docs/005-railway-deploy-prep.md](docs/005-railway-deploy-prep.md) | Railway デプロイ手順と env 駆動化 |
-| [docs/006-records-user-scope-schema.md](docs/006-records-user-scope-schema.md) | records を catalog + ownership に 2 層分離する計画（Proposed） |
-| [docs/010-place.md](docs/010-place.md) | 場所マスタと訪問体験の設計（Phase C 以降） |
-| [docs/999-vision.md](docs/999-vision.md) | プロダクトの長期ビジョン |
-| [CLAUDE.md](CLAUDE.md) | Claude Code セッション向け作業規約 |
+Open the app via `127.0.0.1`, not `localhost`: Spotify no longer accepts `localhost` redirect URIs, and the session cookie host must match. Setup paths (dev container / Codespaces / plain Docker), the command cheat sheet, the `make spec && make gen` rule, tests and deployment notes are in **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
+
+Quick checks:
+
+```bash
+cd app/backend && uv sync && uv run ruff format --check . && uv run ruff check . && uv run mypy app && uv run pytest tests/unit
+cd app/frontend && npm ci && npm run typecheck && npm run gen && git status --porcelain src/api/generated   # must be clean
+```
+
+## Repository layout
+
+```
+app/
+  backend/      FastAPI app (app/routers · services · core/repositories · models · schemas), Alembic migrations, openapi.json
+  frontend/     React app (src/api/client.ts mock/real switch, src/api/generated orval output, src/api/mocks demo fixtures)
+  docker-compose.yml (+ .override.yml for dev), Makefile, .env.example
+docs/           requirements, ADRs, DEVELOPMENT.md, media/
+.devcontainer/  dev container / Codespaces definition
+.github/        CI workflows (backend, frontend)
+```
+
+## Documentation
+
+- [docs/README.md](docs/README.md) — index of all design documents with an English summary of each. ADR-002 and ADR-006 are fully in English; the remaining documents are in Japanese with an English summary at the top.
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — developer guide.
+
+## License
+
+[MIT](LICENSE)

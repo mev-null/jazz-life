@@ -177,10 +177,11 @@ export const getUpsertArtistApiArtistsPostUrl = () => {
 }
 
 /**
- * spotify_id をキーに upsert。既存なら既存を返す (200)。
+ * Upsert keyed on spotify_id; returns the existing row if present (200).
 
-Phase B-3 PR-2: RecordFormModal が Spotify album を選んだ時、その album の
-artist がまだ DB に無い場合に呼び出す。重複 POST でも 409 を返さない冪等設計。
+Phase B-3 PR-2: called by RecordFormModal when a Spotify album is selected
+and the album's artist is not yet in the DB. Idempotent by design: a
+duplicate POST never returns 409.
  * @summary Upsert Artist
  */
 export const upsertArtistApiArtistsPost = async (artistCreate: ArtistCreate, options?: RequestInit): Promise<upsertArtistApiArtistsPostResponse> => {
@@ -270,11 +271,12 @@ export const getGetArtistApiArtistsSpotifyIdGetUrl = (spotifyId: string,) => {
 }
 
 /**
- * 単一 artist を取り、image_url が NULL なら Spotify から補完する。
+ * Fetch a single artist, filling in image_url from Spotify when it is NULL.
 
-ArtistDetailModal を開いた時に呼ぶ「lazy photo hydration」エンドポイント。
-Spotify 側エラーは service 層で握り潰されるので、画像が無い場合は
-image_url=null のまま返る (UI 側で initials fallback)。
+The "lazy photo hydration" endpoint called when ArtistDetailModal opens.
+Spotify-side errors are swallowed in the service layer, so when no image
+is available the artist is returned with image_url=null (the UI falls back
+to initials).
  * @summary Get Artist
  */
 export const getArtistApiArtistsSpotifyIdGet = async (spotifyId: string, options?: RequestInit): Promise<getArtistApiArtistsSpotifyIdGetResponse> => {

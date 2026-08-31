@@ -1,10 +1,10 @@
-"""Feed の releases API。
+"""Releases API for the Feed.
 
-- GET /api/releases: 期間窓 (デフォルト today-1y .. today+1m) の release 一覧
-- POST /api/releases/sync: 認証必須。Spotify Get Artist's Albums を follow 中
-  アーティスト全件に対して呼び出し、release テーブルを upsert する
-- GET /api/releases/sync-status: 最終同期時刻 / エラー状態を返す (空状態の
-  ステータス表示用、ADR-000 §314)
+- GET /api/releases: releases within a date window (default today-1y .. today+1m)
+- POST /api/releases/sync: auth required. Calls Spotify Get Artist's Albums for
+  every followed artist and upserts the release table
+- GET /api/releases/sync-status: last sync time / error state (for the
+  empty-state status display, ADR-000 §314)
 """
 
 from datetime import date, timedelta
@@ -36,10 +36,11 @@ from app.services.spotify_app_client import SpotifyAppClient
 
 router = APIRouter(prefix="/api/releases", tags=["releases"])
 
-# Feed タブ「直近30日 / 今後の予定」用のデフォルト窓。
-# 開発段階では取り込み量を絞るため過去 30 日 + 未来 30 日 (≒ ±1 ヶ月)。
-# 本番投入時には ADR-000 §220 の「直近30日 / 今後の予定」を満たすかチェックし、
-# 必要なら過去側を 365 日などに広げる。
+# Default window for the Feed tab's "last 30 days / upcoming" view.
+# During development it is 30 days back + 30 days ahead (roughly ±1 month) to
+# limit ingestion volume. Before going to production, check that this satisfies
+# the "last 30 days / upcoming" requirement in ADR-000 §220 and widen the
+# lookback to e.g. 365 days if needed.
 _DEFAULT_LOOKBACK_DAYS = 30
 _DEFAULT_LOOKAHEAD_DAYS = 30
 
@@ -59,16 +60,16 @@ def list_releases(
     service: ReleaseService = Depends(get_release_service),
     current_user: User = Depends(get_current_user),
 ) -> ListResponse[ReleaseRead]:
-    """current user が follow 中 (archived=false) の artist の release を返す
-    (ADR-007 §2.4)。既読状態は user 単位で計算される (ADR-007 §2.3)。"""
+    """Return releases of artists the current user follows (archived=false)
+    (ADR-007 §2.4). Read state is computed per user (ADR-007 §2.3)."""
     default_from, default_to = _default_window()
     items = service.list_window(current_user.id, from_date or default_from, to_date or default_to)
     return ListResponse(items=items)
 
 
-# 注意: `/sync-status` を `/{spotify_id}` 風の path より先に宣言したいが
-# こちらは平らな 2 endpoint なので順序衝突は起きない。それでも明示順で
-# 一覧 → status → sync の順に並べる。
+# Note: `/sync-status` would need to be declared before a `/{spotify_id}`-style
+# path, but these are two flat endpoints so there is no ordering conflict.
+# We still keep an explicit order: list → status → sync.
 @router.get("/sync-status", response_model=SyncStatusRead)
 def get_sync_status(
     repo: SyncStatusRepository = Depends(get_sync_status_repository),
@@ -113,10 +114,10 @@ def set_release_read_status(
     service: ReleaseService = Depends(get_release_service),
     current_user: User = Depends(get_current_user),
 ) -> ReleaseRead:
-    """release の既読フラグを user 単位でトグル (Feed の未読 dot 用、ADR-007)。
+    """Toggle a release's read flag per user (for the Feed unread dot, ADR-007).
 
-    `is_read=true` で `release_read_states` に upsert (read_at = now())、`false`
-    で行を DELETE。release catalog が無ければ 404。
+    `is_read=true` upserts into `release_read_states` (read_at = now());
+    `false` DELETEs the row. 404 if the release is not in the catalog.
     """
     with http_errors():
         return service.set_read_status(spotify_id, payload.is_read, current_user.id)
@@ -130,12 +131,13 @@ def trigger_sync(
     session_factory: SessionFactory = Depends(get_session_factory),
     current_user: User = Depends(get_current_user),
 ) -> SyncRunAccepted:
-    """フォロー中アーティスト全件の releases を Spotify から取り込む (非同期)。
+    """Ingest releases for all followed artists from Spotify (asynchronously).
 
-    Spotify レート制限の都合で sync は数十秒〜分かかりうるため、リクエスト内で
-    同期実行せずバックグラウンドジョブを投入して即 202 を返す。進捗はフロントが
-    `/sync-status` の `is_running` を polling して把握する。既に実行中なら多重
-    起動を避けて already_running を返す (Phase B-4 で APScheduler 日次バッチへ移行)。
+    Because of Spotify rate limits a sync can take tens of seconds to minutes,
+    so instead of running it inside the request we enqueue a background job and
+    return 202 immediately. The frontend tracks progress by polling `is_running`
+    on `/sync-status`. If a sync is already running we return already_running
+    to avoid concurrent runs (Phase B-4 moves this to an APScheduler daily batch).
     """
     default_from, default_to = _default_window()
     since = (payload.since_date if payload else None) or default_from

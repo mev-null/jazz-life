@@ -1,7 +1,11 @@
 # ADR-014: records のピン UI を詳細モーダルへ移設 / view all の並び替えを撤去
 
+> **Summary (English).** Removes pin toggles, badges and drag-and-drop reordering from the "view all" grid so it becomes a pure browsing grid; moves the pin toggle into the record detail modal (owned records only, in the metadata section rather than over the cover art); and makes Home show only pinned owned records (limit 8 at the time, in backend `pin_order`) with explicit empty states. Frontend-only. The `PUT /api/records/pins/order` endpoint and the `pin_order` column are kept but become dormant.
+>
+> *The body of this document is in Japanese. See [docs/README.md](./README.md) for the index of all design documents.*
+
 **Status**: Accepted | **Date**: 2026-05-30
-**Related**: [ADR-013](./013-digging-tab-and-concert-removal.md) §2.2（records の既定ソート `is_pinned DESC, pin_order ASC NULLS LAST, display_order ASC`）, [ADR-000](./000-pre-adr.md) §B-7（vinyl_records 並び替えエンドポイント）, [ADR-990](./990-ui-philosophy.md)（Home = 所有のショーケース）
+**Related**: [ADR-013](./013-digging-tab-and-concert-removal.md) §2.2（records の既定ソート `is_pinned DESC, pin_order ASC NULLS LAST, display_order ASC`）, [ADR-000](./000-pre-adr.md) §B-7（vinyl_records 並び替えエンドポイント）, UI 設計原則（Home = 所有のショーケース。ADR-990、未公開）
 
 ---
 
@@ -9,7 +13,7 @@
 
 Home の「view all」モーダル（`RecordsAllModal`、PC 8/page・モバイル 9/page のページネーション一覧）で、ピン UI が 2 つの形でジャケット・グリッドに重なっていた。
 
-1. **各ジャケ右上の ★ トグル / バッジ**。owned レコードの表紙の上に ★ を常時オーバーレイしており、「所有の棚をひと目で見せる」ショーケース（[ADR-990](./990-ui-philosophy.md)）の視覚を損ねていた。
+1. **各ジャケ右上の ★ トグル / バッジ**。owned レコードの表紙の上に ★ を常時オーバーレイしており、「所有の棚をひと目で見せる」ショーケース（UI 設計原則）の視覚を損ねていた。
 2. **ピン済みレコードのドラッグ&ドロップ並び替え**（`PinDragLayer` / dnd-kit）。Home プレビュー順（最初の 8 枚の並び）を編集する手段だったが、view all の中だけに存在する重い操作で、ジャケットを掴むと drag/click が競合しやすかった。
 
 ピンの本質は「**Home に showcase する owned を選ぶ**」ことであり、これは個々のレコードに対する属性操作。一覧グリッドの上に常時 UI を散らすより、レコードを開いた詳細の文脈で切り替えるほうが情報設計として素直。なお Home プレビュー本体（`JacketCard`）には元々 ★ を出していない（★ 単独では解釈できないため）。
@@ -35,7 +39,7 @@ Home の「view all」モーダル（`RecordsAllModal`、PC 8/page・モバイ�
 ### 2.3 Home はピン済み owned のみを表示する
 
 - `HomePage` のグリッドは **`is_pinned` の owned だけ**を出す（最大 8 枚。backend の `pin_order` 昇順をそのまま使う）。所有はしているが未ピンのレコードは **view all（`RecordsAllModal`）でのみ**参照する。
-- これにより Home は「自分で選んだ棚」になり、ピンが Home への載せる/載せないの明示スイッチになる。[ADR-990](./990-ui-philosophy.md) の「Home = 所有のショーケース」を「ピンで厳選したショーケース」に具体化する。
+- これにより Home は「自分で選んだ棚」になり、ピンが Home への載せる/載せないの明示スイッチになる。UI 設計原則の「Home = 所有のショーケース」を「ピンで厳選したショーケース」に具体化する。
 - 状態別の表示:
   - ピン済みあり: ピンの grid（room があれば末尾に追加タイル）。
   - owned はあるがピン 0: 「Home に固定されたレコードがありません。view all から ★ で固定」を促す。view all は owned があれば常時出す。

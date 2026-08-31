@@ -5,99 +5,125 @@
       "name": "Kind of Blue",
       "release_date": "1959-08-17",
       "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music/7f/9f/d6/mzi.vtnaewef.jpg/600x600bb.jpg",
-      "artist_names": ["Miles Davis"],
+      "artist_names": [
+        "Miles Davis"
+      ],
       "primary_artist_id": "0kbYTNQb4Pb1rPbbaF0pT4",
-      "keywords": ["blue in green", "so what", "kind of blue", "miles davis", "freddie freeloader"]
+      "keywords": [
+        "blue in green",
+        "so what",
+        "kind of blue",
+        "miles davis",
+        "freddie freeloader"
+      ]
+    },
+    {
+      "id": "mock_alb_time_out",
+      "name": "Time Out",
+      "release_date": "1959-12-14",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/39/da/45/39da45ea-0a55-8668-0a84-4017b45fb13e/dj.rzbgoyft.jpg/600x600bb.jpg",
+      "artist_names": [
+        "The Dave Brubeck Quartet"
+      ],
+      "primary_artist_id": "mock_artist_dave_brubeck",
+      "keywords": [
+        "take five",
+        "blue rondo"
+      ]
+    },
+    {
+      "id": "mock_alb_somethin_else",
+      "name": "Somethin' Else",
+      "release_date": "1958-03-09",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/47/0c/66/470c6637-381c-5ad9-073b-8b863d6fa965/00724349532953.rgb.jpg/600x600bb.jpg",
+      "artist_names": [
+        "Cannonball Adderley"
+      ],
+      "primary_artist_id": "mock_artist_cannonball_adderley",
+      "keywords": [
+        "autumn leaves"
+      ]
+    },
+    {
+      "id": "mock_alb_getz_gilberto",
+      "name": "Getz/Gilberto",
+      "release_date": "1964-03-01",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/54/04/b8/5404b8fd-3dbf-9fe1-0513-4611c4dec84e/06UMGIM14182.rgb.jpg/600x600bb.jpg",
+      "artist_names": [
+        "Stan Getz",
+        "João Gilberto"
+      ],
+      "primary_artist_id": "mock_artist_stan_getz",
+      "keywords": [
+        "girl from ipanema",
+        "bossa nova"
+      ]
+    },
+    {
+      "id": "mock_alb_moanin",
+      "name": "Moanin'",
+      "release_date": "1959-01-01",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/83/91/66/839166b8-0b77-a5fa-c5ff-16907ffe54d4/19UMGIM32054.rgb.jpg/600x600bb.jpg",
+      "artist_names": [
+        "Art Blakey & The Jazz Messengers"
+      ],
+      "primary_artist_id": "mock_artist_art_blakey"
+    },
+    {
+      "id": "mock_alb_speak_no_evil",
+      "name": "Speak No Evil",
+      "release_date": "1966-06-01",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/a8/ee/3c/a8ee3cc7-e694-f7e1-5208-2c67f9ae5ed5/13ULAIM49176.rgb.jpg/600x600bb.jpg",
+      "artist_names": [
+        "Wayne Shorter"
+      ],
+      "primary_artist_id": "mock_artist_wayne_shorter"
     },
     {
       "id": "mock_alb_explorations",
       "name": "Explorations",
       "release_date": "1961-02-02",
       "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/1b/ab/89/1bab89a5-ebad-9534-55e3-a5699daeb173/00888072330443.rgb.jpg/600x600bb.jpg",
-      "artist_names": ["Bill Evans Trio"],
+      "artist_names": [
+        "Bill Evans Trio"
+      ],
       "primary_artist_id": "4xRYI6VqpkE3UwrDrAZL8L"
     },
     {
-      "id": "mock_alb_moon_beams",
-      "name": "Moon Beams",
-      "release_date": "1962-05-01",
-      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/45/d6/a0/45d6a0a0-0d2b-1a20-2bab-5fbc973931b3/24CRGIM46034.rgb.jpg/600x600bb.jpg",
-      "artist_names": ["Bill Evans Trio"],
-      "primary_artist_id": "4xRYI6VqpkE3UwrDrAZL8L"
-    },
-    {
-      "id": "mock_alb_continuo",
-      "name": "Continuo",
-      "release_date": "2006-05-23",
-      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/49/00/01/4900011c-b1cf-ab29-2c31-9c5780422c75/cover.jpg/600x600bb.jpg",
-      "artist_names": ["Avishai Cohen"],
-      "primary_artist_id": "7HRgLn5KUXfLeKjsoXl5XS"
-    },
-    {
-      "id": "mock_alb_almah",
-      "name": "Almah",
-      "release_date": "2013-11-04",
-      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/7c/0c/20/7c0c2002-d581-251f-df28-effd434e600b/825646367900.jpg/600x600bb.jpg",
-      "artist_names": ["Avishai Cohen"],
-      "primary_artist_id": "7HRgLn5KUXfLeKjsoXl5XS"
-    },
-    {
-      "id": "mock_alb_virtuosi",
-      "name": "Virtuosi",
-      "release_date": "2002-01-01",
-      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music118/v4/cd/0f/ae/cd0faeea-f91c-9e13-088f-dc642531c666/00013431210528.rgb.jpg/600x600bb.jpg",
-      "artist_names": ["Gary Burton", "Makoto Ozone"],
-      "primary_artist_id": "1d4dvLcRoOiH3w2Eb4TPDD"
-    },
-    {
-      "id": "mock_alb_we_get_requests",
-      "name": "We Get Requests",
-      "release_date": "1964-01-01",
-      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/6a/92/89/6a9289d1-69aa-6e20-7cef-4279b6cc415d/15UMGIM33844.rgb.jpg/600x600bb.jpg",
-      "artist_names": ["Oscar Peterson Trio"],
-      "primary_artist_id": "6Mt1DgI3mzrnvY1xGruqLk"
-    },
-    {
-      "id": "mock_alb_cole_porter",
-      "name": "Oscar Peterson Plays the Cole Porter Songbook",
-      "release_date": "1959-01-01",
-      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music128/v4/8d/ea/7b/8dea7b51-5057-6eb4-ab6a-ac66dd308dbf/00602547464149.rgb.jpg/600x600bb.jpg",
-      "artist_names": ["Oscar Peterson"],
-      "primary_artist_id": "6Mt1DgI3mzrnvY1xGruqLk"
-    },
-    {
-      "id": "mock_alb_symbiosis",
-      "name": "Symbiosis",
-      "release_date": "2009-09-22",
-      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music/62/3c/64/mzi.edjvdgtw.jpg/600x600bb.jpg",
-      "artist_names": ["The Jeff Hamilton Trio"],
-      "primary_artist_id": "2T0HkYzLYxPjXNJqNZTUzz"
+      "id": "mock_alb_ballads",
+      "name": "Ballads",
+      "release_date": "1963-01-01",
+      "image_url": "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/d3/df/2d/d3df2d33-99b9-2edd-e7e7-9ee13bceb0db/06UMGIM14021.rgb.jpg/600x600bb.jpg",
+      "artist_names": [
+        "John Coltrane Quartet"
+      ],
+      "primary_artist_id": "2hPgGN4uhvXAxiXQBIXOmE"
     }
   ],
   "artists": [
     {
-      "spotify_id": "0kbYTNQb4Pb1rPbbaF0pT4",
-      "name": "Miles Davis",
+      "spotify_id": "mock_artist_dave_brubeck",
+      "name": "Dave Brubeck",
       "image_url": null
     },
     {
-      "spotify_id": "2hPgGN4uhvXAxiXQBIXOmE",
-      "name": "John Coltrane",
+      "spotify_id": "mock_artist_cannonball_adderley",
+      "name": "Cannonball Adderley",
       "image_url": null
     },
     {
-      "spotify_id": "2ZvrvbQNrci3jM490M5fA4",
-      "name": "Herbie Hancock",
+      "spotify_id": "mock_artist_stan_getz",
+      "name": "Stan Getz",
       "image_url": null
     },
     {
-      "spotify_id": "4Ww5mwS7BWYjoZTUIrMHfC",
-      "name": "Keith Jarrett",
+      "spotify_id": "mock_artist_art_blakey",
+      "name": "Art Blakey",
       "image_url": null
     },
     {
-      "spotify_id": "5HxhfvBuQNl8jfdEHbBxQ8",
-      "name": "Chet Baker",
+      "spotify_id": "mock_artist_wayne_shorter",
+      "name": "Wayne Shorter",
       "image_url": null
     }
   ]

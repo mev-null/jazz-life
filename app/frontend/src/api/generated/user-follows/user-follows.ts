@@ -59,10 +59,11 @@ export const getListFollowedArtistsApiUserFollowsArtistsGetUrl = () => {
 }
 
 /**
- * 現ユーザが follow 中 (archived=false) の artists を返す。
+ * Return the artists the current user follows (archived=false).
 
-ArtistsPage 一覧専用。`GET /api/artists` は global registry (HomePage の
-record→artist 名前引きなどで利用) なので別エンドポイントに切る。
+Dedicated to the ArtistsPage list. `GET /api/artists` is the global registry
+(used e.g. for record→artist name lookup on HomePage), hence a separate
+endpoint.
  * @summary List Followed Artists
  */
 export const listFollowedArtistsApiUserFollowsArtistsGet = async ( options?: RequestInit): Promise<listFollowedArtistsApiUserFollowsArtistsGetResponse> => {
@@ -175,12 +176,13 @@ export const getListRecordCountsApiUserFollowsRecordCountsGetUrl = () => {
 }
 
 /**
- * current user の所有レコード数を artist_id ごとに集計して返す。
+ * Return the current user's owned record count aggregated per artist_id.
 
-ArtistsPage 一覧の件数列専用。records 全件取得を避けて軽量化する。
-旧 `/api/artists/record-counts` を user-follows 配下に移設し (集計の単位が
-follow と一致するため意味論として整合する)、同時に user_id でスコープを
-切るようにした。status='owned' のみ数える (want list は除外)。
+Dedicated to the count column of the ArtistsPage list; avoids fetching all
+records. Moved here from the old `/api/artists/record-counts` because the
+aggregation unit matches follows (semantically consistent under
+user-follows), and scoped by user_id at the same time. Only status='owned'
+is counted (the want list is excluded).
  * @summary List Record Counts
  */
 export const listRecordCountsApiUserFollowsRecordCountsGet = async ( options?: RequestInit): Promise<listRecordCountsApiUserFollowsRecordCountsGetResponse> => {
@@ -300,15 +302,16 @@ export const getFollowArtistApiUserFollowsPostUrl = () => {
 }
 
 /**
- * `artist_id` を current user の follow に追加する。
+ * Add `artist_id` to the current user's follows.
 
-`UserFollowRepository.upsert` を使うので冪等:
-- 既に active follow なら上書きで no-op、201 + 既存 artist
-- archived 行があれば archived_flag=false に戻して再 follow
-- 行が無ければ新規 INSERT
+Idempotent because it uses `UserFollowRepository.upsert`:
+- already an active follow: overwrite is a no-op, 201 + existing artist
+- an archived row exists: reset archived_flag=false and re-follow
+- no row: new INSERT
 
-artist が `artists` テーブルに無い場合は 404。UI 側で先に `POST /api/artists`
-で upsert する想定 (Spotify 検索結果のメタデータをそのまま投入する)。
+404 if the artist is not in the `artists` table. The UI is expected to
+upsert it first via `POST /api/artists` (passing the Spotify search result
+metadata as-is).
  * @summary Follow Artist
  */
 export const followArtistApiUserFollowsPost = async (userFollowCreate: UserFollowCreate, options?: RequestInit): Promise<followArtistApiUserFollowsPostResponse> => {
@@ -398,13 +401,13 @@ export const getUnfollowArtistApiUserFollowsArtistIdDeleteUrl = (artistId: strin
 }
 
 /**
- * Spotify ID の artist を follow から外す (soft delete: archived_flag=true)。
+ * Unfollow the artist with this Spotify ID (soft delete: archived_flag=true).
 
-archived_flag を立てるだけなので「以前 follow してた」履歴は残る。
-list_artist_ids は archived_flag=false のみ返すので、次の release sync は
-このアーティストを対象から外す。
+Only sets archived_flag, so the "previously followed" history is kept.
+list_artist_ids returns archived_flag=false rows only, so the next release
+sync excludes this artist.
 
-無いものを消そうとしたら 404、既に archived なら 204 (冪等)。
+404 if there is nothing to remove; 204 if already archived (idempotent).
  * @summary Unfollow Artist
  */
 export const unfollowArtistApiUserFollowsArtistIdDelete = async (artistId: string, options?: RequestInit): Promise<unfollowArtistApiUserFollowsArtistIdDeleteResponse> => {

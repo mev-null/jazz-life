@@ -2,11 +2,12 @@ from pydantic import BaseModel
 
 
 class SpotifyArtistSummary(BaseModel):
-    """Spotify artist search 結果の 1 件を表す DTO。
+    """DTO for one Spotify artist search result.
 
-    ArtistsPage の「フォロー追加」モーダルが Spotify から候補を引く時に使う。
-    `upsert_artist` (POST /api/artists) と `follow_artist` (POST /api/user-follows)
-    に渡せるよう、`spotify_id` / `name` / `image_url` を露出する。
+    Used when the "add follow" modal on ArtistsPage pulls candidates from
+    Spotify. Exposes `spotify_id` / `name` / `image_url` so the result can be
+    passed to `upsert_artist` (POST /api/artists) and `follow_artist`
+    (POST /api/user-follows).
     """
 
     spotify_id: str
@@ -15,15 +16,16 @@ class SpotifyArtistSummary(BaseModel):
 
 
 class SpotifyAlbumSummary(BaseModel):
-    """Spotify album search 結果の 1 件を表す DTO。
+    """DTO for one Spotify album search result.
 
-    `vinyl_records` への投入で必要なフィールドだけを露出する:
+    Exposes only the fields needed to insert into `vinyl_records`:
     `spotify_album_id` (= id) / `title` (= name) / `original_release_date` (= release_date)
-    / `image_url` / 表示用の `artist_names` / artist auto-upsert 用の `primary_artist_id`。
+    / `image_url` / `artist_names` for display / `primary_artist_id` for artist auto-upsert.
 
-    `primary_artist_id` は album.artists[0].id (Spotify artist ID)。RecordFormModal が
-    album 選択時に artists テーブルへ upsert する際、name 一致ではなく Spotify 正規 ID で
-    識別するために用いる。album に artists が無いケース (極めて稀) のみ null。
+    `primary_artist_id` is album.artists[0].id (Spotify artist ID). When
+    RecordFormModal upserts into the artists table on album selection, it
+    identifies the artist by canonical Spotify ID rather than by name match.
+    null only in the (very rare) case where the album has no artists.
     """
 
     id: str

@@ -10,12 +10,12 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir uv
 
-# 依存解決を先に：pyproject.toml と uv.lock を先にコピーしてレイヤキャッシュを効かせる
+# Resolve dependencies first: copy pyproject.toml and uv.lock before the source so the layer cache is reused
 COPY pyproject.toml ./
 COPY uv.lock* ./
 RUN uv sync --no-dev --frozen 2>/dev/null || uv sync --no-dev
 
-# アプリ本体
+# Application code
 COPY app ./app
 COPY alembic.ini ./
 COPY migrations ./migrations
@@ -25,13 +25,13 @@ RUN chmod +x ./entrypoint.sh
 EXPOSE 8000
 
 ENTRYPOINT ["./entrypoint.sh"]
-# dual-stack (IPv4 + IPv6) で listen する launcher を経由して uvicorn を起動。
-# Railway は edge → container を IPv4 で、service-to-service の private network
-# を IPv6 で来るため、両方受ける必要がある。`uvicorn --host ::` だけでは kernel の
-# `bindv6only` 設定次第になり、Railway コンテナでは IPv4 が受けられず 502 になる
-# 事例があったため、socket を `IPV6_V6ONLY=0` で事前 bind して fd 経由で渡す。
-# 詳細は app/server.py の docstring 参照。
+# Start uvicorn through a launcher that listens dual-stack (IPv4 + IPv6).
+# On Railway, edge -> container traffic arrives over IPv4 while service-to-service
+# private networking arrives over IPv6, so both must be accepted. `uvicorn --host ::`
+# alone depends on the kernel's `bindv6only` setting; in Railway containers that left
+# IPv4 unreachable and produced 502s, so the socket is pre-bound with `IPV6_V6ONLY=0`
+# and handed over by fd. See the docstring in app/server.py for details.
 #
-# ローカル / docker-compose では override が exec 形式で CMD を完全置換するため、
-# この launcher は触られない (=既存挙動を維持)。
+# Locally / under docker-compose the override replaces CMD entirely (exec form), so
+# this launcher is not used there (existing behaviour is unchanged).
 CMD ["python", "-m", "app.server"]

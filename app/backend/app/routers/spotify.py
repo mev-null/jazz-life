@@ -1,7 +1,8 @@
-"""Spotify Web API のプロキシ系エンドポイント。
+"""Proxy endpoints for the Spotify Web API.
 
-現状は album 検索のみ。将来 ADR-003 PR-3 (`POST /api/records/from-release`) で
-release lookup を足す際もここに集約する。
+Currently album search and artist search. When ADR-003 PR-3
+(`POST /api/records/from-release`) adds release lookup, it should be
+consolidated here as well.
 """
 
 from __future__ import annotations
@@ -25,10 +26,10 @@ def search_artists(
     _: User = Depends(get_current_user),
     client: SpotifyAppClient = Depends(get_spotify_app_client),
 ) -> ListResponse[SpotifyArtistSummary]:
-    """ArtistsPage のフォロー追加モーダルから叩く。
+    """Called from the add-follow modal on ArtistsPage.
 
-    UI で選んだ結果を `POST /api/artists` (upsert) → `POST /api/user-follows`
-    の 2 段で follow まで進める。
+    The UI takes the selected result through two steps to reach a follow:
+    `POST /api/artists` (upsert) → `POST /api/user-follows`.
     """
     try:
         items = client.search_artists(query=q, limit=limit)
@@ -49,8 +50,8 @@ def search_artists(
 def search_albums(
     q: str = Query(min_length=1, description="album title query"),
     artist: str | None = Query(default=None, description="artist name to refine the query"),
-    # 2026-05 時点で Spotify Search は max=10 を超えると 400 を返す
-    # (公式 doc は max=50 だが実挙動が乖離)。10 に絞って 400 を防ぐ。
+    # As of 2026-05, Spotify Search returns 400 when limit exceeds 10
+    # (the official docs say max=50, but actual behavior differs). Cap at 10.
     limit: int = Query(default=10, ge=1, le=10),
     _: User = Depends(get_current_user),
     client: SpotifyAppClient = Depends(get_spotify_app_client),

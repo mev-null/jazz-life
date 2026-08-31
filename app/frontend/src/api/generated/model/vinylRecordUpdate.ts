@@ -7,8 +7,8 @@
 import type { FavoriteTrack } from './favoriteTrack';
 
 /**
- * ADR-002 寛容 PUT: omit したフィールドは no-op、明示的に null/`[]` を
-送った場合のみ clear する (`exclude_unset` 経由)。
+ * ADR-002 lenient PUT: omitted fields are a no-op; a field is cleared only
+when null/`[]` is sent explicitly (via `exclude_unset`).
  */
 export interface VinylRecordUpdate {
   artist_id?: string | null;

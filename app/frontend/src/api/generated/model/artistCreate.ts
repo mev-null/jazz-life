@@ -7,10 +7,10 @@
 import type { ArtistCreateSource } from './artistCreateSource';
 
 /**
- * 新規 artist 作成リクエスト。upsert 動作 (spotify_id 既存なら既存を返す)。
+ * Create-artist request; upserts (returns the existing row if spotify_id exists).
 
-Phase B-3 PR-2 の RecordFormModal が Spotify album を選んだ時、
-その album の artist がまだ DB に無い場合に呼び出す。
+Called by the Phase B-3 PR-2 RecordFormModal when a Spotify album is
+selected and the album's artist is not yet in the DB.
  */
 export interface ArtistCreate {
   /**

@@ -6,10 +6,10 @@
  */
 
 /**
- * `PATCH /api/releases/{spotify_id}/read` の body。
+ * Body of `PATCH /api/releases/{spotify_id}/read`.
 
-既読 / 未読のトグル用。True で既読 (read_at が now)、False で未読
-(read_at が null)。
+Toggles read / unread. True marks as read (read_at = now), False marks as
+unread (read_at = null).
  */
 export interface ReleaseReadStatusUpdate {
   is_read: boolean;

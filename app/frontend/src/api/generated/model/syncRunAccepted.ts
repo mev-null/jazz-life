@@ -7,13 +7,13 @@
 import type { SyncRunAcceptedStatus } from './syncRunAcceptedStatus';
 
 /**
- * `POST /api/releases/sync` のレスポンス (202 Accepted)。
+ * Response of `POST /api/releases/sync` (202 Accepted).
 
-sync はバックグラウンド実行に切り出したため、件数などの結果は同期的に
-返さない。フロントは `is_running` を見てローディングし、`/sync-status` を
-polling して完了 / エラーを知る。
-- status=started: 今回ジョブを投入した
-- status=already_running: 既に実行中だったので投入をスキップした
+Since the sync runs in the background, results such as counts are not
+returned synchronously. The frontend shows a loading state based on
+`is_running` and polls `/sync-status` to learn about completion / errors.
+- status=started: a job was enqueued by this request
+- status=already_running: a sync was already running, so enqueueing was skipped
  */
 export interface SyncRunAccepted {
   status: SyncRunAcceptedStatus;

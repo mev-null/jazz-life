@@ -126,10 +126,10 @@ export function ListenPanel({ onAdd }: Props) {
       const name = err instanceof DOMException ? err.name : "";
       setErrorMsg(
         name === "NotAllowedError"
-          ? "マイクの使用が許可されていません。ブラウザ／OS の設定でこのアプリのマイクを許可してください（iOS は 設定 > 対象アプリ > マイク）。"
+          ? "Microphone access is blocked. Allow the microphone for this app in your browser or OS settings (on iOS: Settings > this app > Microphone)."
           : name === "NotFoundError"
-            ? "マイクが見つかりませんでした。"
-            : "マイクを起動できませんでした。",
+            ? "No microphone was found."
+            : "Could not start the microphone.",
       );
       setStatus("error");
       return;
@@ -239,9 +239,9 @@ export function ListenPanel({ onAdd }: Props) {
   if (!supported) {
     return (
       <div className="mt-8 text-center text-sm italic text-ink-mute">
-        この環境では録音に対応していません。
+        Recording is not supported in this environment.
         <br />
-        https 接続とマイク対応ブラウザが必要です。
+        It needs an https connection and a browser with microphone support.
       </div>
     );
   }
@@ -273,7 +273,7 @@ export function ListenPanel({ onAdd }: Props) {
           }
           disabled={status === "recognizing"}
           aria-label={
-            status === "recording" ? "録音を停止" : "録音して認識"
+            status === "recording" ? "Stop recording" : "Record and recognize"
           }
           className={`group relative h-64 w-64 rounded-full ${
             tappable || status === "recording"
@@ -294,7 +294,7 @@ export function ListenPanel({ onAdd }: Props) {
             </p>
             {USE_MOCK && (
               <p className="max-w-xs text-xs italic leading-relaxed text-ink-faint">
-                demo — 録音せずサンプル音源で認識します
+                demo — recognizes a sample track, no microphone needed
               </p>
             )}
           </>
@@ -401,14 +401,14 @@ export function ListenPanel({ onAdd }: Props) {
         {status === "error" && (
           <>
             <p className="max-w-xs text-sm italic leading-relaxed text-ink-mute">
-              {errorMsg ?? "エラーが発生しました。"}
+              {errorMsg ?? "Something went wrong."}
             </p>
             <button
               type="button"
               onClick={reset}
               className="cursor-pointer border-b border-ink/40 pb-0.5 text-sm tracking-wide text-ink transition-colors hover:border-ink"
             >
-              もう一度
+              Try again
             </button>
           </>
         )}

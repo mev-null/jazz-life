@@ -6,11 +6,11 @@
  */
 
 /**
- * `POST /api/user-follows` のリクエスト。
+ * Request body of `POST /api/user-follows`.
 
-artist は事前に `artists` テーブルに存在している必要がある (FK 制約)。
-UI 側は Spotify artist search → `POST /api/artists` (upsert) →
-本エンドポイント の 3 段で follow まで到達する想定。
+The artist must already exist in the `artists` table (FK constraint).
+The UI is expected to reach a follow in three steps: Spotify artist
+search → `POST /api/artists` (upsert) → this endpoint.
  */
 export interface UserFollowCreate {
   /**

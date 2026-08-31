@@ -1,105 +1,105 @@
-# 002. Phase B 開始時の方針再評価（PostgreSQL / クリーンアーキ / orval）
+# 002. Phase B kickoff decisions (PostgreSQL / clean architecture / orval)
 
-**Status**: Accepted（Phase B-1 完了時点でのスナップショット）
+**Status**: Accepted (snapshot as of Phase B-1 completion)
 **Date**: 2026-05-10
-**Relates to**: [000-pre-adr.md](./000-pre-adr.md) §11（アーキテクチャ）, §12（データモデル）, §13（技術スタック）, §14（Docker 構成）, §16（開発手順）/ [001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.3（書き込み API の確定）
+**Relates to**: [000-pre-adr.md](./000-pre-adr.md) §11 (architecture), §12 (data model), §13 (tech stack), §14 (Docker setup), §16 (development procedure) / [001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.3 (finalization of the write API)
 
 ---
 
 ## 1. Context
 
-Phase B-1（home 機能のバックエンド実装）に着手するにあたり、Phase A までに想定していた以下の前提を見直す必要が生じた。
+As Phase B-1 (backend implementation of the home feature) got underway, the following assumptions made through Phase A needed to be revisited.
 
-- **DB**: 000-pre-adr.md §13 / §14 では「MVP は SQLite、Phase 2 で PostgreSQL 移行」と規定していた。
-- **マイグレーション**: 同 §12 では「初期は `create_all()`、Phase C-4 で Alembic 導入」と段階的アプローチを定めていた。
-- **vinyl_records.id**: 同 §12 および 001-phase-a-revisions.md §2.3 で「サーバ側 auto-increment（int）」と確定していた。
-- **PUT セマンティクス**: 001-phase-a-revisions.md §2.3 で「PUT body は `VinylRecord` 全体」と定めていた。
-- **型生成ツール**: 000-pre-adr.md §13 / §17 では `openapi-typescript` による型のみの自動生成を前提としていた。
+- **DB**: 000-pre-adr.md §13 / §14 specified "SQLite for the MVP, migrate to PostgreSQL in Phase 2."
+- **Migrations**: §12 of the same document set out a staged approach: "`create_all()` initially, introduce Alembic in Phase C-4."
+- **vinyl_records.id**: §12 of the same document and 001-phase-a-revisions.md §2.3 had settled on "server-side auto-increment (int)."
+- **PUT semantics**: 001-phase-a-revisions.md §2.3 specified "the PUT body is the full `VinylRecord`."
+- **Type generation tool**: 000-pre-adr.md §13 / §17 assumed type-only generation via `openapi-typescript`.
 
-これらは Phase A 終了時点での暫定方針であり、Phase B-1 の実装過程で「将来の負債を先回りして潰す」観点から複数項目を再決定した。本 ADR はその決定事項を集約する。
+These were provisional policies as of the end of Phase A; during the Phase B-1 implementation, several items were re-decided from the standpoint of "eliminating future debt ahead of time." This ADR consolidates those decisions.
 
-集約しない場合、以下の問題が想定される。
+Without consolidating them, the following problems are anticipated.
 
-- Phase B-2 以降のセッションで、各前提が依然有効か都度ソースから判断する必要が生じる。
-- 000-pre-adr.md / 001-phase-a-revisions.md の記述と実装の差異が顕在化し、Phase 2 のクラウド移行時に手戻りとなる可能性がある。
-- 後続作業（frontend の `make gen` 切替、jacket upload 実装等）で前提を読み違える。
+- In sessions from Phase B-2 onward, whether each assumption still holds would have to be judged from the source each time.
+- Discrepancies between the text of 000-pre-adr.md / 001-phase-a-revisions.md and the implementation would surface, potentially causing rework at the Phase 2 cloud migration.
+- Follow-up work (switching the frontend's `make gen`, implementing jacket upload, etc.) could misread the assumptions.
 
 ---
 
 ## 2. Decision
 
-### 2.1 PostgreSQL 16 を Phase B 開始時点で採用（SQLite 計画を破棄）
+### 2.1 Adopt PostgreSQL 16 from the start of Phase B (drop the SQLite plan)
 
-[000-pre-adr.md](./000-pre-adr.md) §13 / §14 の「MVP は SQLite」を撤回し、Phase B-1 開始時点から **PostgreSQL 16 (alpine)** を採用する。
+Withdraw "SQLite for the MVP" from [000-pre-adr.md](./000-pre-adr.md) §13 / §14 and adopt **PostgreSQL 16 (alpine)** from the start of Phase B-1.
 
-- docker-compose に `db` サービスを追加し、named volume `jazz-pgdata` で永続化する。
-- 同インスタンス内に `jazz`（dev）と `jazz_test`（test）の 2 データベースを initdb script (`app/db/init/01-create-test-db.sql`) で分離する。
-- 接続には `psycopg[binary]` 3.x（同期）を使用する。
+- Add a `db` service to docker-compose, persisted with the named volume `jazz-pgdata`.
+- Separate two databases, `jazz` (dev) and `jazz_test` (test), within the same instance via an initdb script (`app/db/init/01-create-test-db.sql`).
+- Use `psycopg[binary]` 3.x (synchronous) for connections.
 
-#### 採用理由
+#### Rationale
 
-- `vinyl_records.id` に UUID v7 を採用する（§2.3）。SQLite でも理論上は可能だが、Postgres の `uuid` 型 / `gen_random_uuid()` 互換のエコシステムに乗る方が将来の拡張で齟齬が出ない。
-- Phase 2 のクラウドデプロイでも Postgres を継続使用する想定であり、開発と本番の境界条件（trailing whitespace の比較、case sensitivity、トランザクション分離レベル等）を初期から揃える方が、後段のデバッグコストが小さい。
-- Postgres の `pg_advisory_xact_lock` を `display_order` 採番のシリアライズに使用する（§2.5）。SQLite では同等の機構が存在しない。
-- ローカル開発でも実 DB が立ち上がるコストは Docker により隠蔽されており、SQLite との優位差は小さい。
+- `vinyl_records.id` adopts UUID v7 (§2.3). While theoretically possible with SQLite, building on the ecosystem compatible with Postgres's `uuid` type / `gen_random_uuid()` avoids mismatches in future extensions.
+- Postgres is expected to remain in use for the Phase 2 cloud deployment; aligning the boundary conditions between development and production (trailing-whitespace comparison, case sensitivity, transaction isolation levels, etc.) from the outset keeps later debugging costs low.
+- Postgres's `pg_advisory_xact_lock` is used to serialize `display_order` assignment (§2.5). SQLite has no equivalent mechanism.
+- The cost of spinning up a real DB even for local development is hidden by Docker, so SQLite's advantage is small.
 
-### 2.2 3 層クリーンアーキテクチャ
+### 2.2 3-layer clean architecture
 
-[000-pre-adr.md](./000-pre-adr.md) にはバックエンド内部のモジュール構造に関する規定がなかった。Phase B-1 で以下の 3 層構造を採用する。
+[000-pre-adr.md](./000-pre-adr.md) had no provisions regarding the internal module structure of the backend. Phase B-1 adopts the following 3-layer structure.
 
 ```
 app/backend/app/
 ├── core/
 │   ├── db.py                    # engine / get_session
 │   ├── exceptions.py            # DomainError / NotFoundError
-│   └── repositories/            # DB アクセス層（SQLModel exec、col() スタイル）
-├── services/                    # ビジネスロジック層（採番 / 部分更新 / DomainError raise）
-├── schemas/                     # Pydantic API DTO（Read / Create / Update 分離）
+│   └── repositories/            # DB access layer (SQLModel exec, col() style)
+├── services/                    # business logic layer (numbering / partial updates / raising DomainError)
+├── schemas/                     # Pydantic API DTOs (Read / Create / Update separated)
 ├── models/                      # SQLModel ORM
-└── routers/                     # FastAPI 薄い API 層（DTO ↔ service 変換、http_errors マッピング）
+└── routers/                     # thin FastAPI API layer (DTO ↔ service conversion, http_errors mapping)
 ```
 
-#### 採用理由および規約
+#### Rationale and conventions
 
-- 依存方向は `routers → services → repositories → models` の一方向に固定する。逆方向の import は禁ずる。
-- 例外マッピングは routers 層の `http_errors()` context manager に集約する。service が `NotFoundError` を raise すれば 404 に、追加の DomainError サブクラスを定義すれば対応する HTTP ステータスへマップする運用とする。
-- 依存性注入は FastAPI の `Depends` チェーンで構築する（`get_session → get_*_repository → get_*_service`）。同一リクエスト内で `get_session` がキャッシュされるため、複数 repository が同じ session を共有する。
-- API DTO は `*Read` / `*Create` / `*Update` に分離する。`*Update` は全フィールド optional とし、§2.4 の部分更新セマンティクスを支える。
+- The dependency direction is fixed one-way: `routers → services → repositories → models`. Imports in the reverse direction are prohibited.
+- Exception mapping is centralized in the `http_errors()` context manager in the routers layer. When a service raises `NotFoundError` it maps to 404; defining additional DomainError subclasses maps them to the corresponding HTTP status.
+- Dependency injection is built with FastAPI's `Depends` chain (`get_session → get_*_repository → get_*_service`). Because `get_session` is cached within a single request, multiple repositories share the same session.
+- API DTOs are separated into `*Read` / `*Create` / `*Update`. All fields of `*Update` are optional, supporting the partial-update semantics of §2.4.
 
-### 2.3 vinyl_records.id を UUID v7 に変更
+### 2.3 Change vinyl_records.id to UUID v7
 
-[000-pre-adr.md](./000-pre-adr.md) §12 の「`id: int`（auto increment）」および [001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.3 の「サーバ側 auto-increment に統一する」を撤回し、**UUID v7** を採用する。
+Withdraw "`id: int` (auto increment)" from [000-pre-adr.md](./000-pre-adr.md) §12 and "standardize on server-side auto-increment" from [001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.3, and adopt **UUID v7**.
 
-- 生成は backend 側で行う（`uuid6` ライブラリの `uuid7()`）。クライアント生成は将来 offline 編集対応を入れるときに検討する。
-- artists 系（`artists.spotify_id`, `concerts.id` 等）は文字列 PK のままとする。本決定は `vinyl_records.id` および将来の純粋アプリ内エンティティに限定する。
+- Generation happens on the backend (`uuid7()` from the `uuid6` library). Client-side generation will be considered when offline editing support is added in the future.
+- The artists family (`artists.spotify_id`, `concerts.id`, etc.) keeps string PKs. This decision is limited to `vinyl_records.id` and future purely app-internal entities.
 
-#### 採用理由
+#### Rationale
 
-- UUID v7 は時刻順にソート可能であり、`display_order` を介さない一覧でも安定した並びを得られる。
-- マルチクライアント・将来の同期機能を見据えた採番衝突回避。
-- BIGINT auto-increment と異なり、id を URL に含めても序数が露出しない（個人用アプリでは弱い理由だが、副次的メリット）。
+- UUID v7 is time-ordered and sortable, so listings that do not go through `display_order` still get a stable order.
+- Avoids id collisions with an eye toward multi-client use and a future sync feature.
+- Unlike BIGINT auto-increment, including the id in a URL does not expose an ordinal (a weak reason for a personal app, but a side benefit).
 
-#### 既知の留意点
+#### Known caveats
 
-- 開発時の URL コピペ・curl 動作確認では int に比べて煩雑となる。Phase B-1 の `.claude/settings.json` allowlist にはダミー UUID（`00000000-0000-7000-8000-000000000000`）を含めて対応した。
+- URL copy-pasting and curl checks during development are more cumbersome than with int. This was handled in Phase B-1 by including a dummy UUID (`00000000-0000-7000-8000-000000000000`) in the `.claude/settings.json` allowlist.
 
-### 2.4 PUT の寛容セマンティクス（部分更新）
+### 2.4 Lenient PUT semantics (partial update)
 
-[001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.3 の「PUT body は `VinylRecord` 全体」を撤回し、**送られたフィールドのみ更新する部分更新セマンティクス** を採用する。
+Withdraw "the PUT body is the full `VinylRecord`" from [001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.3 and adopt **partial-update semantics that update only the fields that were sent**.
 
-- Pydantic の `model_dump(exclude_unset=True)` により「明示的に送られたフィールド」のみを抽出する。
-- `null` を明示的に送れば null へクリアできる。送らなければ従前の値を保持する。
-- `updated_at` はサーバ側で常に上書きする。`created_at` は不変。
-- `artist_id` の張り替えは許容するが、新 `artist_id` の存在検証を行い、未存在なら `NotFoundError` を raise する（404）。
+- Pydantic's `model_dump(exclude_unset=True)` extracts only the "explicitly sent fields."
+- Explicitly sending `null` clears the field to null. Fields not sent retain their previous values.
+- `updated_at` is always overwritten on the server side. `created_at` is immutable.
+- Reassigning `artist_id` is allowed, but the existence of the new `artist_id` is verified; if it does not exist, `NotFoundError` is raised (404).
 
-#### 採用理由
+#### Rationale
 
-- フロントエンドの編集モーダルが「変更したフィールドだけ送る」設計と自然に整合する。
-- HTTP セマンティクス的には PATCH が厳密だが、本 API は単一クライアント前提・冪等性も担保されるため、PUT の寛容運用とした。RFC 7396 (JSON Merge Patch) に準拠した PATCH への移行余地は残す。
+- Aligns naturally with the frontend edit modal's design of "send only the changed fields."
+- In terms of HTTP semantics PATCH would be the strict choice, but since this API assumes a single client and idempotency is preserved, we went with lenient PUT (partial update). Room is left to migrate to a PATCH conforming to RFC 7396 (JSON Merge Patch).
 
-### 2.5 display_order 採番のシリアライズ（pg_advisory_xact_lock 採用）
+### 2.5 Serializing display_order assignment (adopt pg_advisory_xact_lock)
 
-[000-pre-adr.md](./000-pre-adr.md) §12 の「新規追加は `display_order = MAX + 1`」のレース条件対策として、`pg_advisory_xact_lock` を service 層の create 経路で取得する。
+As a countermeasure to the race condition in "new additions use `display_order = MAX + 1`" from [000-pre-adr.md](./000-pre-adr.md) §12, acquire `pg_advisory_xact_lock` on the create path in the service layer.
 
 ```python
 # RecordRepository
@@ -110,102 +110,102 @@ def lock_for_display_order(self) -> None:
     )
 ```
 
-#### 不採用案
+#### Rejected alternatives
 
-- **`SELECT max(display_order) ... FOR UPDATE`**: Postgres は aggregate に対する FOR UPDATE を構文エラーで拒否する。
-- **`SELECT ... ORDER BY display_order DESC LIMIT 1 FOR UPDATE`**: READ COMMITTED 分離下で、ロック解放後に「元クエリで選ばれていた行（旧 MAX）」を再ロックする挙動となる。新たに COMMIT された MAX 行を読み直さないため、後発トランザクションが旧 MAX の `+1` を採番してしまい、回帰テストで重複が発生した。
+- **`SELECT max(display_order) ... FOR UPDATE`**: Postgres rejects FOR UPDATE on an aggregate as a syntax error.
+- **`SELECT ... ORDER BY display_order DESC LIMIT 1 FOR UPDATE`**: Under READ COMMITTED isolation, after the lock is released it re-locks "the row that was selected by the original query (the old MAX)." Because it does not re-read the newly COMMITted MAX row, a later transaction assigns the old MAX `+1`, and duplicates occurred in the regression test.
 
-#### advisory lock 採用の利点
+#### Advantages of the advisory lock
 
-- transaction-scoped であり COMMIT / ROLLBACK で自動解放される。
-- 空テーブルでも有効（FOR UPDATE 系はロック対象行が無いため空テーブル時にレースが残る）。
-- aggregate query (`SELECT max(...)`) をそのまま使える。
+- Transaction-scoped and automatically released on COMMIT / ROLLBACK.
+- Works even on an empty table (FOR UPDATE variants leave a race on an empty table because there is no row to lock).
+- The aggregate query (`SELECT max(...)`) can be used as-is.
 
-#### キー定数
+#### Key constant
 
-`0x1A22_DE51_0001`（任意の固定値）を使用する。将来、別箇所で advisory lock を導入する際は衝突回避のため定数集約を検討する（現時点では単独使用）。
+Uses `0x1A22_DE51_0001` (an arbitrary fixed value). If advisory locks are introduced elsewhere in the future, consider consolidating the constants to avoid collisions (currently the sole use).
 
-### 2.6 Alembic を Phase B-1 から導入
+### 2.6 Introduce Alembic from Phase B-1
 
-[000-pre-adr.md](./000-pre-adr.md) §16 Phase C-4 の「Alembic 導入 + 初期マイグレーション生成」を Phase B-1 に前倒しする。
+Move "introduce Alembic + generate the initial migration" from [000-pre-adr.md](./000-pre-adr.md) §16 Phase C-4 forward to Phase B-1.
 
-- `app/backend/migrations/` に Alembic 環境を配置する。
-- migration ファイル名は `alembic.ini` の `file_template` で `YYYYMMDD_HHMM_<slug>` 形式に固定する。
-- 初期マイグレーション (`0001_initial`) で全 8 テーブル（artists / artist_aliases / venues / concerts / concert_artists / releases / vinyl_records / sync_status）を一括定義する。`releases.read_at` / `concerts.read_at`（[001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.2）も含む。
-- コンテナ起動時の `entrypoint.sh` で `alembic upgrade head` を実行してから uvicorn を起動する。
+- Place the Alembic environment in `app/backend/migrations/`.
+- Fix migration file names to the `YYYYMMDD_HHMM_<slug>` format via `file_template` in `alembic.ini`.
+- The initial migration (`0001_initial`) defines all 8 tables (artists / artist_aliases / venues / concerts / concert_artists / releases / vinyl_records / sync_status) at once. `releases.read_at` / `concerts.read_at` ([001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.2) are included.
+- `entrypoint.sh` runs `alembic upgrade head` on container startup before launching uvicorn.
 
-#### 採用理由
+#### Rationale
 
-- Postgres 採用と同時に複数テーブルを定義する都合上、`SQLModel.metadata.create_all()` 運用では本番との差が出やすい。
-- CI で `alembic upgrade head` を走らせる前提が整うため、後続 PR でスキーマ変更が安全に追跡できる。
+- Since multiple tables are defined at the same time as adopting Postgres, operating with `SQLModel.metadata.create_all()` tends to diverge from production.
+- It establishes the premise of running `alembic upgrade head` in CI, so schema changes in subsequent PRs can be tracked safely.
 
-### 2.7 型生成ツールチェーン: openapi-typescript → orval
+### 2.7 Type generation toolchain: openapi-typescript → orval
 
-[000-pre-adr.md](./000-pre-adr.md) §4 / §13 / §16 の `make gen` における **`openapi-typescript`** を、Phase B-2 frontend 接続のタイミングで **`orval`** に置き換える。
+Replace **`openapi-typescript`** in `make gen` from [000-pre-adr.md](./000-pre-adr.md) §4 / §13 / §16 with **`orval`** at the time of the Phase B-2 frontend connection.
 
-#### 採用理由
+#### Rationale
 
-- `openapi-typescript` は型スキーマのみを生成する。React Query (TanStack Query v5) の `useQuery` / `useMutation` hooks および fetch wrapper はすべて手書きとなる。
-- `orval` は **型 + HTTP client + React Query hooks** を一括生成する。mutation 後の `queryClient.invalidateQueries` を type-safe に記述でき、API 変更時の追従漏れが型エラーで検出される。
-- spec 変更からフロント実装への伝播経路が短縮される。
+- `openapi-typescript` generates only type schemas. The React Query (TanStack Query v5) `useQuery` / `useMutation` hooks and the fetch wrapper would all be hand-written.
+- `orval` generates **types + HTTP client + React Query hooks** in one go. `queryClient.invalidateQueries` after a mutation can be written type-safely, and missed follow-ups on API changes are caught as type errors.
+- Shortens the propagation path from spec changes to frontend implementation.
 
-#### 採用設定
+#### Adopted configuration
 
-- **client mode**: `react-query` + 純粋 `fetch`（axios 依存を追加しない）
-- **output mode**: `tags-split`（FastAPI の tag 別にディレクトリを分割）
-- **生成先**: `app/frontend/src/api/generated/`（`gitignore` しない）
-- **mock 生成**: 当 ADR では採用しない。orval の msw 連携機能は Phase 2 候補とする（§2.8 と整合）。
+- **client mode**: `react-query` + plain `fetch` (no axios dependency added)
+- **output mode**: `tags-split` (directories split by FastAPI tag)
+- **output location**: `app/frontend/src/api/generated/` (not `gitignore`d)
+- **mock generation**: not adopted in this ADR. orval's msw integration is a Phase 2 candidate (consistent with §2.8).
 
-#### Phase B-2 への段階的移行
+#### Staged migration toward Phase B-2
 
-frontend 側の置換は backend と独立した PR として扱う。
+The frontend replacement is handled as a PR independent of the backend.
 
-- **PR-A（型基盤）**: orval 導入、`make gen` 差し替え、**既実装エンドポイント (artists / records) の型のみ generated 由来に切替**（未実装の releases / concerts / sync_status / auth は `types/api.ts` に手書きで残す）、モック JSON の id を UUID 文字列化。OpenAPI spec は `app/backend/openapi.json` に backend が所有する形でコミットし、frontend は orval から `../backend/openapi.json` を読む。これにより API 変更の差分が backend PR 内で完結し、frontend PR には混入しない。backend 未起動でも `make gen` / CI が走る構成は変わらない。挙動は `VITE_USE_MOCK=true` のまま据え置き。
-- **PR-B（実 API 接続）**: `upsertVinylRecord` を `createVinylRecord` (POST) / `updateVinylRecord` (PUT) に分解、`.env.example` の `VITE_USE_MOCK` を `false` に切替、ブラウザでの golden path 動作確認。
+- **PR-A (type foundation)**: introduce orval, replace `make gen`, **switch only the types for already-implemented endpoints (artists / records) to the generated source** (the unimplemented releases / concerts / sync_status / auth remain hand-written in `types/api.ts`), and convert mock JSON ids to UUID strings. The OpenAPI spec is committed as `app/backend/openapi.json`, owned by the backend, and the frontend has orval read `../backend/openapi.json`. This keeps API-change diffs contained within backend PRs and out of frontend PRs. The setup in which `make gen` / CI run even without the backend running is unchanged. Behavior stays as-is with `VITE_USE_MOCK=true`.
+- **PR-B (real API connection)**: split `upsertVinylRecord` into `createVinylRecord` (POST) / `updateVinylRecord` (PUT), switch `VITE_USE_MOCK` in `.env.example` to `false`, and verify the golden path in the browser.
 
-### 2.8 モック切替機構の維持
+### 2.8 Keep the mock toggle mechanism
 
-[000-pre-adr.md](./000-pre-adr.md) §4 の「`VITE_USE_MOCK` による mock / 実 API 切替」を Phase B-2 以降も維持する。
+Keep the "mock / real API toggle via `VITE_USE_MOCK`" from [000-pre-adr.md](./000-pre-adr.md) §4 in Phase B-2 and beyond.
 
-- `client.ts` に相当する分岐レイヤーを残し、orval が生成した実 API hooks と、既存の `mocks/*.json` を上層で出し分ける。
-- orval 生成 hooks は実 API 経路のみを担う。mock 経路は `if (USE_MOCK)` のままとする。
-- 当面は手書きの mock JSON を維持する。orval msw 機能（spec から msw handler を自動生成）は Phase 2 候補。
+- Keep a branching layer equivalent to `client.ts`, which dispatches at the upper level between the real API hooks generated by orval and the existing `mocks/*.json`.
+- orval-generated hooks serve only the real API path. The mock path remains `if (USE_MOCK)`.
+- Hand-written mock JSON is maintained for the time being. orval's msw feature (auto-generating msw handlers from the spec) is a Phase 2 candidate.
 
-#### 採用理由
+#### Rationale
 
-- backend 未起動でも frontend を触れる開発体験を残す。
-- backend 障害時のフォールバック確認に使える。
-- 完全削除は「モック前提のドキュメントを大量に書き換える」コストが大きく、便益に見合わない。
+- Preserves the developer experience of working on the frontend without the backend running.
+- Useful for verifying the fallback when the backend is down.
+- Complete removal would carry the large cost of "rewriting a large amount of documentation that assumes mocks," which is not worth the benefit.
 
-### 2.9 テスト戦略（unit / integration マトリクス）
+### 2.9 Test strategy (unit / integration matrix)
 
-CI (`.github/workflows/backend.yml`) で 3 ジョブを並走させる。
+CI (`.github/workflows/backend.yml`) runs 3 jobs in parallel.
 
 - **lint-and-typecheck**: `ruff format --check` + `ruff check` + `mypy app`
 - **test (unit)**: `pytest tests/unit -v`
 - **test (integration)**: `pytest tests/integration -v`
 
-#### 採用方針
+#### Adopted policy
 
-- どちらの suite も実 PostgreSQL（GitHub Actions services container）を使用する。`tests/unit` も service 層を実 DB で叩くため、厳密な意味での unit ではない（純粋 mock-based unit との区別は維持しないコスト判断）。
-- conftest で `app.dependency_overrides[get_session]` によりテスト session を注入する。
-- `TestClient(app)` を `with` 構文 **無し** で構築することで FastAPI の lifespan を発火させず、dev DB への seed 投入を抑止する。
-- engine fixture は function-scoped で `drop_all → create_all → drop_all`。テスト数の増加に伴い遅くなり始めたら session-scoped + `TRUNCATE ... CASCADE` への移行を検討する。
+- Both suites use a real PostgreSQL (GitHub Actions services container). Since `tests/unit` also exercises the service layer against the real DB, it is not strictly a unit suite (a cost-based decision not to maintain the distinction from pure mock-based unit tests).
+- conftest injects the test session via `app.dependency_overrides[get_session]`.
+- Constructing `TestClient(app)` **without** a `with` block avoids triggering FastAPI's lifespan, preventing seed data from being inserted into the dev DB.
+- The engine fixture is function-scoped with `drop_all → create_all → drop_all`. If it starts slowing down as the number of tests grows, consider moving to session-scoped + `TRUNCATE ... CASCADE`.
 
 ---
 
 ## 3. Out of scope
 
-以下の項目は本 ADR では扱わず、後続 PR / ADR に委ねる。
+The following items are not covered by this ADR and are left to subsequent PRs / ADRs.
 
-- **frontend の orval 移行実装**: §2.7 の方針に従い PR-A / PR-B として独立に実装する。
-- **jacket 画像アップロード API 実装**: [001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.4 の仕様に従い Phase B-2 で実装する。
-- **`PATCH /api/records/reorder`**: ドラッグ&ドロップ並び替えの bulk update。Phase B-2 で実装する。
-- **releases / concerts API 実装**: Phase B-2 以降。
-- **既読 API 実装**: [001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.2 の仕様に従い後続 PR で実装する。
-- **Spotify OAuth / 新譜バッチ**: Phase B-3 以降。
-- **AI 補完** (`POST /api/records/lookup`): [000-pre-adr.md](./000-pre-adr.md) §19.2。
-- **マルチユーザ化**: 当面単一ユーザ前提を維持する。
+- **frontend orval migration implementation**: implemented independently as PR-A / PR-B following the policy in §2.7.
+- **jacket image upload API implementation**: implemented in Phase B-2 per the spec in [001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.4.
+- **`PATCH /api/records/reorder`**: bulk update for drag-and-drop reordering. Implemented in Phase B-2.
+- **releases / concerts API implementation**: Phase B-2 or later.
+- **mark-as-read API implementation**: implemented in a subsequent PR per the spec in [001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.2.
+- **Spotify OAuth / new-release batch**: Phase B-3 or later.
+- **AI autofill** (`POST /api/records/lookup`): [000-pre-adr.md](./000-pre-adr.md) §19.2.
+- **Multi-user support**: the single-user assumption is maintained for the time being.
 
 ---
 
@@ -213,65 +213,65 @@ CI (`.github/workflows/backend.yml`) で 3 ジョブを並走させる。
 
 ### Positive
 
-- Phase 2 のクラウド移行時に DB エンジンの切替が不要となり、本番との挙動差を初期から潰せる。
-- UUID v7 採用により、将来のマルチクライアント対応・分散シナリオで採番衝突を回避できる。
-- 3 層分離により service / repository の単体テストが組みやすく、`http_errors()` 経由で例外マッピングが集約される。
-- orval 採用により mutation の cache invalidation を type-safe に記述でき、spec 変更時の frontend 追従漏れが型エラーで検出される。
-- Alembic 早期導入により、Phase B-2 以降のスキーマ変更を YYYYMMDD_HHMM_<slug> 形式で安全に追跡できる。
+- No DB engine switch is needed at the Phase 2 cloud migration, and behavioral differences from production can be eliminated from the start.
+- Adopting UUID v7 avoids id collisions in future multi-client and distributed scenarios.
+- The 3-layer separation makes service / repository unit tests easier to set up, and exception mapping is centralized via `http_errors()`.
+- Adopting orval allows mutation cache invalidation to be written type-safely, and missed frontend follow-ups on spec changes are caught as type errors.
+- Early adoption of Alembic allows schema changes from Phase B-2 onward to be tracked safely in the YYYYMMDD_HHMM_<slug> format.
 
-### Negative / 留意事項
+### Negative / caveats
 
-- docker compose の必須サービスが db 1 個増え、起動コストおよびメモリ使用量が上がる（個人開発では許容）。
-- UUID v7 は curl での動作確認・URL コピペが int 比で煩雑となる。`.claude/settings.json` allowlist にダミー UUID を登録する運用で対応する。
-- orval 生成コードの量が増える（`gitignore` はしない）。生成物の差分は PR レビュー対象に含める。
-- advisory lock のキー定数 `0x1A22_DE51_0001` はマジックナンバーであり、将来別箇所で advisory lock を導入する際は集約管理を検討する必要がある。
-- [000-pre-adr.md](./000-pre-adr.md) §12 / §13 / §14 / §16 および [001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.3 の関連記述は本 ADR で supersede される。原典の修正は行わず、本 ADR を参照される正規ソースとして扱う。
+- docker compose gains one more required service (db), raising startup cost and memory usage (acceptable for personal development).
+- UUID v7 makes curl checks and URL copy-pasting more cumbersome than int. Handled by registering a dummy UUID in the `.claude/settings.json` allowlist.
+- The volume of orval-generated code grows (not `gitignore`d). Diffs in generated output are included in the scope of PR review.
+- The advisory lock key constant `0x1A22_DE51_0001` is a magic number; if advisory locks are introduced elsewhere in the future, consolidated management will need to be considered.
+- The related text in [000-pre-adr.md](./000-pre-adr.md) §12 / §13 / §14 / §16 and [001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.3 is superseded by this ADR. The originals are not amended; this ADR is treated as the canonical source to reference.
 
 ---
 
-## 5. Supersede notes（差し替えの対応関係）
+## 5. Supersede notes (mapping of replacements)
 
-| 原典 | 該当箇所 | 旧方針 | 新方針（本 ADR） |
+| Original | Section | Old policy | New policy (this ADR) |
 |---|---|---|---|
-| [000-pre-adr.md](./000-pre-adr.md) | §12 vinyl_records | `id: int`（auto increment） | UUID v7（§2.3） |
-| [000-pre-adr.md](./000-pre-adr.md) | §13 / §14 | DB は SQLite、Phase 2 で Postgres 移行 | PostgreSQL 16 を Phase B-1 から採用（§2.1） |
-| [000-pre-adr.md](./000-pre-adr.md) | §12 / §16 C-4 | `create_all()` 運用、Phase C-4 で Alembic 導入 | Phase B-1 から Alembic 運用（§2.6） |
-| [000-pre-adr.md](./000-pre-adr.md) | §4 / §13 / §16 | `make gen` は `openapi-typescript` | `make gen` は `orval`（react-query + fetch mode）（§2.7） |
-| [001-phase-a-revisions.md](./001-phase-a-revisions.md) | §2.3 id 採番 | サーバ側 auto-increment | サーバ側 UUID v7（§2.3） |
-| [001-phase-a-revisions.md](./001-phase-a-revisions.md) | §2.3 PUT body | `VinylRecord` 全体 | 部分更新セマンティクス（`exclude_unset`）（§2.4） |
+| [000-pre-adr.md](./000-pre-adr.md) | §12 vinyl_records | `id: int` (auto increment) | UUID v7 (§2.3) |
+| [000-pre-adr.md](./000-pre-adr.md) | §13 / §14 | DB is SQLite, migrate to Postgres in Phase 2 | Adopt PostgreSQL 16 from Phase B-1 (§2.1) |
+| [000-pre-adr.md](./000-pre-adr.md) | §12 / §16 C-4 | Operate with `create_all()`, introduce Alembic in Phase C-4 | Operate with Alembic from Phase B-1 (§2.6) |
+| [000-pre-adr.md](./000-pre-adr.md) | §4 / §13 / §16 | `make gen` uses `openapi-typescript` | `make gen` uses `orval` (react-query + fetch mode) (§2.7) |
+| [001-phase-a-revisions.md](./001-phase-a-revisions.md) | §2.3 id assignment | Server-side auto-increment | Server-side UUID v7 (§2.3) |
+| [001-phase-a-revisions.md](./001-phase-a-revisions.md) | §2.3 PUT body | Full `VinylRecord` | Partial-update semantics (`exclude_unset`) (§2.4) |
 
 ---
 
-## 6. Phase B-2 実装チェックリスト
+## 6. Phase B-2 implementation checklist
 
-本 ADR から派生する Phase B-2 の作業項目を以下にまとめる。
+The Phase B-2 work items derived from this ADR are summarized below.
 
-### frontend: orval 導入と型置換（PR-A）
+### frontend: orval introduction and type replacement (PR-A)
 
-- [ ] `app/frontend` に `orval` を devDependency として追加（`openapi-typescript` は削除）
-- [ ] `orval.config.ts` を作成（input: `../backend/openapi.json`、client: `react-query`、httpClient: `fetch`、output mode: `tags-split`、output path: `src/api/generated/`）
-- [ ] OpenAPI spec を `app/backend/openapi.json` にコミットする（backend が所有。jq で 2-space indent に整形）
-- [ ] `app/Makefile` に `make spec`（backend から spec を再取得）と `make gen`（spec ファイルから生成）を分離
-- [ ] orval 用カスタム mutator (`src/api/mutator.ts`) を実装し、`API_BASE` を env から取って fetch する
-- [ ] `src/types/api.ts` から既実装分（`Artist` / `VinylRecord`）を削除し、generated/ から re-export する形に縮小（未実装の `Release` / `Concert` / `SyncStatus` / `AuthUser` 等は手書きのまま残す）
-- [ ] `src/api/mocks/*.json` の `id` を UUID 文字列化（vinyl_records）
-- [ ] `src/api/mocks/*.json` に `source` / `purchase_currency` フィールドを補完（実 API レスポンスと shape を一致させる）
-- [ ] `RecordFormModal` の `Date.now()` 採番を `crypto.randomUUID()` に変更（VinylRecord.id が string 化したため）
-- [ ] `client.ts` の `VITE_USE_MOCK` 分岐は維持（実 API 側のみ orval 生成 fetcher を経由）
-- [ ] `npm run typecheck` が green
+- [ ] Add `orval` to `app/frontend` as a devDependency (remove `openapi-typescript`)
+- [ ] Create `orval.config.ts` (input: `../backend/openapi.json`, client: `react-query`, httpClient: `fetch`, output mode: `tags-split`, output path: `src/api/generated/`)
+- [ ] Commit the OpenAPI spec as `app/backend/openapi.json` (owned by the backend; formatted to 2-space indent with jq)
+- [ ] Split `app/Makefile` into `make spec` (re-fetch the spec from the backend) and `make gen` (generate from the spec file)
+- [ ] Implement a custom mutator for orval (`src/api/mutator.ts`) that reads `API_BASE` from env and performs fetch
+- [ ] Remove the already-implemented parts (`Artist` / `VinylRecord`) from `src/types/api.ts` and shrink it to re-export from generated/ (the unimplemented `Release` / `Concert` / `SyncStatus` / `AuthUser` etc. remain hand-written)
+- [ ] Convert `id` in `src/api/mocks/*.json` to UUID strings (vinyl_records)
+- [ ] Add the `source` / `purchase_currency` fields to `src/api/mocks/*.json` (match the shape of real API responses)
+- [ ] Change the `Date.now()`-based id generation in `RecordFormModal` to `crypto.randomUUID()` (since VinylRecord.id is now a string)
+- [ ] Keep the `VITE_USE_MOCK` branch in `client.ts` (only the real API side goes through the orval-generated fetcher)
+- [ ] `npm run typecheck` is green
 
-### frontend: home の実 API 接続（PR-B）
+### frontend: connect home to the real API (PR-B)
 
-- [ ] `upsertVinylRecord` を `createVinylRecord` (POST) / `updateVinylRecord` (PUT) に分解
-- [ ] `RecordFormModal` の保存ロジックを「新規 → create、編集 → update」で振り分け
-- [ ] `app/.env.example` の `VITE_USE_MOCK` を `false` に変更
-- [ ] `make up` でスタックを起動し、ブラウザでレコードの一覧 / 追加 / 編集の golden path を確認
-- [ ] react-query の cache invalidation が正しく走り、追加・編集後に一覧が更新されることを確認
-- [ ] エラーケース（不正な日付、存在しない artist、422 / 404 レスポンス）の UI 挙動を確認
+- [ ] Split `upsertVinylRecord` into `createVinylRecord` (POST) / `updateVinylRecord` (PUT)
+- [ ] Route the save logic in `RecordFormModal` as "new → create, edit → update"
+- [ ] Change `VITE_USE_MOCK` in `app/.env.example` to `false`
+- [ ] Start the stack with `make up` and verify the golden path of listing / adding / editing records in the browser
+- [ ] Verify that react-query cache invalidation runs correctly and the list refreshes after adding / editing
+- [ ] Verify UI behavior for error cases (invalid date, nonexistent artist, 422 / 404 responses)
 
-### backend / docs（Out of scope の準備、別 PR で順次）
+### backend / docs (groundwork for Out of scope items, sequentially in separate PRs)
 
-- [ ] jacket upload API 実装（[001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.4 の仕様）
-- [ ] `PATCH /api/records/reorder` 実装
-- [ ] releases / concerts API 実装
-- [ ] 既読 API（`releases.read_at` / `concerts.read_at` の更新）実装
+- [ ] Implement the jacket upload API (spec in [001-phase-a-revisions.md](./001-phase-a-revisions.md) §2.4)
+- [ ] Implement `PATCH /api/records/reorder`
+- [ ] Implement the releases / concerts API
+- [ ] Implement the mark-as-read API (updating `releases.read_at` / `concerts.read_at`)

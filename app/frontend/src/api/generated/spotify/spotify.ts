@@ -69,10 +69,10 @@ export const getSearchArtistsApiSpotifyArtistsSearchGetUrl = (params: SearchArti
 }
 
 /**
- * ArtistsPage のフォロー追加モーダルから叩く。
+ * Called from the add-follow modal on ArtistsPage.
 
-UI で選んだ結果を `POST /api/artists` (upsert) → `POST /api/user-follows`
-の 2 段で follow まで進める。
+The UI takes the selected result through two steps to reach a follow:
+`POST /api/artists` (upsert) → `POST /api/user-follows`.
  * @summary Search Artists
  */
 export const searchArtistsApiSpotifyArtistsSearchGet = async (params: SearchArtistsApiSpotifyArtistsSearchGetParams, options?: RequestInit): Promise<searchArtistsApiSpotifyArtistsSearchGetResponse> => {

@@ -1,5 +1,9 @@
 # ADR-016: 音声認識による On the hunt 追加（Digging / Listen タブ）
 
+> **Summary (English).** Adds a third Digging tab, **Listen**: the browser records about 12 seconds with `MediaRecorder`, `POST /api/recognize` forwards the clip to AudD (`return=spotify`) and returns a normalized `RecognitionResult` (track, album, Spotify album/artist ids, cover), which prefills the existing add-record form with `status=wanted`; unknown artists are upserted first. AudD was chosen over shazamio (terms of service, needs ffmpeg), RapidAPI Shazam (raw PCM input) and ACRCloud (overkill for a few calls a day). Tabs are URL-driven (`/digging/:tab`) with per-tab lazy fetching; microphone permission is requested only on tap and released afterwards; "no match" offers Cancel / Try again. A missing API token yields 503, an upstream failure 502.
+>
+> *The body of this document is in Japanese. See [docs/README.md](./README.md) for the index of all design documents.*
+
 - **Status**: Accepted
 - **Date**: 2026-05-30
 - **Supersedes**: [ADR-013](./013-digging-tab-and-concert-removal.md) §2.1（Digging を 2 タブ

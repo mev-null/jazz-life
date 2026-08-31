@@ -3,9 +3,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# Phase B-3 では Get Artist's Albums の include_groups を `album,single` に絞って
-# ingest しているので、UI 側でも 2 値だけが流れてくる前提。compilation /
-# appears_on を将来追加するときはここを拡張して openapi 再生成する。
+# Phase B-3 ingests Get Artist's Albums with include_groups limited to
+# `album,single`, so the UI only ever sees these two values. When adding
+# compilation / appears_on later, extend this and regenerate the openapi spec.
 AlbumType = Literal["album", "single"]
 
 
@@ -23,12 +23,13 @@ class ReleaseRead(BaseModel):
 
 
 class SyncRunSummary(BaseModel):
-    """直近に完走した sync ジョブの結果サマリ。
+    """Result summary of the most recently completed sync job.
 
-    sync_status の last_* (DB 永続) と違い in-memory 由来 (プロセス再起動で消える)。
-    フロントが「partial: N ingested / rate limited」等の補足表示に使う。
-    artists_succeeded < artists_total なら一部のアーティストが取り込めていない
-    (rate limit で打ち切り or per-artist エラー)。
+    Unlike the last_* fields of sync_status (persisted in the DB), this is
+    in-memory and lost on process restart. The frontend uses it for
+    supplementary text such as "partial: N ingested / rate limited".
+    artists_succeeded < artists_total means some artists were not ingested
+    (cut off by rate limiting, or a per-artist error).
     """
 
     artists_total: int
@@ -38,10 +39,10 @@ class SyncRunSummary(BaseModel):
 
 
 class SyncStatusRead(BaseModel):
-    """`/api/releases/sync-status` のレスポンス。
+    """Response of `/api/releases/sync-status`.
 
-    フロント Feed 側で「最終同期日時 / エラー状態」を表示するため (ADR-000 §314)。
-    Row が無い (一度も sync していない) ケースでは last_* が null になる。
+    Lets the Feed show "last synced at / error state" (ADR-000 §314).
+    When no row exists (never synced), the last_* fields are null.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -50,21 +51,21 @@ class SyncStatusRead(BaseModel):
     last_success_at: datetime | None
     last_attempt_at: datetime | None
     last_error: str | None
-    # sync が今まさにバックグラウンド実行中か。フロントはこれを polling して
-    # ローディング表示する。in-memory フラグ由来で DB には永続化しない。
+    # Whether a sync is currently running in the background. The frontend polls
+    # this to show a loading state. Comes from an in-memory flag, not persisted.
     is_running: bool
-    # 直近完走ジョブの結果サマリ (in-memory)。未実行 / 再起動直後は null。
+    # Summary of the last completed job (in-memory). null if never run or right after restart.
     last_run: SyncRunSummary | None = None
 
 
 class SyncRunAccepted(BaseModel):
-    """`POST /api/releases/sync` のレスポンス (202 Accepted)。
+    """Response of `POST /api/releases/sync` (202 Accepted).
 
-    sync はバックグラウンド実行に切り出したため、件数などの結果は同期的に
-    返さない。フロントは `is_running` を見てローディングし、`/sync-status` を
-    polling して完了 / エラーを知る。
-    - status=started: 今回ジョブを投入した
-    - status=already_running: 既に実行中だったので投入をスキップした
+    Since the sync runs in the background, results such as counts are not
+    returned synchronously. The frontend shows a loading state based on
+    `is_running` and polls `/sync-status` to learn about completion / errors.
+    - status=started: a job was enqueued by this request
+    - status=already_running: a sync was already running, so enqueueing was skipped
     """
 
     status: Literal["started", "already_running"]
@@ -72,9 +73,9 @@ class SyncRunAccepted(BaseModel):
 
 
 class SyncRunRequest(BaseModel):
-    """`POST /api/releases/sync` の任意 body。
+    """Optional body of `POST /api/releases/sync`.
 
-    省略時は service 側で `today - 365d` / `today + 30d` を採用する。
+    When omitted, the service falls back to `today - 365d` / `today + 30d`.
     """
 
     since_date: date | None = None
@@ -82,10 +83,10 @@ class SyncRunRequest(BaseModel):
 
 
 class ReleaseReadStatusUpdate(BaseModel):
-    """`PATCH /api/releases/{spotify_id}/read` の body。
+    """Body of `PATCH /api/releases/{spotify_id}/read`.
 
-    既読 / 未読のトグル用。True で既読 (read_at が now)、False で未読
-    (read_at が null)。
+    Toggles read / unread. True marks as read (read_at = now), False marks as
+    unread (read_at = null).
     """
 
     is_read: bool = Field(...)

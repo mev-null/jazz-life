@@ -16,5 +16,5 @@ services:
       - ./frontend/tsconfig.json:/app/tsconfig.json
       - ./frontend/tsconfig.app.json:/app/tsconfig.app.json
       - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
-      # node_modules はホスト側で管理しないように匿名ボリュームで保護
+      # Anonymous volume so node_modules is never managed from the host
       - /app/node_modules

@@ -55,9 +55,10 @@ export const getRecognizeApiRecognizePostUrl = () => {
 }
 
 /**
- * 録音クリップ (multipart `file`) を AudD で認識して 1 件のマッチを返す。
+ * Recognize a recorded clip (multipart `file`) via AudD and return one match.
 
-マッチしなければ `matched=False`。トークン未設定は 503、上流失敗は 502。
+`matched=False` when nothing matched. 503 if the API token is not
+configured, 502 on upstream failure.
  * @summary Recognize
  */
 export const recognizeApiRecognizePost = async (bodyRecognizeApiRecognizePost: BodyRecognizeApiRecognizePost, options?: RequestInit): Promise<recognizeApiRecognizePostResponse> => {

@@ -14,8 +14,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 if (env_url := os.environ.get("DATABASE_URL")) is not None:
-    # Railway などの managed PG が渡す `postgres://` 形式を SQLAlchemy 2.x が
-    # 解釈できる `postgresql+psycopg://` に揃える。Settings と同じロジック。
+    # Normalize the `postgres://` form handed out by managed Postgres (e.g. Railway) to
+    # `postgresql+psycopg://`, which SQLAlchemy 2.x understands. Same logic as Settings.
     config.set_main_option("sqlalchemy.url", normalize_database_url(env_url))
 
 target_metadata = SQLModel.metadata

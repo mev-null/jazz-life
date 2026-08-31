@@ -84,10 +84,10 @@ jobs:
         run: uv run pytest tests/${{ matrix.suite }} -v
 
   openapi-spec-check:
-    # backend のコード変更後に `make spec` でコミット済み openapi.json を更新し忘れていないか
-    # 検証する。FastAPI app を直接 import して `app.openapi()` をダンプし、jq で整形した
-    # 結果がコミット済みファイルと byte 一致するかを確認する。lifespan を起動しないので
-    # DB 不要・サーバ不要で軽量に走る（make spec の jq 出力と一致する）。
+    # Checks that the committed openapi.json was refreshed with `make spec` after backend
+    # code changes. Imports the FastAPI app directly, dumps `app.openapi()`, pretty-prints
+    # it with jq and requires a byte-for-byte match with the committed file. Lifespan never
+    # starts, so it needs no DB or server and runs fast (matches what `make spec` produces).
     name: openapi.json freshness
     runs-on: ubuntu-latest
     steps:

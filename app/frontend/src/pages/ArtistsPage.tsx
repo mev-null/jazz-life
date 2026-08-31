@@ -155,7 +155,7 @@ export function ArtistsPage() {
           <p className="text-sm text-ink-faint">loading…</p>
         )}
         {artistsQ.isError && (
-          <p className="text-sm text-ink-mute">読み込みに失敗しました</p>
+          <p className="text-sm text-ink-mute">Failed to load</p>
         )}
         {artistsQ.data && (
           <ul className="divide-y divide-ink-faint/30">

@@ -20,12 +20,12 @@ services:
     build:
       context: ./backend
     image: jazz-life-backend:dev
-    # `.env` は廃止。値は host shell から forward する。
-    # - Codespaces: .devcontainer/devcontainer.json の containerEnv (公開デフォルト) と
-    #   secrets (Codespaces user secrets から注入) が shell に揃う
-    # - 非 Codespaces: 各自 host shell に export する (例: direnv で .envrc) か、
-    #   app/.env を作っておけば docker-compose が自動で interpolation 用に拾う
-    # - Railway などの本番デプロイは Railway UI 側で同名 env を設定する (ADR-005)
+    # `.env` is no longer used; values are forwarded from the host shell.
+    # - Codespaces: containerEnv in .devcontainer/devcontainer.json (public defaults) and
+    #   secrets (injected from Codespaces user secrets) are both present in the shell
+    # - Outside Codespaces: export them in your host shell (e.g. direnv with .envrc), or
+    #   create app/.env, which docker-compose picks up automatically for interpolation
+    # - Production deploys such as Railway set the same env vars in the Railway UI (ADR-005)
     environment:
       DATABASE_URL: postgresql+psycopg://jazz:jazz@db:5432/jazz
       TEST_DATABASE_URL: postgresql+psycopg://jazz:jazz@db:5432/jazz_test
@@ -39,7 +39,7 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       COOKIE_SAMESITE: ${COOKIE_SAMESITE:-lax}
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
-      # ローカル / CI は /docs を見られたいので default true、本番では false にする
+      # Default true so /docs is visible locally / in CI; set to false in production
       EXPOSE_OPENAPI_DOCS: ${EXPOSE_OPENAPI_DOCS:-true}
     ports:
       - "8000:8000"
@@ -52,8 +52,8 @@ services:
   frontend:
     build:
       context: ./frontend
-      # ローカルは Vite dev server (HMR) で動かす。本番 build は Railway 側で
-      # `target: prod` を指定する。
+      # Local runs use the Vite dev server (HMR). The production build sets
+      # `target: prod` on the Railway side.
       target: dev
     image: jazz-life-frontend:dev
     environment:

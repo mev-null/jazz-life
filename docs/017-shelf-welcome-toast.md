@@ -1,7 +1,11 @@
 # ADR-017: 棚入れ (owned 化) の迎え入れトースト
 
+> **Summary (English).** When a record becomes owned ("To the shelf": a new owned record or a wanted → owned transition), show a quiet toast at the top of the screen — "Welcome to the collection — your Nth record." — using the existing toast provider and no new libraries. The count is fetched fresh via `GET /api/records?status=owned&limit=1` (`total`) and omitted if unknown, never wrong. Celebrations appear at the top, warnings at the bottom; no automatic navigation. Frontend-only, mock parity kept.
+>
+> *The body of this document is in Japanese. See [docs/README.md](./README.md) for the index of all design documents.*
+
 **Status**: Accepted | **Date**: 2026-05-30
-**Related**: [ADR-015](./015-pin-auto-and-limit.md) §2.2（owned になった瞬間 = 新規 owned 作成 / wanted→owned 遷移。本祝福の発火点と同一面）, [ADR-990](./990-ui-philosophy.md)（Home = 所有のショーケース / paper・ink のミニマル世界観）, [ADR-002](./002-phase-b-decisions.md) §2.8（mock パリティ）
+**Related**: [ADR-015](./015-pin-auto-and-limit.md) §2.2（owned になった瞬間 = 新規 owned 作成 / wanted→owned 遷移。本祝福の発火点と同一面）, UI 設計原則（Home = 所有のショーケース / paper・ink のミニマル世界観。ADR-990、未公開）, [ADR-002](./002-phase-b-decisions.md) §2.8（mock パリティ）
 
 ---
 
@@ -9,7 +13,7 @@
 
 レコードが `owned` になる瞬間（"To the shelf"）は、現状「mutation 成功 → `["records"]` invalidate → モーダル即閉じ」だけで、status フラグの反転以上の意味を持っていなかった。
 
-しかし **レコードを実際に所有するという体験は、ユーザーにとって大きな意味を持つ**。コレクションに一枚を迎え入れる行為は、本アプリの中心体験（Home = 所有のショーケース, [ADR-990](./990-ui-philosophy.md)）そのものであり、その瞬間が無反応で過ぎるのは軽すぎる。
+しかし **レコードを実際に所有するという体験は、ユーザーにとって大きな意味を持つ**。コレクションに一枚を迎え入れる行為は、本アプリの中心体験（Home = 所有のショーケース、UI 設計原則）そのものであり、その瞬間が無反応で過ぎるのは軽すぎる。
 
 検討の過程で「ジャケットに収集印を押す」スタンプ演出も候補に挙がったが、「押す」という能動的な所作は *所有が静かに確定する* 感覚と合わず不採用とした。派手な祝福ではなく、**静かな迎え入れ**を、既存資産の範囲で最小実装する方針とする。
 

@@ -1,14 +1,14 @@
 # app/backend/Makefile
-# 使い方: cd app/backend && make <target>
+# Usage: cd app/backend && make <target>
 #
-# - 依存管理 / 品質チェック / 単発スクリプトはホストの uv で動かす
-# - 起動・ログ・シェル・Alembic は docker compose 経由で稼働中の backend コンテナを叩く
-# 前提: ホストに uv (https://docs.astral.sh/uv/) と Python 3.11+ が入っていること
+# - Dependency management / quality checks / one-off scripts run with uv on the host
+# - Start / logs / shell / Alembic go through docker compose to the running backend container
+# Prerequisite: uv (https://docs.astral.sh/uv/) and Python 3.11+ installed on the host
 
-# docker-compose.yml は app/ にある。-f を毎回書かずに cd で吸収する
+# docker-compose.yml lives in app/. cd there instead of passing -f every time
 COMPOSE_DIR := ..
 
-# codespace 等で事前に設定された VIRTUAL_ENV が .venv と競合する警告を抑止
+# Suppress the warning when a VIRTUAL_ENV preset by Codespaces etc. conflicts with .venv
 unexport VIRTUAL_ENV
 
 .DEFAULT_GOAL := help
@@ -21,20 +21,20 @@ unexport VIRTUAL_ENV
 help:
 	@echo "backend targets:"
 	@echo ""
-	@echo "  起動 (docker, 通常の開発はこっち)"
-	@echo "    dev                 backend コンテナをフォアグラウンドで起動 (HMR + ログ)"
-	@echo "    dev-mobile          Codespaces 公開 URL でバインドして起動 (iPhone 実機確認用)"
+	@echo "  Run (docker, the usual dev loop)"
+	@echo "    dev                 Run the backend container in the foreground (HMR + logs)"
+	@echo "    dev-mobile          Bind to the Codespaces public URL (for testing on a real iPhone)"
 	@echo ""
-	@echo "  起動 (host, no docker)"
-	@echo "    run                 uvicorn を host で --reload 起動"
+	@echo "  Run (host, no docker)"
+	@echo "    run                 Run uvicorn on the host with --reload"
 	@echo ""
-	@echo "  依存管理 (host uv)"
-	@echo "    sync                uv sync (本番依存のみ)"
-	@echo "    sync-dev            uv sync --group dev (dev 依存込み、IDE 補完用)"
+	@echo "  Dependencies (host uv)"
+	@echo "    sync                uv sync (production deps only)"
+	@echo "    sync-dev            uv sync --group dev (includes dev deps, for IDE completion)"
 	@echo "    add pkg=NAME        uv add NAME"
 	@echo "    lock                uv lock --upgrade"
 	@echo ""
-	@echo "  品質 (host uv run)"
+	@echo "  Quality (host uv run)"
 	@echo "    test                pytest"
 	@echo "    lint                ruff check"
 	@echo "    lint-fix            ruff check --fix"
@@ -42,32 +42,33 @@ help:
 	@echo "    typecheck           mypy app"
 	@echo "    check               lint + typecheck + test"
 	@echo ""
-	@echo "  Docker (稼働中のコンテナ)"
-	@echo "    shell               backend に bash で入る"
-	@echo "    logs                backend のログを follow"
-	@echo "    restart             backend サービスのみ再起動"
-	@echo "    db-shell            db に psql で入る"
+	@echo "  Docker (running containers)"
+	@echo "    shell               Open bash in the backend container"
+	@echo "    logs                Follow backend logs"
+	@echo "    restart             Restart only the backend service"
+	@echo "    db-shell            Open psql in the db container"
 	@echo ""
 	@echo "  Alembic"
-	@echo "    migration MSG=...   autogenerate でマイグレーション生成"
-	@echo "    migrate             head までアップグレード"
-	@echo "    migrate-down        1 つダウングレード"
+	@echo "    migration MSG=...   Autogenerate a migration"
+	@echo "    migrate             Upgrade to head"
+	@echo "    migrate-down        Downgrade one revision"
 
-# ---------- 起動（docker, foreground） ----------
-# 通常の開発はこれを別ターミナルで叩いて動かす。Ctrl-C で停止すると container も止まる。
-# 初回は image build が走るので時間がかかる。db は devcontainer postStartCommand で既に上がっている前提。
+# ---------- Run (docker, foreground) ----------
+# The usual dev loop: run this in a separate terminal. Ctrl-C stops the container too.
+# The first run builds the image, so it takes a while. Assumes db is already up via the
+# devcontainer postStartCommand.
 dev:
 	cd $(COMPOSE_DIR) && docker compose up --build backend
 
-# ---------- 起動（docker, Codespaces 公開 URL バインド） ----------
-# iPhone 等の実機から確認したい時用。Codespaces 限定。
-# 事前準備:
-#   1. Spotify Dashboard で Redirect URI に
-#      `https://<CODESPACE_NAME>-8000.app.github.dev/api/auth/callback` を追加
-#   2. VS Code の PORTS タブで 5173 / 8000 の visibility を Public に変更
-# 5173 と 8000 は別ホスト扱いになるため SameSite=None; Secure cookie が必須。
+# ---------- Run (docker, bound to the Codespaces public URL) ----------
+# For testing from a real device such as an iPhone. Codespaces only.
+# Setup:
+#   1. In the Spotify Dashboard, add
+#      `https://<CODESPACE_NAME>-8000.app.github.dev/api/auth/callback` as a Redirect URI
+#   2. In the VS Code PORTS tab, set the visibility of 5173 / 8000 to Public
+# 5173 and 8000 count as different hosts, so SameSite=None; Secure cookies are required.
 dev-mobile:
-	@test -n "$$CODESPACE_NAME" || { echo "CODESPACE_NAME 未設定 (Codespaces 専用 target)"; exit 1; }
+	@test -n "$$CODESPACE_NAME" || { echo "CODESPACE_NAME is not set (Codespaces-only target)"; exit 1; }
 	@DOMAIN=$${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}; \
 	echo "→ frontend public URL: https://$$CODESPACE_NAME-5173.$$DOMAIN"; \
 	echo "→ backend  public URL: https://$$CODESPACE_NAME-8000.$$DOMAIN"; \
@@ -80,11 +81,11 @@ dev-mobile:
 	COOKIE_SAMESITE=none \
 	docker compose up --build backend
 
-# ---------- 起動（host） ----------
+# ---------- Run (host) ----------
 run:
 	uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-# ---------- 依存管理（host uv） ----------
+# ---------- Dependencies (host uv) ----------
 sync:
 	uv sync --no-dev
 
@@ -98,7 +99,7 @@ add:
 lock:
 	uv lock --upgrade
 
-# ---------- 品質（host uv run） ----------
+# ---------- Quality (host uv run) ----------
 test:
 	@uv run pytest; ec=$$?; if [ $$ec -eq 5 ]; then echo "(no tests collected)"; exit 0; else exit $$ec; fi
 
@@ -116,7 +117,7 @@ typecheck:
 
 check: lint typecheck test
 
-# ---------- Docker（稼働中の backend コンテナ） ----------
+# ---------- Docker (running backend container) ----------
 shell:
 	cd $(COMPOSE_DIR) && docker compose exec backend bash
 

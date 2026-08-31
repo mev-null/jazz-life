@@ -76,8 +76,8 @@ export const getListReleasesApiReleasesGetUrl = (params?: ListReleasesApiRelease
 }
 
 /**
- * current user が follow 中 (archived=false) の artist の release を返す
-(ADR-007 §2.4)。既読状態は user 単位で計算される (ADR-007 §2.3)。
+ * Return releases of artists the current user follows (archived=false)
+(ADR-007 §2.4). Read state is computed per user (ADR-007 §2.3).
  * @summary List Releases
  */
 export const listReleasesApiReleasesGet = async (params?: ListReleasesApiReleasesGetParams, options?: RequestInit): Promise<listReleasesApiReleasesGetResponse> => {
@@ -309,10 +309,10 @@ export const getSetReleaseReadStatusApiReleasesSpotifyIdReadPatchUrl = (spotifyI
 }
 
 /**
- * release の既読フラグを user 単位でトグル (Feed の未読 dot 用、ADR-007)。
+ * Toggle a release's read flag per user (for the Feed unread dot, ADR-007).
 
-`is_read=true` で `release_read_states` に upsert (read_at = now())、`false`
-で行を DELETE。release catalog が無ければ 404。
+`is_read=true` upserts into `release_read_states` (read_at = now());
+`false` DELETEs the row. 404 if the release is not in the catalog.
  * @summary Set Release Read Status
  */
 export const setReleaseReadStatusApiReleasesSpotifyIdReadPatch = async (spotifyId: string,
@@ -403,12 +403,13 @@ export const getTriggerSyncApiReleasesSyncPostUrl = () => {
 }
 
 /**
- * フォロー中アーティスト全件の releases を Spotify から取り込む (非同期)。
+ * Ingest releases for all followed artists from Spotify (asynchronously).
 
-Spotify レート制限の都合で sync は数十秒〜分かかりうるため、リクエスト内で
-同期実行せずバックグラウンドジョブを投入して即 202 を返す。進捗はフロントが
-`/sync-status` の `is_running` を polling して把握する。既に実行中なら多重
-起動を避けて already_running を返す (Phase B-4 で APScheduler 日次バッチへ移行)。
+Because of Spotify rate limits a sync can take tens of seconds to minutes,
+so instead of running it inside the request we enqueue a background job and
+return 202 immediately. The frontend tracks progress by polling `is_running`
+on `/sync-status`. If a sync is already running we return already_running
+to avoid concurrent runs (Phase B-4 moves this to an APScheduler daily batch).
  * @summary Trigger Sync
  */
 export const triggerSyncApiReleasesSyncPost = async (syncRunRequestNull?: SyncRunRequest | null, options?: RequestInit): Promise<triggerSyncApiReleasesSyncPostResponse> => {

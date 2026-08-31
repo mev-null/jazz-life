@@ -15,5 +15,5 @@ def http_errors() -> Iterator[None]:
     except ConflictError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except RecognitionError as exc:
-        # status_code は RecognitionError 側が決める (503 未設定 / 502 上流失敗)。
+        # RecognitionError decides the status_code (503 not configured / 502 upstream failure).
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc

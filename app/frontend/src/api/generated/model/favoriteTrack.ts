@@ -6,10 +6,11 @@
  */
 
 /**
- * ADR-006 §2.8: アルバム内の「お気に入り曲」1 件分。
+ * ADR-006 §2.8: one "favorite track" within an album.
 
-`spotify_track_id` は Spotify Get Album Tracks の id (manual 時は省略可)。
-`note` は曲ごとの短い所感 (裏ジャケに走り書きしたメモ)。
+`spotify_track_id` is the id from Spotify Get Album Tracks (optional for
+manual records). `note` is a short per-track impression (like a note
+scribbled on the back cover).
  */
 export interface FavoriteTrack {
   spotify_track_id?: string | null;

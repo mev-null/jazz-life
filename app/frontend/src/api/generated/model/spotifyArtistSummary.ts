@@ -6,11 +6,12 @@
  */
 
 /**
- * Spotify artist search 結果の 1 件を表す DTO。
+ * DTO for one Spotify artist search result.
 
-ArtistsPage の「フォロー追加」モーダルが Spotify から候補を引く時に使う。
-`upsert_artist` (POST /api/artists) と `follow_artist` (POST /api/user-follows)
-に渡せるよう、`spotify_id` / `name` / `image_url` を露出する。
+Used when the "add follow" modal on ArtistsPage pulls candidates from
+Spotify. Exposes `spotify_id` / `name` / `image_url` so the result can be
+passed to `upsert_artist` (POST /api/artists) and `follow_artist`
+(POST /api/user-follows).
  */
 export interface SpotifyArtistSummary {
   spotify_id: string;

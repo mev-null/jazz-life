@@ -1,24 +1,6 @@
-# Railway service config (backend).
-#
-# このファイルは Railway service "backend" の rootDirectory (= app/backend) 直下に
-# 置かれている。Railway は deploy 時にこのファイルを読み、サービス設定を上書きする。
-#
-# rootDirectory 自体は Railway service-level の設定で、このファイルでは指定できない
-# (rootDirectory を決めないとこのファイルの場所が定まらないため、当然そうなる)。
-# rootDirectory は Railway dashboard / `railway environment edit --service-config` で
-# 設定済み (2026-05-14 の Railpack 誤検出インシデント対応で復旧)。
-#
-# 経緯: builder / dockerfilePath / rootDirectory が空のまま git push 経由の
-# auto-deploy が走ると、Railway は pyproject.toml を見て Railpack の Python
-# auto-detect に倒れ、Dockerfile が無視されて起動できないという事故が起きた。
-# 再発を防ぐため、build 設定をコードで pin する。
-#
-# watchPatterns: frontend だけの変更（例: index.html 修正）でも watchPatterns
-# が空だと backend service の auto-deploy がキックされ、しかも Railway 側の
-# snapshot 最適化で `app/backend/` がスナップショットから欠落して build が
-# "lstat app/backend: no such file or directory" で即死する事故が再発した
-# (2026-05-14, PR #26 merge 時)。`app/backend/**` 配下の変更時だけ deploy する
-# ように絞る。
+# Railway service config for the backend service (rootDirectory = app/backend).
+# Pins the build to the Dockerfile builder so Railway never falls back to Railpack auto-detect.
+# watchPatterns limits auto-deploys to changes under this service's directory.
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"

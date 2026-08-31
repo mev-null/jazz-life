@@ -6,24 +6,25 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class PinReorderRequest(BaseModel):
-    """drag & drop で並び替えた pinned レコードの id 列。
+    """The id sequence of pinned records after a drag & drop reorder.
 
-    `ids` は user が現在 pin している全行を、ユーザが望む順序で並べたもの。
-    backend は 1..N で `pin_order` を再採番する。欠け/重複/未 pin 行混入は 409。
+    `ids` is every row the user currently has pinned, in the user's desired
+    order. The backend renumbers `pin_order` as 1..N. Missing / duplicate /
+    unpinned ids return 409.
     """
 
     ids: list[uuid.UUID]
 
 
 RecordSource = Literal["spotify", "manual"]
-# ADR-003 §2.1: "owned" は Home マトリクスに表示、"wanted" は want list 専用。
+# ADR-003 §2.1: "owned" is shown in the Home matrix, "wanted" is want-list only.
 RecordStatus = Literal["owned", "wanted"]
-# 文字列リテラル直書きを避け、service 層から参照する定数。
+# Constants for the service layer to reference instead of bare string literals.
 RECORD_STATUS_OWNED: RecordStatus = "owned"
 RECORD_STATUS_WANTED: RecordStatus = "wanted"
-# ADR-013: Digging の Hunt list 用の並び替え軸。
-# "artist" = アーティスト名昇順(→title)、"added" = on the hunt 登録日 (created_at) 降順。
-# 未指定時は従来の is_pinned/display_order 順 (Home マトリクス用)。
+# ADR-013: sort axis for the Hunt list in Digging.
+# "artist" = artist name asc (then title); "added" = on-the-hunt date (created_at) desc.
+# When omitted, the legacy is_pinned/display_order order is used (for the Home matrix).
 RecordSort = Literal["artist", "added"]
 
 _DATE_PATTERN = r"^\d{4}(-\d{2}(-\d{2})?)?$"
@@ -31,10 +32,11 @@ _CURRENCY_PATTERN = r"^[A-Z]{3}$"
 
 
 class FavoriteTrack(BaseModel):
-    """ADR-006 §2.8: アルバム内の「お気に入り曲」1 件分。
+    """ADR-006 §2.8: one "favorite track" within an album.
 
-    `spotify_track_id` は Spotify Get Album Tracks の id (manual 時は省略可)。
-    `note` は曲ごとの短い所感 (裏ジャケに走り書きしたメモ)。
+    `spotify_track_id` is the id from Spotify Get Album Tracks (optional for
+    manual records). `note` is a short per-track impression (like a note
+    scribbled on the back cover).
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -45,10 +47,10 @@ class FavoriteTrack(BaseModel):
 
 
 class VinylRecordRead(BaseModel):
-    """ADR-006: response shape は catalog + ownership を flat に並べて維持。
+    """ADR-006: the response shape stays flat, combining catalog + ownership.
 
-    `id` は `user_collections.id` を返す (frontend からは 1 件の record と見える)。
-    `favorite_tracks` は構造化リスト (position 昇順)。
+    `id` is `user_collections.id` (the frontend sees it as a single record).
+    `favorite_tracks` is a structured list (ascending by position).
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -71,8 +73,8 @@ class VinylRecordRead(BaseModel):
     favorite_tracks: list[FavoriteTrack]
     display_order: int
     is_pinned: bool
-    # ピン済みレコードの並び順 (drag & drop で書き換える)。非 pin 行は null。
-    # フロントが pin リストを表示順で並べるのに使う。
+    # Order among pinned records (rewritten via drag & drop). null for unpinned rows.
+    # The frontend uses it to sort the pin list for display.
     pin_order: int | None
     created_at: datetime
     updated_at: datetime
@@ -97,8 +99,8 @@ class VinylRecordCreate(BaseModel):
 
 
 class VinylRecordUpdate(BaseModel):
-    """ADR-002 寛容 PUT: omit したフィールドは no-op、明示的に null/`[]` を
-    送った場合のみ clear する (`exclude_unset` 経由)。
+    """ADR-002 lenient PUT: omitted fields are a no-op; a field is cleared only
+    when null/`[]` is sent explicitly (via `exclude_unset`).
     """
 
     artist_id: str | None = None
