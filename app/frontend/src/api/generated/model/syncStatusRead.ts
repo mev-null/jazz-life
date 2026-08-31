@@ -7,10 +7,10 @@
 import type { SyncRunSummary } from './syncRunSummary';
 
 /**
- * `/api/releases/sync-status` のレスポンス。
+ * Response of `/api/releases/sync-status`.
 
-フロント Feed 側で「最終同期日時 / エラー状態」を表示するため (ADR-000 §314)。
-Row が無い (一度も sync していない) ケースでは last_* が null になる。
+Lets the Feed show "last synced at / error state" (ADR-000 §314).
+When no row exists (never synced), the last_* fields are null.
  */
 export interface SyncStatusRead {
   source: string;

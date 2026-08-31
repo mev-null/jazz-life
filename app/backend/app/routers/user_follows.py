@@ -1,13 +1,13 @@
-"""user_follows 操作の API。
+"""API for user_follows operations.
 
-- GET /api/user-follows/artists: 現ユーザが follow 中 (archived=false) の artists
-- GET /api/user-follows/record-counts: 現ユーザの artist_id ごとの所有レコード数
-- POST /api/user-follows: 明示的に artist を follow に追加 (ArtistsPage の「追加」UI 用)
-- DELETE /api/user-follows/{artist_id}: follow 解除 (soft delete)
+- GET /api/user-follows/artists: artists the current user follows (archived=false)
+- GET /api/user-follows/record-counts: current user's owned record count per artist_id
+- POST /api/user-follows: explicitly follow an artist (for the "add" UI on ArtistsPage)
+- DELETE /api/user-follows/{artist_id}: unfollow (soft delete)
 
-records 登録経由の auto-follow (RecordService.create) と並行して、
-ArtistsPage から Spotify 検索で artist を選んで follow を作る経路も
-このルータが受け持つ。
+Alongside the auto-follow that happens on record creation (RecordService.create),
+this router also handles the path where a user picks an artist from Spotify search
+on ArtistsPage and creates a follow.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -34,29 +34,32 @@ def list_followed_artists(
     current_user: User = Depends(get_current_user),
     artist_repo: ArtistRepository = Depends(get_artist_repository),
 ) -> ListResponse[ArtistRead]:
-    """現ユーザが follow 中 (archived=false) の artists を返す。
+    """Return the artists the current user follows (archived=false).
 
-    ArtistsPage 一覧専用。`GET /api/artists` は global registry (HomePage の
-    record→artist 名前引きなどで利用) なので別エンドポイントに切る。
+    Dedicated to the ArtistsPage list. `GET /api/artists` is the global registry
+    (used e.g. for record→artist name lookup on HomePage), hence a separate
+    endpoint.
     """
     rows = artist_repo.list_followed_by(current_user.id)
     return ListResponse(items=[ArtistRead.model_validate(row) for row in rows])
 
 
-# 注意: `/{artist_id}` (DELETE) より先に `/record-counts` を宣言する。
-# FastAPI は宣言順でマッチングするが、HTTP メソッドが異なる (GET vs DELETE)
-# ので順序衝突は起きない。ただし可読性のため一覧系を先にまとめる。
+# Note: `/record-counts` is declared before `/{artist_id}` (DELETE).
+# FastAPI matches in declaration order, but the HTTP methods differ (GET vs
+# DELETE) so there is no ordering conflict. Listing endpoints are grouped first
+# for readability.
 @router.get("/record-counts", response_model=ListResponse[ArtistRecordCount])
 def list_record_counts(
     current_user: User = Depends(get_current_user),
     service: RecordService = Depends(get_record_service),
 ) -> ListResponse[ArtistRecordCount]:
-    """current user の所有レコード数を artist_id ごとに集計して返す。
+    """Return the current user's owned record count aggregated per artist_id.
 
-    ArtistsPage 一覧の件数列専用。records 全件取得を避けて軽量化する。
-    旧 `/api/artists/record-counts` を user-follows 配下に移設し (集計の単位が
-    follow と一致するため意味論として整合する)、同時に user_id でスコープを
-    切るようにした。status='owned' のみ数える (want list は除外)。
+    Dedicated to the count column of the ArtistsPage list; avoids fetching all
+    records. Moved here from the old `/api/artists/record-counts` because the
+    aggregation unit matches follows (semantically consistent under
+    user-follows), and scoped by user_id at the same time. Only status='owned'
+    is counted (the want list is excluded).
     """
     counts = service.count_owned_by_artist_for_user(current_user.id)
     return ListResponse(items=[ArtistRecordCount(artist_id=k, count=v) for k, v in counts.items()])
@@ -69,15 +72,16 @@ def follow_artist(
     artist_repo: ArtistRepository = Depends(get_artist_repository),
     follow_repo: UserFollowRepository = Depends(get_user_follow_repository),
 ) -> ArtistRead:
-    """`artist_id` を current user の follow に追加する。
+    """Add `artist_id` to the current user's follows.
 
-    `UserFollowRepository.upsert` を使うので冪等:
-    - 既に active follow なら上書きで no-op、201 + 既存 artist
-    - archived 行があれば archived_flag=false に戻して再 follow
-    - 行が無ければ新規 INSERT
+    Idempotent because it uses `UserFollowRepository.upsert`:
+    - already an active follow: overwrite is a no-op, 201 + existing artist
+    - an archived row exists: reset archived_flag=false and re-follow
+    - no row: new INSERT
 
-    artist が `artists` テーブルに無い場合は 404。UI 側で先に `POST /api/artists`
-    で upsert する想定 (Spotify 検索結果のメタデータをそのまま投入する)。
+    404 if the artist is not in the `artists` table. The UI is expected to
+    upsert it first via `POST /api/artists` (passing the Spotify search result
+    metadata as-is).
     """
     artist = artist_repo.get(payload.artist_id)
     if artist is None:
@@ -95,13 +99,13 @@ def unfollow_artist(
     current_user: User = Depends(get_current_user),
     follow_repo: UserFollowRepository = Depends(get_user_follow_repository),
 ) -> None:
-    """Spotify ID の artist を follow から外す (soft delete: archived_flag=true)。
+    """Unfollow the artist with this Spotify ID (soft delete: archived_flag=true).
 
-    archived_flag を立てるだけなので「以前 follow してた」履歴は残る。
-    list_artist_ids は archived_flag=false のみ返すので、次の release sync は
-    このアーティストを対象から外す。
+    Only sets archived_flag, so the "previously followed" history is kept.
+    list_artist_ids returns archived_flag=false rows only, so the next release
+    sync excludes this artist.
 
-    無いものを消そうとしたら 404、既に archived なら 204 (冪等)。
+    404 if there is nothing to remove; 204 if already archived (idempotent).
     """
     ok = follow_repo.archive(current_user.id, artist_id)
     if not ok:

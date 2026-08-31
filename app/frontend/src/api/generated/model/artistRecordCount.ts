@@ -6,11 +6,12 @@
  */
 
 /**
- * ArtistsPage 一覧の件数列に渡す軽量行。
+ * Lightweight row for the count column of the ArtistsPage list.
 
-records 本体は ArtistDetailModal を開くまで fetch しない方針のため、
-一覧では「N records」表示だけ別エンドポイント `/api/user-follows/record-counts`
-から先に取れるようにする (auth 必須、current user 所有 owned のみ集計)。
+Records themselves are not fetched until ArtistDetailModal opens, so the
+list gets just the "N records" figure up front from the separate endpoint
+`/api/user-follows/record-counts` (auth required; counts only the current
+user's owned records).
  */
 export interface ArtistRecordCount {
   artist_id: string;

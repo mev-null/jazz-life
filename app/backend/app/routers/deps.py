@@ -110,9 +110,9 @@ def get_spotify_oauth_client(settings: Settings = Depends(get_settings)) -> Spot
     return SpotifyOAuthClient(settings)
 
 
-# Client Credentials Flow 用クライアントは process-wide で 1 つに揃え、
-# in-memory token cache を共有する。FastAPI の Depends は呼び出し毎に新しい
-# インスタンスを返すので、ここでモジュール変数に保持する。
+# Keep a single process-wide Client Credentials Flow client so the in-memory
+# token cache is shared. FastAPI's Depends returns a new instance per call,
+# so the instance is held in a module-level variable here.
 _spotify_app_client: SpotifyAppClient | None = None
 
 

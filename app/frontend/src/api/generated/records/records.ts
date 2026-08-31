@@ -75,14 +75,16 @@ export const getListRecordsApiRecordsGetUrl = (params?: ListRecordsApiRecordsGet
 }
 
 /**
- * current user の collection を返す (ADR-006 §3.4)。
+ * Return the current user's collection (ADR-006 §3.4).
 
-`limit` を渡すと paginated。レスポンス `total` は (status 絞り込み後の) user の
-collection 件数なので、フロント側で `Math.ceil(total / limit)` でページ数を出せる。
+Passing `limit` paginates. The response `total` is the size of the user's
+collection (after the `status` filter), so the frontend can derive the page
+count with `Math.ceil(total / limit)`.
 
-- `status`: owned / wanted で絞り込み (ADR-013 の Hunt list は `wanted`)。
-- `sort`: `artist` (アーティスト名→title 昇順) / `added` (created_at 降順)。
-  省略時は `is_pinned DESC, pin_order ASC, display_order ASC` (Home マトリクス用)。
+- `status`: filter by owned / wanted (the ADR-013 Hunt list uses `wanted`).
+- `sort`: `artist` (artist name, then title, ascending) / `added`
+  (created_at descending). Defaults to
+  `is_pinned DESC, pin_order ASC, display_order ASC` (for the Home matrix).
  * @summary List Records
  */
 export const listRecordsApiRecordsGet = async (params?: ListRecordsApiRecordsGetParams, options?: RequestInit): Promise<listRecordsApiRecordsGetResponse> => {
@@ -202,8 +204,9 @@ export const getCreateRecordApiRecordsPostUrl = () => {
 }
 
 /**
- * record を 1 件作成。catalog find-or-create + user_collections INSERT +
-auto-follow を 1 TX で行う。UNIQUE(user_id, vinyl_record_id) 違反は 409。
+ * Create one record: catalog find-or-create + user_collections INSERT +
+auto-follow in a single transaction. UNIQUE(user_id, vinyl_record_id)
+violations return 409.
  * @summary Create Record
  */
 export const createRecordApiRecordsPost = async (vinylRecordCreate: VinylRecordCreate, options?: RequestInit): Promise<createRecordApiRecordsPostResponse> => {
@@ -293,10 +296,10 @@ export const getReorderPinsApiRecordsPinsOrderPutUrl = () => {
 }
 
 /**
- * ピン済みレコードの並び順を drag & drop 後に保存する。
+ * Persist the order of pinned records after a drag & drop.
 
-body の `ids` は現在 pin しているすべての user_collection.id を、望む順序で
-並べたもの。current pin セットと一致しない場合は 409。
+`ids` in the body is every currently pinned user_collection.id in the
+desired order. 409 if it does not match the current pin set.
  * @summary Reorder Pins
  */
 export const reorderPinsApiRecordsPinsOrderPut = async (pinReorderRequest: PinReorderRequest, options?: RequestInit): Promise<reorderPinsApiRecordsPinsOrderPutResponse> => {
@@ -386,9 +389,9 @@ export const getUpdateRecordApiRecordsIdPutUrl = (id: string,) => {
 }
 
 /**
- * user_collections を user_id ガード付きで部分更新。catalog 系は
-`source='manual'` のみ書く (ADR-006 §2.5)。`spotify_album_id` を埋め直すと
-manual→spotify promote 経路 (§2.9)。
+ * Partially update user_collections, guarded by user_id. Catalog fields
+are written only when `source='manual'` (ADR-006 §2.5). Setting
+`spotify_album_id` takes the manual→spotify promotion path (§2.9).
  * @summary Update Record
  */
 export const updateRecordApiRecordsIdPut = async (id: string,
@@ -479,7 +482,7 @@ export const getDeleteRecordApiRecordsIdDeleteUrl = (id: string,) => {
 }
 
 /**
- * user_collections を物理削除 (favorites も CASCADE)。catalog は触らない。
+ * Hard-delete the user_collections row (favorites CASCADE). The catalog is untouched.
  * @summary Delete Record
  */
 export const deleteRecordApiRecordsIdDelete = async (id: string, options?: RequestInit): Promise<deleteRecordApiRecordsIdDeleteResponse> => {

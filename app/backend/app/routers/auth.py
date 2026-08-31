@@ -1,7 +1,6 @@
-"""Spotify Authorization Code Flow と JWT セッションの 4 endpoint。
+"""The four endpoints for the Spotify Authorization Code Flow and JWT sessions.
 
-設計詳細は docs/000-pre-adr.md §15 / §F-A1 と plan
-(/home/codespace/.claude/plans/memoized-orbiting-lark.md) §設計詳細 5。
+Design details: docs/000-pre-adr.md §15 / §F-A1.
 """
 
 from __future__ import annotations
@@ -19,7 +18,7 @@ from app.services.auth_service import AuthService
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-# OAuth state cookie はコールバックのみで使うため path を絞る。
+# The OAuth state cookie is only used by the callback, so narrow its path.
 _STATE_COOKIE_PATH = "/api/auth/callback"
 
 
@@ -55,7 +54,7 @@ def callback(
     settings: Settings = Depends(get_settings),
 ) -> RedirectResponse:
     if error is not None:
-        # ユーザが認可画面で deny した場合などに Spotify が返す
+        # Returned by Spotify e.g. when the user denies on the consent screen.
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="authorization denied")
     if not code:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="missing code")
@@ -104,8 +103,9 @@ def logout(
     response: Response,
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    # SameSite=None; Secure で発行した cookie は同属性付きでないと削除が効かない
-    # ブラウザがあるため、login/callback と同じ属性で expire させる。
+    # Some browsers ignore deletion of a cookie issued with SameSite=None; Secure
+    # unless the same attributes are sent, so expire it with the same attributes
+    # as login/callback.
     response.delete_cookie(
         key=settings.cookie_name,
         path="/",

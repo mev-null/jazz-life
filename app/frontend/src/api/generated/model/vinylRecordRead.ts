@@ -9,10 +9,10 @@ import type { VinylRecordReadSource } from './vinylRecordReadSource';
 import type { VinylRecordReadStatus } from './vinylRecordReadStatus';
 
 /**
- * ADR-006: response shape は catalog + ownership を flat に並べて維持。
+ * ADR-006: the response shape stays flat, combining catalog + ownership.
 
-`id` は `user_collections.id` を返す (frontend からは 1 件の record と見える)。
-`favorite_tracks` は構造化リスト (position 昇順)。
+`id` is `user_collections.id` (the frontend sees it as a single record).
+`favorite_tracks` is a structured list (ascending by position).
  */
 export interface VinylRecordRead {
   id: string;

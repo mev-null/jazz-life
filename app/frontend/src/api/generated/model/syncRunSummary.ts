@@ -6,12 +6,13 @@
  */
 
 /**
- * 直近に完走した sync ジョブの結果サマリ。
+ * Result summary of the most recently completed sync job.
 
-sync_status の last_* (DB 永続) と違い in-memory 由来 (プロセス再起動で消える)。
-フロントが「partial: N ingested / rate limited」等の補足表示に使う。
-artists_succeeded < artists_total なら一部のアーティストが取り込めていない
-(rate limit で打ち切り or per-artist エラー)。
+Unlike the last_* fields of sync_status (persisted in the DB), this is
+in-memory and lost on process restart. The frontend uses it for
+supplementary text such as "partial: N ingested / rate limited".
+artists_succeeded < artists_total means some artists were not ingested
+(cut off by rate limiting, or a per-artist error).
  */
 export interface SyncRunSummary {
   artists_total: number;

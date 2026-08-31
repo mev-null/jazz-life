@@ -1,10 +1,12 @@
-"""音声認識エンドポイント (ADR-016)。
+"""Audio recognition endpoint (ADR-016).
 
-録音した短いクリップを受け取り、AudD で曲を認識して `RecognitionResult` を返す。
-frontend (Digging の Listen タブ) はこの結果を Record 追加フォームに prefill する。
+Accepts a short recorded clip, identifies the track via AudD, and returns a
+`RecognitionResult`. The frontend (the Listen tab in Digging) uses the result to
+prefill the add-record form.
 
-認証は既存のアプリログイン (`get_current_user`) で保護する。AudD への通信は
-RecognitionService が担い、失敗は RecognitionError → http_errors で HTTP 化する。
+Protected by the existing app login (`get_current_user`). RecognitionService
+handles the AudD call; failures surface as RecognitionError and are mapped to
+HTTP by http_errors.
 """
 
 from __future__ import annotations
@@ -26,9 +28,10 @@ def recognize(
     service: RecognitionService = Depends(get_recognition_service),
     _: User = Depends(get_current_user),
 ) -> RecognitionResult:
-    """録音クリップ (multipart `file`) を AudD で認識して 1 件のマッチを返す。
+    """Recognize a recorded clip (multipart `file`) via AudD and return one match.
 
-    マッチしなければ `matched=False`。トークン未設定は 503、上流失敗は 502。
+    `matched=False` when nothing matched. 503 if the API token is not
+    configured, 502 on upstream failure.
     """
     with http_errors():
         audio = file.file.read()

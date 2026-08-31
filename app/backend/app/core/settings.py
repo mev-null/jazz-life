@@ -10,7 +10,7 @@ env の出所:
 - 公開デフォルト → `.devcontainer/devcontainer.json` の `containerEnv`
 - docker-compose は host shell env を `environment:` substitution で container に
   forward する
-- `.env` ファイルは廃止 (詳細: README / CLAUDE.md)
+- `.env` ファイルは廃止 (詳細: README / docs/DEVELOPMENT.md)
 
 起動時に Fernet 鍵 / JWT_SECRET / allowlist の妥当性を `model_validator` で検証し、
 誤った設定で起動して最初の callback 時に初めて気付く事故を防ぐ。

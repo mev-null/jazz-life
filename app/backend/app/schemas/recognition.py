@@ -1,11 +1,13 @@
-"""音声認識 (AudD) の DTO (ADR-016)。
+"""DTOs for audio recognition via AudD (ADR-016).
 
-`/api/recognize` のレスポンス。録音した短いクリップを AudD に投げて得た 1 件の
-マッチを、frontend の Record 追加フォームに prefill しやすい最小フィールドに正規化する。
+Response of `/api/recognize`. Normalizes the single match AudD returns for a
+short recorded clip into the minimal set of fields the frontend needs to
+prefill the add-record form.
 
-AudD の `return=spotify` 指定で付いてくる Spotify メタ (album.id / images /
-release_date / artists[].id) を使い、曲 → アルバム + Spotify アーティスト ID まで
-解決する。マッチしなければ `matched=False` で他は None。
+Uses the Spotify metadata attached when AudD is called with `return=spotify`
+(album.id / images / release_date / artists[].id) to resolve track → album +
+Spotify artist ID. When nothing matched, `matched=False` and everything else is
+None.
 """
 
 from __future__ import annotations
@@ -14,19 +16,19 @@ from pydantic import BaseModel
 
 
 class RecognitionResult(BaseModel):
-    # マッチしたか。False の場合、以降のフィールドはすべて None。
+    # Whether a match was found. If False, all remaining fields are None.
     matched: bool = False
 
-    # 認識した「曲」の情報 (favorite_tracks への自動挿入に使う)。
+    # The recognized track (used to auto-insert into favorite_tracks).
     title: str | None = None
     artist_name: str | None = None
 
-    # 曲が属する「アルバム」の情報 (On the hunt = レコード単位なので主役)。
+    # The album the track belongs to (the main subject: On the hunt is per record).
     album: str | None = None
     spotify_album_id: str | None = None
-    image_url: str | None = None  # アルバムジャケット
+    image_url: str | None = None  # album cover art
     original_release_date: str | None = None
 
-    # アーティスト解決用。DB 未在籍なら frontend が upsertArtist で追加する。
+    # For artist resolution. If not yet in the DB, the frontend adds it via upsertArtist.
     spotify_artist_id: str | None = None
     artist_image_url: str | None = None

@@ -6,10 +6,11 @@
  */
 
 /**
- * drag & drop で並び替えた pinned レコードの id 列。
+ * The id sequence of pinned records after a drag & drop reorder.
 
-`ids` は user が現在 pin している全行を、ユーザが望む順序で並べたもの。
-backend は 1..N で `pin_order` を再採番する。欠け/重複/未 pin 行混入は 409。
+`ids` is every row the user currently has pinned, in the user's desired
+order. The backend renumbers `pin_order` as 1..N. Missing / duplicate /
+unpinned ids return 409.
  */
 export interface PinReorderRequest {
   ids: string[];

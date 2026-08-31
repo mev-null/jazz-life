@@ -163,7 +163,7 @@
           "artists"
         ],
         "summary": "Upsert Artist",
-        "description": "spotify_id をキーに upsert。既存なら既存を返す (200)。\n\nPhase B-3 PR-2: RecordFormModal が Spotify album を選んだ時、その album の\nartist がまだ DB に無い場合に呼び出す。重複 POST でも 409 を返さない冪等設計。",
+        "description": "Upsert keyed on spotify_id; returns the existing row if present (200).\n\nPhase B-3 PR-2: called by RecordFormModal when a Spotify album is selected\nand the album's artist is not yet in the DB. Idempotent by design: a\nduplicate POST never returns 409.",
         "operationId": "upsert_artist_api_artists_post",
         "requestBody": {
           "content": {
@@ -205,7 +205,7 @@
           "artists"
         ],
         "summary": "Get Artist",
-        "description": "単一 artist を取り、image_url が NULL なら Spotify から補完する。\n\nArtistDetailModal を開いた時に呼ぶ「lazy photo hydration」エンドポイント。\nSpotify 側エラーは service 層で握り潰されるので、画像が無い場合は\nimage_url=null のまま返る (UI 側で initials fallback)。",
+        "description": "Fetch a single artist, filling in image_url from Spotify when it is NULL.\n\nThe \"lazy photo hydration\" endpoint called when ArtistDetailModal opens.\nSpotify-side errors are swallowed in the service layer, so when no image\nis available the artist is returned with image_url=null (the UI falls back\nto initials).",
         "operationId": "get_artist_api_artists__spotify_id__get",
         "parameters": [
           {
@@ -248,7 +248,7 @@
           "records"
         ],
         "summary": "List Records",
-        "description": "current user の collection を返す (ADR-006 §3.4)。\n\n`limit` を渡すと paginated。レスポンス `total` は (status 絞り込み後の) user の\ncollection 件数なので、フロント側で `Math.ceil(total / limit)` でページ数を出せる。\n\n- `status`: owned / wanted で絞り込み (ADR-013 の Hunt list は `wanted`)。\n- `sort`: `artist` (アーティスト名→title 昇順) / `added` (created_at 降順)。\n  省略時は `is_pinned DESC, pin_order ASC, display_order ASC` (Home マトリクス用)。",
+        "description": "Return the current user's collection (ADR-006 §3.4).\n\nPassing `limit` paginates. The response `total` is the size of the user's\ncollection (after the `status` filter), so the frontend can derive the page\ncount with `Math.ceil(total / limit)`.\n\n- `status`: filter by owned / wanted (the ADR-013 Hunt list uses `wanted`).\n- `sort`: `artist` (artist name, then title, ascending) / `added`\n  (created_at descending). Defaults to\n  `is_pinned DESC, pin_order ASC, display_order ASC` (for the Home matrix).",
         "operationId": "list_records_api_records_get",
         "parameters": [
           {
@@ -349,7 +349,7 @@
           "records"
         ],
         "summary": "Create Record",
-        "description": "record を 1 件作成。catalog find-or-create + user_collections INSERT +\nauto-follow を 1 TX で行う。UNIQUE(user_id, vinyl_record_id) 違反は 409。",
+        "description": "Create one record: catalog find-or-create + user_collections INSERT +\nauto-follow in a single transaction. UNIQUE(user_id, vinyl_record_id)\nviolations return 409.",
         "operationId": "create_record_api_records_post",
         "requestBody": {
           "required": true,
@@ -391,7 +391,7 @@
           "records"
         ],
         "summary": "Reorder Pins",
-        "description": "ピン済みレコードの並び順を drag & drop 後に保存する。\n\nbody の `ids` は現在 pin しているすべての user_collection.id を、望む順序で\n並べたもの。current pin セットと一致しない場合は 409。",
+        "description": "Persist the order of pinned records after a drag & drop.\n\n`ids` in the body is every currently pinned user_collection.id in the\ndesired order. 409 if it does not match the current pin set.",
         "operationId": "reorder_pins_api_records_pins_order_put",
         "requestBody": {
           "content": {
@@ -426,7 +426,7 @@
           "records"
         ],
         "summary": "Update Record",
-        "description": "user_collections を user_id ガード付きで部分更新。catalog 系は\n`source='manual'` のみ書く (ADR-006 §2.5)。`spotify_album_id` を埋め直すと\nmanual→spotify promote 経路 (§2.9)。",
+        "description": "Partially update user_collections, guarded by user_id. Catalog fields\nare written only when `source='manual'` (ADR-006 §2.5). Setting\n`spotify_album_id` takes the manual→spotify promotion path (§2.9).",
         "operationId": "update_record_api_records__id__put",
         "parameters": [
           {
@@ -478,7 +478,7 @@
           "records"
         ],
         "summary": "Delete Record",
-        "description": "user_collections を物理削除 (favorites も CASCADE)。catalog は触らない。",
+        "description": "Hard-delete the user_collections row (favorites CASCADE). The catalog is untouched.",
         "operationId": "delete_record_api_records__id__delete",
         "parameters": [
           {
@@ -515,7 +515,7 @@
           "recognize"
         ],
         "summary": "Recognize",
-        "description": "録音クリップ (multipart `file`) を AudD で認識して 1 件のマッチを返す。\n\nマッチしなければ `matched=False`。トークン未設定は 503、上流失敗は 502。",
+        "description": "Recognize a recorded clip (multipart `file`) via AudD and return one match.\n\n`matched=False` when nothing matched. 503 if the API token is not\nconfigured, 502 on upstream failure.",
         "operationId": "recognize_api_recognize_post",
         "requestBody": {
           "content": {
@@ -557,7 +557,7 @@
           "releases"
         ],
         "summary": "List Releases",
-        "description": "current user が follow 中 (archived=false) の artist の release を返す\n(ADR-007 §2.4)。既読状態は user 単位で計算される (ADR-007 §2.3)。",
+        "description": "Return releases of artists the current user follows (archived=false)\n(ADR-007 §2.4). Read state is computed per user (ADR-007 §2.3).",
         "operationId": "list_releases_api_releases_get",
         "parameters": [
           {
@@ -646,7 +646,7 @@
           "releases"
         ],
         "summary": "Set Release Read Status",
-        "description": "release の既読フラグを user 単位でトグル (Feed の未読 dot 用、ADR-007)。\n\n`is_read=true` で `release_read_states` に upsert (read_at = now())、`false`\nで行を DELETE。release catalog が無ければ 404。",
+        "description": "Toggle a release's read flag per user (for the Feed unread dot, ADR-007).\n\n`is_read=true` upserts into `release_read_states` (read_at = now());\n`false` DELETEs the row. 404 if the release is not in the catalog.",
         "operationId": "set_release_read_status_api_releases__spotify_id__read_patch",
         "parameters": [
           {
@@ -699,7 +699,7 @@
           "releases"
         ],
         "summary": "Trigger Sync",
-        "description": "フォロー中アーティスト全件の releases を Spotify から取り込む (非同期)。\n\nSpotify レート制限の都合で sync は数十秒〜分かかりうるため、リクエスト内で\n同期実行せずバックグラウンドジョブを投入して即 202 を返す。進捗はフロントが\n`/sync-status` の `is_running` を polling して把握する。既に実行中なら多重\n起動を避けて already_running を返す (Phase B-4 で APScheduler 日次バッチへ移行)。",
+        "description": "Ingest releases for all followed artists from Spotify (asynchronously).\n\nBecause of Spotify rate limits a sync can take tens of seconds to minutes,\nso instead of running it inside the request we enqueue a background job and\nreturn 202 immediately. The frontend tracks progress by polling `is_running`\non `/sync-status`. If a sync is already running we return already_running\nto avoid concurrent runs (Phase B-4 moves this to an APScheduler daily batch).",
         "operationId": "trigger_sync_api_releases_sync_post",
         "requestBody": {
           "content": {
@@ -748,7 +748,7 @@
           "spotify"
         ],
         "summary": "Search Artists",
-        "description": "ArtistsPage のフォロー追加モーダルから叩く。\n\nUI で選んだ結果を `POST /api/artists` (upsert) → `POST /api/user-follows`\nの 2 段で follow まで進める。",
+        "description": "Called from the add-follow modal on ArtistsPage.\n\nThe UI takes the selected result through two steps to reach a follow:\n`POST /api/artists` (upsert) → `POST /api/user-follows`.",
         "operationId": "search_artists_api_spotify_artists_search_get",
         "parameters": [
           {
@@ -881,7 +881,7 @@
           "user-follows"
         ],
         "summary": "List Followed Artists",
-        "description": "現ユーザが follow 中 (archived=false) の artists を返す。\n\nArtistsPage 一覧専用。`GET /api/artists` は global registry (HomePage の\nrecord→artist 名前引きなどで利用) なので別エンドポイントに切る。",
+        "description": "Return the artists the current user follows (archived=false).\n\nDedicated to the ArtistsPage list. `GET /api/artists` is the global registry\n(used e.g. for record→artist name lookup on HomePage), hence a separate\nendpoint.",
         "operationId": "list_followed_artists_api_user_follows_artists_get",
         "responses": {
           "200": {
@@ -903,7 +903,7 @@
           "user-follows"
         ],
         "summary": "List Record Counts",
-        "description": "current user の所有レコード数を artist_id ごとに集計して返す。\n\nArtistsPage 一覧の件数列専用。records 全件取得を避けて軽量化する。\n旧 `/api/artists/record-counts` を user-follows 配下に移設し (集計の単位が\nfollow と一致するため意味論として整合する)、同時に user_id でスコープを\n切るようにした。status='owned' のみ数える (want list は除外)。",
+        "description": "Return the current user's owned record count aggregated per artist_id.\n\nDedicated to the count column of the ArtistsPage list; avoids fetching all\nrecords. Moved here from the old `/api/artists/record-counts` because the\naggregation unit matches follows (semantically consistent under\nuser-follows), and scoped by user_id at the same time. Only status='owned'\nis counted (the want list is excluded).",
         "operationId": "list_record_counts_api_user_follows_record_counts_get",
         "responses": {
           "200": {
@@ -925,7 +925,7 @@
           "user-follows"
         ],
         "summary": "Follow Artist",
-        "description": "`artist_id` を current user の follow に追加する。\n\n`UserFollowRepository.upsert` を使うので冪等:\n- 既に active follow なら上書きで no-op、201 + 既存 artist\n- archived 行があれば archived_flag=false に戻して再 follow\n- 行が無ければ新規 INSERT\n\nartist が `artists` テーブルに無い場合は 404。UI 側で先に `POST /api/artists`\nで upsert する想定 (Spotify 検索結果のメタデータをそのまま投入する)。",
+        "description": "Add `artist_id` to the current user's follows.\n\nIdempotent because it uses `UserFollowRepository.upsert`:\n- already an active follow: overwrite is a no-op, 201 + existing artist\n- an archived row exists: reset archived_flag=false and re-follow\n- no row: new INSERT\n\n404 if the artist is not in the `artists` table. The UI is expected to\nupsert it first via `POST /api/artists` (passing the Spotify search result\nmetadata as-is).",
         "operationId": "follow_artist_api_user_follows_post",
         "requestBody": {
           "content": {
@@ -967,7 +967,7 @@
           "user-follows"
         ],
         "summary": "Unfollow Artist",
-        "description": "Spotify ID の artist を follow から外す (soft delete: archived_flag=true)。\n\narchived_flag を立てるだけなので「以前 follow してた」履歴は残る。\nlist_artist_ids は archived_flag=false のみ返すので、次の release sync は\nこのアーティストを対象から外す。\n\n無いものを消そうとしたら 404、既に archived なら 204 (冪等)。",
+        "description": "Unfollow the artist with this Spotify ID (soft delete: archived_flag=true).\n\nOnly sets archived_flag, so the \"previously followed\" history is kept.\nlist_artist_ids returns archived_flag=false rows only, so the next release\nsync excludes this artist.\n\n404 if there is nothing to remove; 204 if already archived (idempotent).",
         "operationId": "unfollow_artist_api_user_follows__artist_id__delete",
         "parameters": [
           {
@@ -1086,7 +1086,7 @@
           "name"
         ],
         "title": "ArtistCreate",
-        "description": "新規 artist 作成リクエスト。upsert 動作 (spotify_id 既存なら既存を返す)。\n\nPhase B-3 PR-2 の RecordFormModal が Spotify album を選んだ時、\nその album の artist がまだ DB に無い場合に呼び出す。"
+        "description": "Create-artist request; upserts (returns the existing row if spotify_id exists).\n\nCalled by the Phase B-3 PR-2 RecordFormModal when a Spotify album is\nselected and the album's artist is not yet in the DB."
       },
       "ArtistRead": {
         "properties": {
@@ -1151,7 +1151,7 @@
           "count"
         ],
         "title": "ArtistRecordCount",
-        "description": "ArtistsPage 一覧の件数列に渡す軽量行。\n\nrecords 本体は ArtistDetailModal を開くまで fetch しない方針のため、\n一覧では「N records」表示だけ別エンドポイント `/api/user-follows/record-counts`\nから先に取れるようにする (auth 必須、current user 所有 owned のみ集計)。"
+        "description": "Lightweight row for the count column of the ArtistsPage list.\n\nRecords themselves are not fetched until ArtistDetailModal opens, so the\nlist gets just the \"N records\" figure up front from the separate endpoint\n`/api/user-follows/record-counts` (auth required; counts only the current\nuser's owned records)."
       },
       "AuthUserRead": {
         "properties": {
@@ -1231,7 +1231,7 @@
           "track_name"
         ],
         "title": "FavoriteTrack",
-        "description": "ADR-006 §2.8: アルバム内の「お気に入り曲」1 件分。\n\n`spotify_track_id` は Spotify Get Album Tracks の id (manual 時は省略可)。\n`note` は曲ごとの短い所感 (裏ジャケに走り書きしたメモ)。"
+        "description": "ADR-006 §2.8: one \"favorite track\" within an album.\n\n`spotify_track_id` is the id from Spotify Get Album Tracks (optional for\nmanual records). `note` is a short per-track impression (like a note\nscribbled on the back cover)."
       },
       "HTTPValidationError": {
         "properties": {
@@ -1388,7 +1388,7 @@
           "ids"
         ],
         "title": "PinReorderRequest",
-        "description": "drag & drop で並び替えた pinned レコードの id 列。\n\n`ids` は user が現在 pin している全行を、ユーザが望む順序で並べたもの。\nbackend は 1..N で `pin_order` を再採番する。欠け/重複/未 pin 行混入は 409。"
+        "description": "The id sequence of pinned records after a drag & drop reorder.\n\n`ids` is every row the user currently has pinned, in the user's desired\norder. The backend renumbers `pin_order` as 1..N. Missing / duplicate /\nunpinned ids return 409."
       },
       "RecognitionResult": {
         "properties": {
@@ -1569,7 +1569,7 @@
           "is_read"
         ],
         "title": "ReleaseReadStatusUpdate",
-        "description": "`PATCH /api/releases/{spotify_id}/read` の body。\n\n既読 / 未読のトグル用。True で既読 (read_at が now)、False で未読\n(read_at が null)。"
+        "description": "Body of `PATCH /api/releases/{spotify_id}/read`.\n\nToggles read / unread. True marks as read (read_at = now), False marks as\nunread (read_at = null)."
       },
       "SpotifyAlbumSummary": {
         "properties": {
@@ -1632,7 +1632,7 @@
           "primary_artist_id"
         ],
         "title": "SpotifyAlbumSummary",
-        "description": "Spotify album search 結果の 1 件を表す DTO。\n\n`vinyl_records` への投入で必要なフィールドだけを露出する:\n`spotify_album_id` (= id) / `title` (= name) / `original_release_date` (= release_date)\n/ `image_url` / 表示用の `artist_names` / artist auto-upsert 用の `primary_artist_id`。\n\n`primary_artist_id` は album.artists[0].id (Spotify artist ID)。RecordFormModal が\nalbum 選択時に artists テーブルへ upsert する際、name 一致ではなく Spotify 正規 ID で\n識別するために用いる。album に artists が無いケース (極めて稀) のみ null。"
+        "description": "DTO for one Spotify album search result.\n\nExposes only the fields needed to insert into `vinyl_records`:\n`spotify_album_id` (= id) / `title` (= name) / `original_release_date` (= release_date)\n/ `image_url` / `artist_names` for display / `primary_artist_id` for artist auto-upsert.\n\n`primary_artist_id` is album.artists[0].id (Spotify artist ID). When\nRecordFormModal upserts into the artists table on album selection, it\nidentifies the artist by canonical Spotify ID rather than by name match.\nnull only in the (very rare) case where the album has no artists."
       },
       "SpotifyArtistSummary": {
         "properties": {
@@ -1663,7 +1663,7 @@
           "image_url"
         ],
         "title": "SpotifyArtistSummary",
-        "description": "Spotify artist search 結果の 1 件を表す DTO。\n\nArtistsPage の「フォロー追加」モーダルが Spotify から候補を引く時に使う。\n`upsert_artist` (POST /api/artists) と `follow_artist` (POST /api/user-follows)\nに渡せるよう、`spotify_id` / `name` / `image_url` を露出する。"
+        "description": "DTO for one Spotify artist search result.\n\nUsed when the \"add follow\" modal on ArtistsPage pulls candidates from\nSpotify. Exposes `spotify_id` / `name` / `image_url` so the result can be\npassed to `upsert_artist` (POST /api/artists) and `follow_artist`\n(POST /api/user-follows)."
       },
       "SyncRunAccepted": {
         "properties": {
@@ -1686,7 +1686,7 @@
           "is_running"
         ],
         "title": "SyncRunAccepted",
-        "description": "`POST /api/releases/sync` のレスポンス (202 Accepted)。\n\nsync はバックグラウンド実行に切り出したため、件数などの結果は同期的に\n返さない。フロントは `is_running` を見てローディングし、`/sync-status` を\npolling して完了 / エラーを知る。\n- status=started: 今回ジョブを投入した\n- status=already_running: 既に実行中だったので投入をスキップした"
+        "description": "Response of `POST /api/releases/sync` (202 Accepted).\n\nSince the sync runs in the background, results such as counts are not\nreturned synchronously. The frontend shows a loading state based on\n`is_running` and polls `/sync-status` to learn about completion / errors.\n- status=started: a job was enqueued by this request\n- status=already_running: a sync was already running, so enqueueing was skipped"
       },
       "SyncRunRequest": {
         "properties": {
@@ -1717,7 +1717,7 @@
         },
         "type": "object",
         "title": "SyncRunRequest",
-        "description": "`POST /api/releases/sync` の任意 body。\n\n省略時は service 側で `today - 365d` / `today + 30d` を採用する。"
+        "description": "Optional body of `POST /api/releases/sync`.\n\nWhen omitted, the service falls back to `today - 365d` / `today + 30d`."
       },
       "SyncRunSummary": {
         "properties": {
@@ -1753,7 +1753,7 @@
           "first_error"
         ],
         "title": "SyncRunSummary",
-        "description": "直近に完走した sync ジョブの結果サマリ。\n\nsync_status の last_* (DB 永続) と違い in-memory 由来 (プロセス再起動で消える)。\nフロントが「partial: N ingested / rate limited」等の補足表示に使う。\nartists_succeeded < artists_total なら一部のアーティストが取り込めていない\n(rate limit で打ち切り or per-artist エラー)。"
+        "description": "Result summary of the most recently completed sync job.\n\nUnlike the last_* fields of sync_status (persisted in the DB), this is\nin-memory and lost on process restart. The frontend uses it for\nsupplementary text such as \"partial: N ingested / rate limited\".\nartists_succeeded < artists_total means some artists were not ingested\n(cut off by rate limiting, or a per-artist error)."
       },
       "SyncStatusRead": {
         "properties": {
@@ -1820,7 +1820,7 @@
           "is_running"
         ],
         "title": "SyncStatusRead",
-        "description": "`/api/releases/sync-status` のレスポンス。\n\nフロント Feed 側で「最終同期日時 / エラー状態」を表示するため (ADR-000 §314)。\nRow が無い (一度も sync していない) ケースでは last_* が null になる。"
+        "description": "Response of `/api/releases/sync-status`.\n\nLets the Feed show \"last synced at / error state\" (ADR-000 §314).\nWhen no row exists (never synced), the last_* fields are null."
       },
       "UserFollowCreate": {
         "properties": {
@@ -1836,7 +1836,7 @@
           "artist_id"
         ],
         "title": "UserFollowCreate",
-        "description": "`POST /api/user-follows` のリクエスト。\n\nartist は事前に `artists` テーブルに存在している必要がある (FK 制約)。\nUI 側は Spotify artist search → `POST /api/artists` (upsert) →\n本エンドポイント の 3 段で follow まで到達する想定。"
+        "description": "Request body of `POST /api/user-follows`.\n\nThe artist must already exist in the `artists` table (FK constraint).\nThe UI is expected to reach a follow in three steps: Spotify artist\nsearch → `POST /api/artists` (upsert) → this endpoint."
       },
       "ValidationError": {
         "properties": {
@@ -2234,7 +2234,7 @@
           "updated_at"
         ],
         "title": "VinylRecordRead",
-        "description": "ADR-006: response shape は catalog + ownership を flat に並べて維持。\n\n`id` は `user_collections.id` を返す (frontend からは 1 件の record と見える)。\n`favorite_tracks` は構造化リスト (position 昇順)。"
+        "description": "ADR-006: the response shape stays flat, combining catalog + ownership.\n\n`id` is `user_collections.id` (the frontend sees it as a single record).\n`favorite_tracks` is a structured list (ascending by position)."
       },
       "VinylRecordUpdate": {
         "properties": {
@@ -2444,7 +2444,7 @@
         },
         "type": "object",
         "title": "VinylRecordUpdate",
-        "description": "ADR-002 寛容 PUT: omit したフィールドは no-op、明示的に null/`[]` を\n送った場合のみ clear する (`exclude_unset` 経由)。"
+        "description": "ADR-002 lenient PUT: omitted fields are a no-op; a field is cleared only\nwhen null/`[]` is sent explicitly (via `exclude_unset`)."
       }
     }
   }
