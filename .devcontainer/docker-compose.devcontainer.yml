@@ -12,5 +12,5 @@ services:
       dockerfile: Dockerfile
     privileged: true
     volumes:
-      - ..:/workspaces/jazz-life:cached
+      - ..:/workspaces/${localWorkspaceFolderBasename}:cached
     command: sleep infinity

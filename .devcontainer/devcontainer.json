@@ -4,7 +4,7 @@
     "docker-compose.devcontainer.yml"
   ],
   "service": "workspace",
-  "workspaceFolder": "/workspaces/jazz-life",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "shutdownAction": "stopCompose",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
@@ -70,6 +70,6 @@
   // Run backend / frontend by hand in separate terminals with `cd app/backend && make dev` /
   // `cd app/frontend && make dev` so they stay in the foreground.
   // Secrets are already in the workspace shell, so compose interpolation passes them through even when started later.
-  "postCreateCommand": "cd /workspaces/jazz-life/app && docker compose up -d db",
-  "postStartCommand": "cd /workspaces/jazz-life/app && docker compose up -d db"
+  "postCreateCommand": "cd ${containerWorkspaceFolder}/app && docker compose up -d db",
+  "postStartCommand": "cd ${containerWorkspaceFolder}/app && docker compose up -d db"
 }
