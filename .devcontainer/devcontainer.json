@@ -66,10 +66,10 @@
       "description": "Fernet key for encrypting Spotify refresh_token"
     }
   },
-  // 起動時間短縮のため Codespace 起動では db のみ自動で上げる。
-  // backend / frontend は別ターミナルで `cd app/backend && make dev` /
-  // `cd app/frontend && make dev` をそれぞれ手動で叩いてフォアグラウンドで動かす。
-  // secrets は workspace shell に揃っているので、後から起動しても compose interpolation で渡る。
+  // To keep startup fast, a Codespace only brings up db automatically.
+  // Run backend / frontend by hand in separate terminals with `cd app/backend && make dev` /
+  // `cd app/frontend && make dev` so they stay in the foreground.
+  // Secrets are already in the workspace shell, so compose interpolation passes them through even when started later.
   "postCreateCommand": "cd /workspaces/jazz-life/app && docker compose up -d db",
   "postStartCommand": "cd /workspaces/jazz-life/app && docker compose up -d db"
 }

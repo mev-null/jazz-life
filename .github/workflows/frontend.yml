@@ -37,8 +37,8 @@ jobs:
       - name: typecheck
         run: npm run typecheck
 
-      # backend/openapi.json から再生成して、コミット済み generated/ と一致するか確認する。
-      # backend で API が変わった後に frontend 側で `make gen` を回し忘れたケースを検出する。
+      # Regenerate from backend/openapi.json and check it matches the committed generated/.
+      # Catches the case where the backend API changed but `make gen` was not re-run on the frontend.
       - name: regenerate types
         run: npm run gen
 

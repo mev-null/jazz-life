@@ -1,10 +1,10 @@
 # Devcontainer-only compose stack.
-# VS Code / Codespaces はここで定義する `workspace` サービスにアタッチする。
-# アプリ本体 (db / backend / frontend) は ../app/docker-compose.yml で
-# workspace コンテナ内の docker daemon (docker-in-docker feature が提供) を
-# 使って別プロジェクトとして起動する。bind mount の path 解決は workspace
-# コンテナのファイルシステム上で完結するため、Codespaces 環境でも
-# ../app/backend/app のような相対パスがそのまま効く。
+# VS Code / Codespaces attach to the `workspace` service defined here.
+# The app itself (db / backend / frontend) is started as a separate compose project from
+# ../app/docker-compose.yml, using the docker daemon inside the workspace container
+# (provided by the docker-in-docker feature). Bind-mount paths are resolved on the
+# workspace container's own filesystem, so relative paths such as ../app/backend/app
+# work unchanged in Codespaces.
 services:
   workspace:
     build:

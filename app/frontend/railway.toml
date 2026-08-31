@@ -1,16 +1,6 @@
-# Railway service config (frontend).
-#
-# このファイルは Railway service "frontend" の rootDirectory (= app/frontend) 直下に
-# 置かれている。Railway は deploy 時にこのファイルを読み、サービス設定を上書きする。
-#
-# rootDirectory 自体は Railway service-level の設定で、このファイルでは指定できない。
-# rootDirectory は Railway dashboard / `railway environment edit --service-config` で
-# "app/frontend" 維持されている。
-#
-# 背景: backend と対称的に、frontend も build 設定をコードで pin しておく。frontend
-# は Railpack auto-detect でも Dockerfile を引けていたが、明示しておけば dashboard
-# 設定が消えても再現できる。watchPatterns で backend の変更で frontend が無駄に
-# auto-deploy されるのも防ぐ。
+# Railway service config for the frontend service (rootDirectory = app/frontend).
+# Pins the build to the Dockerfile builder so the setup is reproducible without dashboard settings.
+# watchPatterns limits auto-deploys to changes under this service's directory.
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"

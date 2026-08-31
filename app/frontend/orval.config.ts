@@ -1,10 +1,10 @@
 import { defineConfig } from "orval";
 
-// jazz-life の OpenAPI spec から TypeScript 型 + React Query hooks を生成する。
-// spec は backend が所有する `app/backend/openapi.json` を読む。backend 未起動でも
-// make gen / CI で型生成が可能。spec を更新するには `make spec` で backend の
-// export スクリプトを呼ぶ。
-// 生成先: src/api/generated/<tag>/<tag>.ts （tags-split）と src/api/generated/model/*.ts。
+// Generate TypeScript types + React Query hooks from the jazz-life OpenAPI spec.
+// Reads the backend-owned `app/backend/openapi.json`, so `make gen` / CI can generate
+// types without a running backend. To refresh the spec, run `make spec`, which calls
+// the backend's export script.
+// Output: src/api/generated/<tag>/<tag>.ts (tags-split) and src/api/generated/model/*.ts.
 export default defineConfig({
   jazzlife: {
     input: {
