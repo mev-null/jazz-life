@@ -89,7 +89,7 @@ If you would like to try the real thing with your own Spotify account, open an i
 
 ## How it was built (AI-assisted)
 
-This project was developed spec-first with an AI coding assistant (Claude Code). I wrote the requirements and the ADRs, decided the architecture, the schema and the trade-offs, and reviewed every change; a large share of the implementation and test code was generated from those specifications and then iterated on. The ADRs in [`docs/`](docs/README.md) are the record of what was decided and why — that is the part of the repository I would point a reviewer to first.
+This project was developed spec-first with an AI coding assistant (Claude Code). I wrote the requirements and the ADRs, decided the architecture, the schema and the trade-offs, and reviewed every change; a large share of the implementation and test code was generated from those specifications and then iterated on. The ADRs in [`docs/`](docs/README.md) are the record of what was decided and why — that is the part of the repository I would point a reviewer to first. The agent-facing side of that workflow is kept in the repository too: [`CLAUDE.md`](CLAUDE.md) is the session brief (rules, verification checklist, where to read first) and [`.claude/skills/pr-summary/`](.claude/skills/pr-summary/SKILL.md) drafts PR descriptions from the diff.
 
 ## Getting started
 

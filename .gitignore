@@ -45,3 +45,6 @@ Thumbs.db
 # ---------- Private tooling (never committed) ----------
 newsletter/recipients.txt
 newsletter/send.py
+
+# Claude Code: machine-specific permission allow-list stays local
+.claude/settings.local.json
