@@ -1,5 +1,9 @@
 # ADR-005: Railway デプロイ準備（env 駆動化 + Frontend 本番ビルド）
 
+> **Summary (English).** Prepares the first production deployment without forking the code: every environment difference becomes an env var (`CORS_ALLOW_ORIGINS`, `COOKIE_SECURE` / `COOKIE_SAMESITE` with a validator that enforces `Secure` for `SameSite=None`, `FRONTEND_BASE_URL`, `SPOTIFY_REDIRECT_URI`, `VITE_API_BASE`, `VITE_ALLOWED_HOSTS`); `DATABASE_URL` is normalized from `postgres://` to `postgresql+psycopg://`; the frontend Dockerfile becomes multi-stage (Vite dev server vs. nginx-served static build); the app-side Spotify allow-list is removed in favour of the Spotify dashboard's *Users and Access* list; migrations keep running from the container entrypoint; the backend must run as a single replica because OAuth state is process-local; `/docs` can be hidden with `EXPOSE_OPENAPI_DOCS=false`. The env checklist from §3.7 now lives in [DEVELOPMENT.md](./DEVELOPMENT.md).
+>
+> *The body of this document is in Japanese. See [docs/README.md](./README.md) for the index of all design documents.*
+
 **Status**: Proposed | **Date**: 2026-05-13
 **Related**: [ADR-000](./000-pre-adr.md) §11 / §14 / §15, [ADR-002](./002-phase-b-decisions.md) §2.1（PostgreSQL 採用）
 

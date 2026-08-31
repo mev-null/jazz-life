@@ -1,7 +1,11 @@
 # ADR-012: On This Day — 日次ピックと蓄積メタデータ
 
+> **Summary (English).** A proposal (not implemented) for a quiet "Now On Air" ticker showing a classic album released on today's date decades ago. A daily batch selects from a curated `featured_albums.json` (matching month and day), persists the pick to a `daily_picks` table (unique per date) so picks are reproducible and accumulate as material for a future "monthly personal magazine", and exposes `GET /api/daily-pick`. Phase 1 is text only (no 30-second preview). Open questions cover the candidate source, behaviour on days without a match (stay silent), tie-breaking (oldest wins), placement relative to the Feed's "today" label and click behaviour.
+>
+> *The body of this document is in Japanese. See [docs/README.md](./README.md) for the index of all design documents.*
+
 **Status**: Proposed | **Date**: 2026-05-13
-**Related**: ADR-011 (雑誌的デザインシステム §2.7 Feed), 999-vision.md (Phase 6 月刊個人誌)
+**Related**: UI 設計原則（雑誌的デザインシステム。ADR-990、未公開）§2.7 Feed, プロダクトビジョン（未公開）Phase 6 月刊個人誌
 
 ---
 
@@ -20,7 +24,7 @@
 
 ## 1.1 なぜ作るか
 
-「**今日**」を中心軸にしたジャズライフを編集する (ADR-011 §2.7「上が未来 / 中央が今日 / 下が過去」) という思想を、**過去側にもう一段拡張する** ための機能。
+「**今日**」を中心軸にしたジャズライフを編集する (UI 設計原則 §2.7「上が未来 / 中央が今日 / 下が過去」) という思想を、**過去側にもう一段拡張する** ための機能。
 
 具体的には:
 
@@ -29,7 +33,7 @@
 これによって:
 
 - 開いたその日に「Kind of Blue は 1959 年の今日リリース」のような偶発的な発見が生まれる
-- 「**時間が編集者になる**」(ADR-011 §1.2 原則 2) を体感する仕組みになる
+- 「**時間が編集者になる**」([ADR-003](./003-artist-management.md) §1.2 原則 2) を体感する仕組みになる
 - 日々のピックをデータとして残せば、**過去に何が選ばれたか** が蓄積され、Phase 6「月刊個人誌」の素材として再利用できる
 
 ## 1.2 雑誌としてのメタファ
@@ -39,7 +43,7 @@
 ジャケット棚 (Home) / Feed (今月の予定) / アーティスト一覧 という静的な情報構造に、
 **時間の流れの感触** を一筆加える。
 
-ADR-011 §2.5 の「動きは情報の伝達のためだけに使う」原則からすると、
+UI 設計原則 §2.5 の「動きは情報の伝達のためだけに使う」原則からすると、
 ticker の横スクロールは「時間が流れていることそのもの」を伝達する動きなので、例外的に許容される。
 
 ---
@@ -49,7 +53,7 @@ ticker の横スクロールは「時間が流れていることそのもの」�
 ## 2.1 ユーザー体験 (Phase 1 = テキストのみ)
 
 - Feed (もしくは共通ヘッダ) の右上に小さく `NOW ON AIR · Kind of Blue (1959-08-17) — Miles Davis` 等を表示
-- フォント: サンセリフ体、`text-xs uppercase tracking-wider` (ADR-011 §2.1 メタ情報スタイル)
+- フォント: サンセリフ体、`text-xs uppercase tracking-wider` (UI 設計原則 §2.1 メタ情報スタイル)
 - 動き: 右→左に CSS `@keyframes translateX`、`overflow-hidden` で切り取り
 - クリック挙動: 暫定で「何もしない」(後述 Open Questions)
 - 今日に対応する pick がない日は何も表示しない (沈黙する自由を残す)
@@ -111,7 +115,7 @@ ticker の横スクロールは「時間が流れていることそのもの」�
 
 ## 2.5 フロントエンドの配置
 
-- ADR-011 §2.7 で Feed の上部に「今日」のラベルが既にある (現状 `text-right text-lg italic`)
+- UI 設計原則 §2.7 で Feed の上部に「今日」のラベルが既にある (現状 `text-right text-lg italic`)
 - Now On Air ticker をどう共存させるかは Open Questions §A4
 - 配置候補: Feed ページ右上 / 全画面共通ヘッダ / Home の隅に小さく
 
@@ -143,7 +147,7 @@ ticker の横スクロールは「時間が流れていることそのもの」�
    - (a) 何も表示しない (沈黙)
    - (b) 最も近い日付の名盤にフォールバック
    - (c) ランダムな名盤
-   - **暫定推奨**: (a) — ADR-011 「静かである」原則に従い、無理に何かを流さない
+   - **暫定推奨**: (a) — UI 設計原則の「静かである」原則に従い、無理に何かを流さない
 3. **複数候補の選択ルール**
    - (a) 最も古い (= 何十年前感が強い)
    - (b) ランダム
@@ -182,7 +186,7 @@ ticker の横スクロールは「時間が流れていることそのもの」�
 
 ## §3. なぜ `releases` テーブルを使い回さないか
 
-- `releases` は「**フォロー中アーティストの新譜通知**」用 (ADR-003 / vision.md)、つまり**未来〜近い過去の流動的なフィード**
+- `releases` は「**フォロー中アーティストの新譜通知**」用 ([ADR-003](./003-artist-management.md))、つまり**未来〜近い過去の流動的なフィード**
 - `daily_picks` は「**歴史的事実の静的スナップショット**」で、性格が全く違う
 - 同じテーブルに混ぜると「is_read」「artist_id (フォロー対象?)」などの意味が壊れる
 - 別テーブルに分けることで、`daily_picks` 側で素直なスキーマ進化ができる
@@ -199,7 +203,7 @@ ticker の横スクロールは「時間が流れていることそのもの」�
 
 ### Positive
 
-- ADR-011 「時間が編集者になる」を過去側へ拡張する具体的な装置
+- 「時間が編集者になる」([ADR-003](./003-artist-management.md) §1.2 原則 2) を過去側へ拡張する具体的な装置
 - 日々のピック蓄積が Phase 6 (月刊個人誌) の素材として自然に成長する
 - 候補リスト (featured_albums.json) を育てる楽しみが運用に生まれる
 

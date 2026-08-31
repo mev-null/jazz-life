@@ -1,5 +1,9 @@
 # ADR-007: releases を catalog + release_read_states に分離 + 配信スコープを follow でフィルタ
 
+> **Summary (English).** Applies the ADR-006 pattern to releases: `releases` stays a shared catalog synced from Spotify, and a new `release_read_states (user_id, release_spotify_id, read_at)` table holds per-user read state — a row means "read". `GET /api/releases` now returns only releases of artists the current user follows (`archived_flag = false`), joined with that user's read state, while the URL and response shape (`is_read` / `read_at`) are unchanged. The old "preserve `is_read` on upsert" logic disappears and a hand-written migration drops the old columns. A generic `feed_read_state(kind, item_id)` table is rejected for lack of foreign-key integrity. Lists repository/service changes and the tests that pin the behaviour.
+>
+> *The body of this document is in Japanese. See [docs/README.md](./README.md) for the index of all design documents.*
+
 **Status**: Accepted | **Date**: 2026-05-13
 **Related**: [ADR-001](./001-phase-a-revisions.md) §2.2（元案の feed_read_state）, [ADR-003](./003-artist-management.md) §1.2 原則 1 / 7（主従の反転、物質性の度合いがメモの粒度を決める）, [ADR-005](./005-railway-deploy-prep.md) §2.10（運用ガード）, [ADR-006](./006-records-user-scope-schema.md)（catalog/ownership 2 層分離パターン）
 
@@ -75,7 +79,7 @@ ORDER BY releases.release_date DESC
 
 - `kind` 値ごとに参照先テーブルが変わるため `item_id` 列に FK を張れず、参照整合性が弱い
 - ADR-006 の `vinyl_records` / `user_collections` と同じ 2 層分離パターンに揃えることでコードベースの一貫性が出る
-- vision.md §補足「**MVP では過剰な一般化はしない。具体的なものを作りながら抽象を見出す**」と整合
+- プロダクトビジョンの補足「**MVP では過剰な一般化はしない。具体的なものを作りながら抽象を見出す**」と整合
 - `concerts` の既読は backend 未実装（localStorage で扱う）なので、将来 concerts catalog が backend に降りる時点で `concert_read_states` を別 ADR で別途起こす方が局所的
 
 ---

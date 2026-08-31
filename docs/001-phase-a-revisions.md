@@ -1,5 +1,9 @@
 # 001. Phase A における設計変更の集約
 
+> **Summary (English).** A snapshot of the decisions made while building the Phase A frontend mock: `vinyl_records` gains `original_release_date` (`"YYYY"` or `"YYYY-MM"`) and `favorite_tracks`; `rating` and `purchase_price` stay in the schema but are hidden in the UI; feed read/unread state is kept in `localStorage` in the mock with a plan for `read_at` columns or a `feed_read_state` table; the write API is fixed as `POST /api/records`, `PUT /api/records/{id}` and `PUT /api/records/{id}/jacket` with server-side id assignment; jacket images are stored on the local filesystem and resized with Pillow; artist images fall back to an initials avatar. Ends with a Phase B checklist. Partly superseded by ADR-002 (UUID v7, lenient PUT) and ADR-007 (read state as its own table).
+>
+> *The body of this document is in Japanese. See [docs/README.md](./README.md) for the index of all design documents.*
+
 **Status**: Accepted（Phase A 完了時点でのスナップショット）
 **Date**: 2026-05-10
 **Relates to**: [000-pre-adr.md](./000-pre-adr.md) §4（型契約）, §12（データモデル）, §17（API）, §19（将来拡張）
@@ -66,7 +70,7 @@ class VinylRecord(SQLModel, table=True):
 
 Feed（releases / concerts）に既読／未読の状態管理を追加する。
 
-- **mock 実装**: localStorage の `jazz-life:read` キーに、`${kind}:${id}` 形式のキーを Set として保存する（[src/lib/useReadState.ts](../app/frontend/src/lib/useReadState.ts) 参照）。
+- **mock 実装**: localStorage の `jazz-life:read` キーに、`${kind}:${id}` 形式のキーを Set として保存する（当時の `src/lib/useReadState.ts`。ADR-013 で撤去済み）。
 - **キー規約**: `release:{spotify_id}` および `concert:{concert.id}`。
 - **挙動**: 行クリックで自動的に既読化し、詳細モーダル内に「mark as unread」操作を提供する。
 

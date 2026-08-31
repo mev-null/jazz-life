@@ -1,8 +1,12 @@
 # ADR-003: アーティスト管理の3層構造と体験のライフサイクル
 
+> **Summary (English).** Part 1 sets the product philosophy in seven principles — records come first and artists are a by-product; time, not a follow limit, prunes the list (follows without activity for two years fade); ownership is permanent while interest is fluid; only deliberate actions (adding a record, opening an artist page) update a relationship; Home shows only physically owned records; the artist page is where Feed meets Collection; the degree of physicality decides the granularity of notes — and it explicitly rejects algorithmic recommendation. Part 2 splits artists into a master catalog (`artists`), per-user `user_follows` (follow + pin + `archived_flag` decay) and `vinyl_records` with an `owned`/`wanted` status, adds concert attendance tables, and lists APIs and flows. Part 3 is the PR plan with code patterns (auto-follow on record creation, the 5-pin constraint, the "touch" logic). Appendices record rationale, alternatives considered, deliberately deferred decisions and open questions.
+>
+> *The body of this document is in Japanese. See [docs/README.md](./README.md) for the index of all design documents.*
+
 **Status**: Proposed | **Date**: 2026-05-11
 **Supersedes**: ADR-001 §1 における "followed" 概念
-**Related**: ADR-001, ADR-002, vision.md
+**Related**: ADR-001, ADR-002, プロダクトビジョン（未公開）
 
 ---
 
@@ -24,7 +28,7 @@
 このアプリは「ジャズリスナーのコレクション + Feed ダッシュボード」だが、その根底にあるのは
 **自分の生活を編集する場所** という設計思想である。
 
-vision.md の核:
+プロダクトビジョンの核:
 > コンテキストとして好きな本、音楽、場所を **溜めていって**、そこから新たな提案をもらう
 
 このアプリが他の音楽管理アプリと根本的に違うのは、以下の7つの原則を貫いていることである。
@@ -503,7 +507,7 @@ class ConcertWithAttendanceRead(BaseModel):
 ### artists をマスタカタログにする理由
 - マスタ化により検索の UX が向上 (DB 内 LIKE で即時応答、Spotify API は補完だけ)
 - artists の責務が「マスタ」と「フォロー一覧」で混ざっていた問題を解消
-- 複数ユーザー対応の伏線 (vision.md Phase 6)
+- 複数ユーザー対応の伏線 (プロダクトビジョン Phase 6)
 
 ### user_follows に pin を統合する理由
 - 「フォローしていないのにピン留め」が DB レベルで不可能になる
@@ -555,7 +559,7 @@ class ConcertWithAttendanceRead(BaseModel):
 ### 公演マスタへの手動追加を許す理由
 - スクレイピング範囲外の過去公演を記録できないと、振り返りの価値が薄れる
 - 「2015 年に行った Bill Frisell」を残せるアプリでありたい
-- vision.md Phase 4「時系列での文脈の振り返り」の MVP 実装
+- プロダクトビジョン Phase 4「時系列での文脈の振り返り」の MVP 実装
 
 ### user_concert_attendances を別テーブルにする理由
 - concerts はマスタ、ユーザー個別状態は分離するべき
@@ -563,7 +567,7 @@ class ConcertWithAttendanceRead(BaseModel):
 
 ### アーティストページから Collection への動線を作る理由
 - 情報を見て心が動いた瞬間に、最小の操作で記録に残せる
-- vision.md の「情報を受信して → 興味を表明して → 行動して → 記録に残る」流れを実現
+- プロダクトビジョンの「情報を受信して → 興味を表明して → 行動して → 記録に残る」流れを実現
 - アーティストページが Feed と Collection の交差点になる
 
 ### アルゴリズム推薦を採用しない理由 (思想的判断)

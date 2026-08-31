@@ -1,5 +1,9 @@
 # ADR-018: コスト最小化・脱 Railway（サービス分散で音声認識だけをボトルネック化）
 
+> **Summary (English).** A plan to leave Railway's three always-on services for free tiers: frontend to Cloudflare Pages (or Netlify/Vercel), backend to a scale-to-zero host (Render free tier or Fly.io), Postgres to Neon — with only env values changing, thanks to ADR-005's env-driven design. Release sync stays a manual, authenticated `POST /api/releases/sync` (no cron, no APScheduler — the scheduler dependency was never wired up), which suits scale-to-zero. Audio recognition (AudD) is isolated as the single remaining paid decision, with three options: switch to ACRCloud's free tier, keep paying AudD, or gate the feature. Accepts cold starts and keeps a single replica.
+>
+> *The body of this document is in Japanese. See [docs/README.md](./README.md) for the index of all design documents.*
+
 **Status**: Proposed | **Date**: 2026-05-31
 **Related**: [ADR-005](./005-railway-deploy-prep.md)（env 駆動デプロイ）, [ADR-016](./016-audio-recognition-on-the-hunt.md)（音声認識）, [ADR-002](./002-phase-b-decisions.md) §2.1（PostgreSQL 採用）, [ADR-006](./006-records-user-scope-schema.md) / [ADR-007](./007-releases-user-scope.md)（user-scope）
 

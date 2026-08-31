@@ -1,5 +1,9 @@
 # ジャズ・アーティスト ダッシュボード 要件定義書
 
+> **Summary (English).** The original requirements document for the MVP (v1.7, 2026-05-10): a personal "collection + feed" dashboard for a jazz listener with three screens — **Home** (a visual matrix of owned vinyl that flips over to show notes), **Feed** (new releases and Japan concerts for followed artists) and **Artists** (Spotify follow sync, manual entries, name aliases). It fixes the mock-first development approach (Phase A frontend mock → Phase B backend → Phase C scraping/integration), the hybrid type-contract strategy (hand-written types first, OpenAPI-generated types later), the initial data model (`artists`, `artist_aliases`, `releases`, `vinyl_records`, `venues`, `concerts`, `sync_status`), the Docker layout, the authentication approach and a risk register. Several sections are superseded by later ADRs — notably 002 (PostgreSQL, clean architecture, orval), 005 (auth allow-list, env handling) and 013 (Feed → Digging, concerts removed).
+>
+> *The body of this document is in Japanese. See [docs/README.md](./README.md) for the index of all design documents.*
+
 **バージョン**: v1.7 (MVP)
 **最終更新**: 2026-05-10
 

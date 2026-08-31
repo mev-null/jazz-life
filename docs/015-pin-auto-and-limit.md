@@ -1,7 +1,11 @@
 # ADR-015: ピンの auto-pin 化 / 上限 6 / view all owned-only
 
+> **Summary (English).** Lowers the pin limit from 8 to 6 (matching the mobile Home preview) in both backend and mock; auto-pins a record the moment it becomes owned (creation with `status=owned`, or a wanted → owned transition) if a slot is free — never on ordinary edits and never for wanted records; and makes "view all" owned-only via a status filter so counts and pagination exclude wanted records. When the shelf is full, the add form shows an inline hint that the new record will not appear on Home. The backend is the source of truth; no API shape change.
+>
+> *The body of this document is in Japanese. See [docs/README.md](./README.md) for the index of all design documents.*
+
 **Status**: Accepted | **Date**: 2026-05-30
-**Related**: [ADR-014](./014-record-pin-ui-relocation.md)（ピン UI を詳細モーダルへ移設・Home = ピン済み owned ショーケース）, [ADR-013](./013-digging-tab-and-concert-removal.md) §2.2（records 既定ソート `is_pinned DESC, pin_order ASC NULLS LAST, display_order ASC`）, [ADR-990](./990-ui-philosophy.md)（Home = 所有のショーケース）
+**Related**: [ADR-014](./014-record-pin-ui-relocation.md)（ピン UI を詳細モーダルへ移設・Home = ピン済み owned ショーケース）, [ADR-013](./013-digging-tab-and-concert-removal.md) §2.2（records 既定ソート `is_pinned DESC, pin_order ASC NULLS LAST, display_order ASC`）, UI 設計原則（Home = 所有のショーケース。ADR-990、未公開）
 **Supersedes**: [ADR-014](./014-record-pin-ui-relocation.md) §2.2 のピン上限 8 → **6**
 
 ---
@@ -11,7 +15,7 @@
 [ADR-014](./014-record-pin-ui-relocation.md) でピンは「Home に showcase する owned を選ぶ明示スイッチ」になり、Home はピン済み owned のみを表示する設計になった。運用してみて 2 点の課題が出た。
 
 1. **手動ピンの手間**: レコードを登録するたびに詳細モーダルを開いて ★ を押さないと Home に出ない。モバイルでは特に煩雑で、「棚に追加したのに Home に出ない」状態が初期体験を損ねていた。
-2. **view all に wanted が混入**: Home の view all（`RecordsAllModal` の `PaginatedBody`）が `status` 絞り込みなしで `GET /api/records` を叩いており、wanted レコードまで表示し件数・ページ数も全件で算出していた。Home / view all は所有のショーケース（owned のみ）であるべき（[ADR-990](./990-ui-philosophy.md)）。
+2. **view all に wanted が混入**: Home の view all（`RecordsAllModal` の `PaginatedBody`）が `status` 絞り込みなしで `GET /api/records` を叩いており、wanted レコードまで表示し件数・ページ数も全件で算出していた。Home / view all は所有のショーケース（owned のみ）であるべき（UI 設計原則）。
 
 加えて、ピン枠は「ひと目で見せる棚」であり、モバイルの Home プレビュー枚数（6）に上限を合わせるのが自然と判断した。
 
