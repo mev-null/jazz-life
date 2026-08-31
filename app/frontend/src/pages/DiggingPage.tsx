@@ -326,7 +326,7 @@ export function DiggingPage() {
                     aria-hidden
                     className="inline-block h-3 w-3 animate-spin rounded-full border border-ink-faint border-t-transparent"
                   />
-                  Spotify から新譜を取得中…
+                  Fetching new releases from Spotify…
                 </div>
               )}
               {releaseParts.upcoming.length > 0 && (

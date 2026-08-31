@@ -158,8 +158,8 @@ function PinToggleButton({ record }: PinToggleButtonProps) {
       }
       const msg =
         err instanceof Error && /pin limit/i.test(err.message)
-          ? `ピンは最大 ${PIN_LIMIT} 枚までです。`
-          : "ピンの更新に失敗しました。";
+          ? `You can pin up to ${PIN_LIMIT} records.`
+          : "Could not update the pin.";
       showToast(msg);
     },
     onSettled: () => {
@@ -177,7 +177,7 @@ function PinToggleButton({ record }: PinToggleButtonProps) {
         // すると onClick が発火せずモバイルで理由を出せないため、見た目だけ
         // 非活性にして onClick は生かす。
         if (atLimit) {
-          showToast(`ピンは最大 ${PIN_LIMIT} 枚までです。`);
+          showToast(`You can pin up to ${PIN_LIMIT} records.`);
           return;
         }
         togglePin.mutate();
@@ -185,7 +185,7 @@ function PinToggleButton({ record }: PinToggleButtonProps) {
       aria-label={pinned ? "Unpin" : "Pin"}
       aria-pressed={pinned}
       aria-disabled={atLimit}
-      title={atLimit ? `ピンは最大 ${PIN_LIMIT} 枚までです` : undefined}
+      title={atLimit ? `You can pin up to ${PIN_LIMIT} records` : undefined}
       className={`flex size-6 cursor-pointer items-center justify-center rounded-full text-[11px] leading-none shadow transition-colors ${
         pinned
           ? "bg-ink text-paper"

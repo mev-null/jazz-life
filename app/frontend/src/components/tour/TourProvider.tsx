@@ -369,7 +369,7 @@ function TourOverlay({
         >
           <span className="text-sm text-ink-mute">{step.title}</span>
           <span className="ml-3 text-xs italic text-ink-faint">
-            クリックで進む
+            Click to continue
           </span>
         </div>
       ) : (
@@ -412,11 +412,11 @@ function TourOverlay({
                 onClick={runAction}
                 className="cursor-pointer bg-ink px-4 py-2 text-paper transition-opacity hover:opacity-85"
               >
-                {step.actionLabel ?? "試す"}
+                {step.actionLabel ?? "Try it"}
               </button>
             ) : step.actionTarget && actionState === "running" ? (
               // 認識中は Next を出さず、進行を待たせる。
-              <span className="text-xs italic text-ink-faint">認識中…</span>
+              <span className="text-xs italic text-ink-faint">Recognizing…</span>
             ) : (
               <button
                 type="button"

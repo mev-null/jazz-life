@@ -631,7 +631,7 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
                 <div className="mt-3 max-h-72 overflow-y-auto border border-ink/10 bg-paper">
                   {USE_MOCK && !spotifyError && (
                     <div className="border-b border-ink/10 px-3 py-1.5 text-xs italic text-ink-faint">
-                      demo — サンプルの検索結果を表示しています
+                      demo — showing sample search results
                     </div>
                   )}
                   {spotifyError ? (
@@ -713,7 +713,7 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
                   type="text"
                   value={purchaseStore}
                   onChange={(e) => setPurchaseStore(e.target.value)}
-                  placeholder="ディスクユニオン..."
+                  placeholder="e.g. Local record shop"
                   autoComplete="off"
                   className={inputClass}
                 />
@@ -766,8 +766,8 @@ export function RecordFormModal({ mode, artists, followedArtists, onClose }: Pro
                 : "mt-6 text-xs italic text-ink-mute"
             }
           >
-            Home のピンは上限 {PIN_LIMIT} 枚です。これ以上は自動で Home に
-            出ないので、view all から ★ を入れ替えてください。
+            You can pin up to {PIN_LIMIT} records on Home. Anything beyond that
+            stays off Home until you swap a ★ from view all.
           </p>
         )}
 

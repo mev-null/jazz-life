@@ -38,8 +38,8 @@ export const TOUR_STEPS: TourStep[] = [
     // 導入は最終ステップ (end) と同じく、特定要素をスポットライトせず
     // 全面ディム + 上部カードで見せる。
     placement: "center",
-    title: "あなたのアナログ・コレクション",
-    body: "所有レコードのショーケースです。\nお気に入りの6枚をトップに大きく並べます。\nジャケットをクリックすると、盤情報・購入メモ・お気に入り曲まで見られます。",
+    title: "Your analog collection",
+    body: "A showcase of the records you own.\nYour six favorites sit large at the top.\nClick a jacket to see pressing details, purchase notes, and favorite tracks.",
   },
   {
     id: "digging",
@@ -47,7 +47,7 @@ export const TOUR_STEPS: TourStep[] = [
     selector: '[data-tour="nav-digging"]',
     placement: "bottom",
     title: "Digging",
-    body: "所有していないレコードの管理を行います。\n探している盤（On the hunt）・音声検索（Listen）・新譜フィード（Releases）の3つのタブをまとめています。",
+    body: "Everything you don't own yet lives here.\nThree tabs: records you're looking for (On the hunt), search by sound (Listen), and a feed of new releases (Releases).",
   },
   {
     id: "hunt",
@@ -55,8 +55,8 @@ export const TOUR_STEPS: TourStep[] = [
     selector: '[data-tour="hunt-list"]',
     navSelector: '[data-tour="subtab-hunt"]',
     placement: "bottom",
-    title: "On the hunt — 探求中リスト",
-    body: "「これから買いたい」レコードのウィッシュリストです。レコード屋でディグる時の探し物リストとして使い、手に入れたら所有（棚）へ移せます。",
+    title: "On the hunt — your wishlist",
+    body: "A wishlist of records you're hoping to buy. Use it as your shopping list when digging in a record shop; once you find one, move it to your shelf.",
   },
   {
     id: "listen",
@@ -64,12 +64,12 @@ export const TOUR_STEPS: TourStep[] = [
     // 検索結果 (盤 + 認識結果のキャプション) をまるごとハイライトする。
     selector: '[data-tour="listen-area"]',
     navSelector: '[data-tour="subtab-listen"]',
-    actionLabel: "検索してみる",
+    actionLabel: "Try a search",
     actionTarget: '[data-tour="listen-disc"] button',
     // 盤を隠さないよう、カードは左側に寄せる。
     placement: "left",
-    title: "音声でレコードを探す",
-    body: "盤で流れている曲を音から検索できます（このデモでは録音せずサンプル曲を認識します）。\n下の「検索してみる」で実際に試せます。結果からそのまま「棚に迎え入れる」候補に追加できます。",
+    title: "Find a record by sound",
+    body: "Search for a record by the music playing (in this demo nothing is recorded — a sample track is recognized instead).\nTap “Try a search” below to see it in action. From the result you can add the record straight to the hunt.",
   },
   {
     id: "releases",
@@ -77,8 +77,8 @@ export const TOUR_STEPS: TourStep[] = [
     selector: '[data-tour="releases-feed"]',
     navSelector: '[data-tour="subtab-releases"]',
     placement: "top",
-    title: "新譜フィード",
-    body: "フォロー中アーティストの新譜を時系列で表示します。\ntoday を境に upcoming / past へ分かれ、既読の管理もできます。",
+    title: "New releases",
+    body: "New releases from the artists you follow, in date order.\nThey split into upcoming and past around today, and you can mark them as read.",
   },
   {
     id: "artists",
@@ -86,14 +86,14 @@ export const TOUR_STEPS: TourStep[] = [
     selector: '[data-tour="artists"]',
     navSelector: '[data-tour="nav-artists"]',
     placement: "bottom",
-    title: "アーティスト管理",
-    body: "フォロー中アーティストの一覧です。右上の「+ add」から Spotify 検索（デモはサンプル候補）でフォローを追加できます。",
+    title: "Artists",
+    body: "The artists you follow. Use “+ add” in the top right to search Spotify (the demo shows sample results) and follow more.",
   },
   {
     id: "end",
     route: "/",
     placement: "center",
-    title: "ツアーは以上です",
-    body: "レコードの追加は、Home の「view all」→「+」から手動入力、または Spotify アルバム検索で自動入力できます。あとは自由に触ってみてください。右上の「tour」からいつでも再生できます。",
+    title: "That's the tour",
+    body: "To add a record, go to Home → “view all” → “+” and enter it by hand, or let a Spotify album search fill it in. From here, explore freely. You can replay this tour anytime from “tour” in the top right.",
   },
 ];

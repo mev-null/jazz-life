@@ -22,7 +22,7 @@ export function AddRecordTile({
     <button
       type="button"
       onClick={onClick}
-      aria-label="レコードを追加"
+      aria-label="Add a record"
       className={`flex aspect-square cursor-pointer appearance-none items-center justify-center bg-transparent p-0 transition duration-200 hover:bg-ink/5 ${fillHeight ? "h-full" : "w-full"} ${visibility}`}
       style={{ border: "1px dashed rgba(26, 23, 20, 0.3)" }}
     >

@@ -2,7 +2,7 @@
   "name": "Analog Life",
   "short_name": "Analog Life",
   "description": "An almanac of records & releases.",
-  "lang": "ja",
+  "lang": "en",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

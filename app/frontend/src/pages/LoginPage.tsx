@@ -55,7 +55,7 @@ export function LoginPage() {
 
         {USE_MOCK ? (
           <p className="mt-12 text-xs italic text-ink-faint">
-            Demo — クリックでサンプルデータを表示します（Spotify 認証は不要）
+            Demo — click to explore with sample data (no Spotify login needed)
           </p>
         ) : (
           <p className="mt-12 text-xs italic text-ink-faint">invite-only</p>

@@ -96,7 +96,7 @@ export function HomePage() {
           <p className="text-sm text-ink-faint">loading…</p>
         )}
         {records.isError && (
-          <p className="text-sm text-ink-mute">読み込みに失敗しました</p>
+          <p className="text-sm text-ink-mute">Failed to load</p>
         )}
         {records.data &&
           (pinnedRecords.length > 0 ? (
@@ -129,9 +129,9 @@ export function HomePage() {
             // owned はあるが Home に固定されたものが無い状態。view all から
             // レコードを開いて ★ で固定するよう促す。
             <p className="mt-6 text-center text-sm italic text-ink-mute">
-              Home に固定されたレコードがありません。
+              Nothing is pinned to Home yet.
               <br />
-              view all からレコードを開き ★ で固定してください。
+              Open a record from view all and pin it with ★.
             </p>
           ) : (
             // まだ 1 枚も owned が無い。最初の追加導線を目立たせる。
@@ -143,7 +143,7 @@ export function HomePage() {
                 />
               </div>
               <p className="mt-6 text-center text-sm italic text-ink-mute">
-                まだレコードがありません。最初の 1 枚を追加してください。
+                No records yet. Add your first one.
               </p>
             </>
           ))}
