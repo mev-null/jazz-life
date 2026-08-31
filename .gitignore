@@ -23,7 +23,7 @@ yarn-error.log*
 .env.*.local
 !.env.example
 
-# ---------- App data (SQLite 永続化先) ----------
+# ---------- App data (jacket uploads etc.; DB lives in a named volume) ----------
 app/data/*
 !app/data/.gitkeep
 
@@ -39,5 +39,9 @@ app/data/*
 .DS_Store
 Thumbs.db
 
-# NOTE: frontend/src/types/api.generated.ts は ADR §4 に従いコミット対象。
-#       ここでは ignore しない。
+# NOTE: app/backend/openapi.json and app/frontend/src/api/generated/ are committed
+#       on purpose (ADR-002 §2.7). Do not ignore them here.
+
+# ---------- Private tooling (never committed) ----------
+newsletter/recipients.txt
+newsletter/send.py
